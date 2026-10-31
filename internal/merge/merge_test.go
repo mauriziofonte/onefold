@@ -22,6 +22,7 @@ import (
 	"github.com/mauriziofonte/onefold/internal/fsx"
 	"github.com/mauriziofonte/onefold/internal/sparsehash"
 	"github.com/mauriziofonte/onefold/internal/testfix"
+	"golang.org/x/text/unicode/norm"
 )
 
 var (
@@ -503,5 +504,34 @@ func TestSpellingsOfOneFolder(t *testing.T) {
 	}
 	if len(r.Excluded) != 1 || r.Excluded[0].Rule != catalog.ReasonExcludePath {
 		t.Fatalf("excluded %+v", r.Excluded)
+	}
+}
+
+// Names that differ only in case or Unicode normalization are one name on
+// the usual Mac and Windows volumes: two such files from two inputs must
+// both reach the output under distinct names, on every system.
+func TestNamesOneVolumeConfuses(t *testing.T) {
+	root := testfix.TempDir(t)
+	B, C, O := filepath.Join(root, "B"), filepath.Join(root, "C"), filepath.Join(root, "O")
+	write(t, filepath.Join(B, "Café.txt"), "nfc", t2010)  // NFC
+	write(t, filepath.Join(C, "Café.txt"), "nfd", t2010) // NFD
+	write(t, filepath.Join(B, "Notes.txt"), "upper", t2010)
+	write(t, filepath.Join(C, "notes.txt"), "lower", t2010)
+	r := run(t, opts([]string{B, C}, O, true))
+	if r.Missing() != 0 || len(r.Copies) != 4 {
+		t.Fatalf("copies=%d missing=%d failed=%v", len(r.Copies), r.Missing(), r.Failed)
+	}
+	seen := map[string]string{}
+	for _, c := range r.Copies {
+		k := strings.ToLower(norm.NFC.String(c.Rel))
+		if prev, dup := seen[k]; dup {
+			t.Errorf("%s and %s are one name on a Mac or Windows volume", prev, c.Rel)
+		}
+		seen[k] = c.Rel
+		a, _ := os.ReadFile(c.SrcPath)
+		b, err := os.ReadFile(filepath.Join(O, filepath.FromSlash(c.Rel)))
+		if err != nil || !bytes.Equal(a, b) {
+			t.Errorf("%s: copy differs from %s (%v)", c.Rel, c.SrcPath, err)
+		}
 	}
 }
