@@ -137,7 +137,7 @@ Two operations delete source files, both only when asked explicitly, both dry ru
 
 ### 3.2 Writes are atomic, idempotent and never replace
 
-- Every file is built under a temporary name in its destination directory and published with a rename that refuses to replace an existing file (`fsx.RenameNoReplace`: `renameat2(RENAME_NOREPLACE)` on Linux, `MoveFileEx` without `MOVEFILE_REPLACE_EXISTING` on Windows). A destination that appeared meanwhile is never overwritten; the action counts as skipped.
+- Every file is built under a temporary name in its destination directory and published with a rename that refuses to replace an existing file (`fsx.RenameNoReplace`: `renameat2(RENAME_NOREPLACE)` on Linux, `renamex_np(RENAME_EXCL)` on macOS, `MoveFileEx` without `MOVEFILE_REPLACE_EXISTING` on Windows). A destination that appeared meanwhile is never overwritten; the action counts as skipped.
 - `apply` and `export-text` skip a destination that exists (silvering changes the size, so the test is existence, not size). Running them again finishes an interrupted run.
 - `merge` never moves, renames, overwrites or deletes an existing output file; it deletes only its own `*.onefold-tmp` leftovers.
 - `push` never overwrites a remote file: same size = skipped (resume), different size = conflict (listed, exit 1).
@@ -1493,7 +1493,7 @@ Units are bytes (apply, push, merge copies, verify) or items (catalog, rearrange
 
 ### 24.1 `fsx`
 
-- `RenameNoReplace(src, dst)`: Linux `renameat2(..., RENAME_NOREPLACE)`; Windows `MoveFileEx` without `MOVEFILE_REPLACE_EXISTING`, with `MOVEFILE_WRITE_THROUGH` and the `\\?\` prefix for long paths; where the platform call is unsupported (some filesystems, other OSes) a hard link then removal of the source, and as the last resort a stat-then-rename (not atomic: only where neither primitive exists). An existing destination returns `fsx.ErrExists`. Cross-volume renames fail (rearrange relies on it).
+- `RenameNoReplace(src, dst)`: Linux `renameat2(..., RENAME_NOREPLACE)`; macOS `renamex_np(..., RENAME_EXCL)` (APFS, HFS+); Windows `MoveFileEx` without `MOVEFILE_REPLACE_EXISTING`, with `MOVEFILE_WRITE_THROUGH` and the `\\?\` prefix for long paths; where the platform call is unsupported (some filesystems, other OSes) a hard link then removal of the source, and as the last resort a stat-then-rename (not atomic: only where neither primitive exists). An existing destination returns `fsx.ErrExists`. Cross-volume renames fail (rearrange relies on it). `TestRenameNoReplaceNative` proves the one-call primitive on each CI system.
 - Temp names: `TempSuffix = ".onefold-tmp"`, `TempFor(dst, keepExt)`, `IsTemp(name)` (section 6.6).
 - `OpenUncached(path)` and `AlignedBuffer(n)`: reads that bypass the OS cache (merge `-verify-uncached`).
 - `LinkNoReplace(src, dst)`: a hard link that refuses an existing name (`os.Link`), `ErrCrossVolume` across volumes (`apply -link`, section 14.5).
