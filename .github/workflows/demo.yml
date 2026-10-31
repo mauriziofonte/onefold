@@ -162,8 +162,19 @@ jobs:
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
         run: |
-          git add assets/demo
-          if git diff --cached --quiet; then echo "GIFs unchanged"; exit 0; fi
-          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit -m "docs: render the demo GIFs"
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}"
+          url="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          # the branch may have moved while the GIFs rendered: commit only the
+          # GIFs on top of its current tip (the rest of this checkout is left
+          # out of the index), retrying if it moves again
+          for attempt in 1 2 3; do
+            git fetch -q --depth=1 "$url" "refs/heads/${BRANCH}"
+            git reset -q --mixed FETCH_HEAD
+            git add assets/demo
+            if git diff --cached --quiet; then echo "GIFs unchanged"; exit 0; fi
+            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "docs: render the demo GIFs"
+            if git push -q "$url" "HEAD:refs/heads/${BRANCH}"; then exit 0; fi
+            echo "push attempt $attempt rejected, retrying"
+            sleep $((attempt * 5))
+          done
+          exit 1
