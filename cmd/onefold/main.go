@@ -23,6 +23,7 @@ import (
 	"github.com/mauriziofonte/onefold/internal/catalog"
 	"github.com/mauriziofonte/onefold/internal/config"
 	"github.com/mauriziofonte/onefold/internal/materialize"
+	"github.com/mauriziofonte/onefold/internal/meta"
 	"github.com/mauriziofonte/onefold/internal/plan"
 	"github.com/mauriziofonte/onefold/internal/planreport"
 	"github.com/mauriziofonte/onefold/internal/remote"
@@ -351,6 +352,7 @@ func sortedKeys[V any](m map[string]V) []string {
 func fatal(code int, err error) {
 	dlog("fatal (exit %d): %v", code, err)
 	fmt.Fprintln(os.Stderr, "error:", err)
+	meta.CloseExifReaders()
 	os.Exit(code)
 }
 
@@ -626,6 +628,7 @@ func cmdExportText(args []string) {
 	}
 	close(jobs)
 	wg.Wait()
+	meta.CloseExifReaders() // exiftool readers do not exit with onefold
 	fmt.Printf("export-text: %d eligible, %d written (%d without extractable text), %d skipped (exist), %d errors\n",
 		len(todo), wrote, empty, skipped, failed)
 	if failed > 0 {

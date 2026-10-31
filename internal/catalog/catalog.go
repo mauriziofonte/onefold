@@ -219,6 +219,8 @@ func (noProgress) Advance(int64)             {}
 func (noProgress) Err()                      {}
 
 func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
+	// the exiftool readers the scan started do not outlive it
+	defer meta.CloseExifReaders()
 	prog := o.Progress
 	if prog == nil {
 		prog = noProgress{}

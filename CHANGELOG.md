@@ -6,6 +6,9 @@ The version being prepared is in the `VERSION` file; a release is the tag `v<VER
 
 ## [Unreleased]
 
+- Fixed: the exiftool readers of a catalog run were never stopped and kept running, polling, after onefold exited (Linux and macOS; on Windows they ended with it).
+- Fixed: the `seed` rsync script failed with the rsync macOS ships (no `--info=progress2`); it now falls back to `--progress`.
+- Fixed: a data race in the GUI between a running job updating its summary and the live updates sent to the browser.
 - Fixed: a folder named through a symbolic link or a Windows short name (`C:\Users\JOHNDO~1`) and through its real name was treated as two folders: an output not created yet inside an input could go unnoticed, `-exclude-path` and GUI exclusions typed through a link did not apply, and `purge-sources` refused every file when the output was named differently from the report. Paths are now compared in one canonical spelling.
 - `apply -execute -link`: a byte-original golden tree made of hard links of the sources (same volume, no copy, no stamping, sources untouched).
 - Security: `golang.org/x/crypto` v0.58.0 (SSH and SFTP push), `golang.org/x/text` v0.43.0 and `github.com/ulikunitz/xz` v0.5.15 (7z listing) replace versions with known advisories; building from source now needs Go 1.26 or newer.
