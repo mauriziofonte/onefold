@@ -35,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-14, macos-15-intel]
+        os: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
     runs-on: ${{ matrix.os }}
     # macOS is being brought to parity: its jobs report but do not fail the
     # run until the platform layer is adapted and proven there
