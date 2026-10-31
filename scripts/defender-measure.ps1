@@ -66,10 +66,23 @@ function Measure-Catalog([string]$label) {
     $manifest = Join-Path $Work "$label.jsonl"
     $log = Join-Path $Work "$label.log"
     Remove-Item -Force -ErrorAction SilentlyContinue $manifest
-    $wall = Measure-Command {
-        & $Onefold catalog -preset all -allow-mixed -no-sweep -j 8 -perf -o $manifest $Tree *> $log
+    # onefold writes its progress and -perf table on stderr; Windows
+    # PowerShell 5.1 turns each such line into an error record, which "Stop"
+    # would make fatal: collect them as plain text instead.
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $wall = Measure-Command {
+            & $Onefold catalog -preset all -allow-mixed -no-sweep -j 8 -perf -o $manifest $Tree 2>&1 |
+                ForEach-Object { "$_" } | Set-Content -Path $log -Encoding UTF8
+        }
+        $code = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prev
     }
-    Add-Content -Path $log -Value ("wall seconds: {0:N2}" -f $wall.TotalSeconds)
+    Add-Content -Path $log -Value ("exit code: {0}" -f $code) -Encoding UTF8
+    Add-Content -Path $log -Value ("wall seconds: {0:N2}" -f $wall.TotalSeconds) -Encoding UTF8
+    if ($code -ne 0) { throw "onefold catalog failed (exit code $code), see $log" }
     Write-Host ("{0}: {1:N2} s wall, log in {2}" -f $label, $wall.TotalSeconds, $log)
 }
 
@@ -86,10 +99,10 @@ function Write-Summary {
     foreach ($label in "cold-defender", "cold-excluded") {
         $log = Join-Path $Work "$label.log"
         $lines += "== $label"
-        $lines += Get-Content $log | Where-Object { $_ -match "wall seconds|open|assets|files" }
+        $lines += Get-Content $log | Where-Object { $_ -match "wall seconds|exit code|open|assets|files" }
         $lines += ""
     }
-    Set-Content -Path $out -Value $lines
+    Set-Content -Path $out -Value $lines -Encoding UTF8
     Write-Host ""
     Get-Content $out | Write-Host
     Write-Host ""
