@@ -6,6 +6,7 @@ The version being prepared is in the `VERSION` file; a release is the tag `v<VER
 
 ## [Unreleased]
 
+- Fixed: among byte-identical photos or videos with no sub-second time, the copy kept could change from one run to the next (it followed the order the catalog workers finished in); it is now the one with a clean name, then the oldest, then the shortest path.
 - Fixed: the exiftool readers of a catalog run were never stopped and kept running, polling, after onefold exited (Linux and macOS; on Windows they ended with it).
 - Fixed: the `seed` rsync script failed with the rsync macOS ships (no `--info=progress2`); it now falls back to `--progress`.
 - Fixed: a data race in the GUI between a running job updating its summary and the live updates sent to the browser.

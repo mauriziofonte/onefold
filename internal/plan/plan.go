@@ -438,10 +438,28 @@ func PlanWith(recs []catalog.Record, o Options) *Result {
 		}
 	}
 
+	// copyLess orders interchangeable copies: a name that is not a copy name
+	// ("x (1).jpg"), the oldest mtime, the shortest path, then the path
+	// itself. A total order: the winner never depends on the order the
+	// catalog workers emitted the records in.
+	copyLess := func(a, b catalog.Record) bool {
+		if da, db := names.IsCopyName(a.Path), names.IsCopyName(b.Path); da != db {
+			return !da
+		}
+		if ma, mb := mtimeKey(a), mtimeKey(b); ma != mb {
+			return ma < mb
+		}
+		if len(a.Path) != len(b.Path) {
+			return len(a.Path) < len(b.Path)
+		}
+		return a.Path < b.Path
+	}
+
 	// makeMedia elects the winner of a set of true media variants and records drops.
 	makeMedia := func(members []catalog.Record) {
 		// Winner: resolution, then HDR (Policy C), then byte size (larger wins -
-		// e.g. a phone original over a jpegoptim'd room copy).
+		// e.g. a phone original over a jpegoptim'd room copy); equal on all
+		// three (byte-identical copies, mostly): as for generic files.
 		sort.SliceStable(members, func(i, j int) bool {
 			if ri, rj := res(members[i]), res(members[j]); ri != rj {
 				return ri > rj
@@ -449,7 +467,10 @@ func PlanWith(recs []catalog.Record, o Options) *Result {
 			if hi, hj := isHDR(members[i]), isHDR(members[j]); hi != hj {
 				return hi
 			}
-			return members[i].Size > members[j].Size
+			if members[i].Size != members[j].Size {
+				return members[i].Size > members[j].Size
+			}
+			return copyLess(members[i], members[j])
 		})
 		w := members[0]
 		a := Asset{Winner: w, Members: members, Reasons: map[string]string{}}
@@ -471,20 +492,10 @@ func PlanWith(recs []catalog.Record, o Options) *Result {
 	// makeGeneric elects the winner of a byte-identical generic group.
 	makeGeneric := func(members []catalog.Record) {
 		sort.SliceStable(members, func(i, j int) bool {
-			a, b := members[i], members[j]
-			if ra, rb := roomRank[a.Room], roomRank[b.Room]; ra != rb {
+			if ra, rb := roomRank[members[i].Room], roomRank[members[j].Room]; ra != rb {
 				return ra < rb
 			}
-			if da, db := names.IsCopyName(a.Path), names.IsCopyName(b.Path); da != db {
-				return !da
-			}
-			if ma, mb := mtimeKey(a), mtimeKey(b); ma != mb {
-				return ma < mb
-			}
-			if len(a.Path) != len(b.Path) {
-				return len(a.Path) < len(b.Path)
-			}
-			return a.Path < b.Path
+			return copyLess(members[i], members[j])
 		})
 		a := Asset{Winner: members[0], Members: members, Reasons: map[string]string{}}
 		for _, m := range members[1:] {
