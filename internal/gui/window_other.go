@@ -7,21 +7,32 @@
 
 package gui
 
-import "github.com/mauriziofonte/onefold/internal/tools"
+import (
+	"runtime"
+
+	"github.com/mauriziofonte/onefold/internal/tools"
+)
 
 // OpenWindow shows the GUI. Outside Windows there is no embedded browser: it
-// asks the desktop to open the default browser (xdg-open, when present) and
-// reports false, so the caller serves until idle or interrupted.
+// asks the desktop to open the default browser and reports false, so the
+// caller serves until idle or interrupted.
 func OpenWindow(url, dataDir, title string, opened <-chan struct{}) bool {
-	if cmd := tools.Command("xdg-open", url); cmd != nil {
-		cmd.Start()
-	}
+	OpenBrowser(url)
 	return false
 }
 
-// OpenBrowser opens url in the default browser (best-effort).
+// OpenBrowser opens url in the default browser (best-effort): `open` on
+// macOS, xdg-open elsewhere, when present.
 func OpenBrowser(url string) {
-	if cmd := tools.Command("xdg-open", url); cmd != nil {
+	if cmd := tools.Command(browserOpener(), url); cmd != nil {
 		cmd.Start()
 	}
+}
+
+// browserOpener is the desktop's command that opens a URL.
+func browserOpener() string {
+	if runtime.GOOS == "darwin" {
+		return "open"
+	}
+	return "xdg-open"
 }
