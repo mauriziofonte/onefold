@@ -104,6 +104,8 @@ On Windows a window opens (the console closes); without the WebView2 runtime, th
 
 Fold several folders into one, keeping every distinct file exactly once. The output can be one of the inputs.
 
+![onefold merge in a terminal: preview, then execute](assets/demo/cli-merge.gif)
+
 ```bat
 :: preview
 onefold.exe --input D:\FILES --input E:\old-disk --output D:\FILES
@@ -175,6 +177,8 @@ In `merge` and `rearrange` photos and videos are files like the others: copied o
 The archive works in steps that can run on different machines: each computer indexes its own disks, the indexes are planned together anywhere, and each computer then copies its share.
 
 ### First run
+
+![catalog, plan and apply on a made-up photo folder](assets/demo/cli-golden.gif)
 
 ```bash
 # 1. index each machine locally (read-only); -host names the machine in the index

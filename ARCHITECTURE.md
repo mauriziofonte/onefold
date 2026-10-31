@@ -229,7 +229,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 │   └── media-synth/        synthetic photos/videos pinning the media rules
 ├── VERSION, CHANGELOG.md   version being prepared; release notes
 ├── scripts/                fixture generators, workflow check, GUI demo
-├── assets/demo/            README demo GIF
+├── assets/demo/            README demo GIFs
 ├── .github/                CI and release workflows
 ├── Makefile, go.mod, go.sum
 └── README.md, LLMS.md, ARCHITECTURE.md, TODOS.md, LICENSE
@@ -346,6 +346,7 @@ Direct dependencies and what they are for:
 | `make web` | rebuilds `internal/gui/web/dist` (Node) |
 | `make web-e2e` | Playwright end-to-end test of the GUI against a freshly built binary |
 | `make web-demo` | records `assets/demo/gui-merge.gif` (section 22.11) |
+| `make cli-demo` | records `assets/demo/cli-merge.gif` and `cli-golden.gif` with vhs (section 22.11) |
 | `make workflows-check` | actionlint, zizmor and `act` runs of the workflows on a clean clone |
 | `make dist-clean` | removes build outputs |
 
@@ -1460,6 +1461,8 @@ The first page on a fresh install, and a button in every mode. It asks the goal 
 ### 22.11 README demo
 
 `make web-demo` (`scripts/gui-demo.sh`) runs `internal/gui/web/demo/merge.spec.js` with `playwright.demo.config.js`: the real binary merges two made-up folders (written by the spec, dated 2023) while screenshots are taken every ~200 ms; the system ffmpeg assembles them into `assets/demo/gui-merge.gif`.
+
+`make cli-demo` (`scripts/tapes/render.sh`) builds onefold, makes a made-up sandbox (`scripts/tapes/sandbox.sh`: fixed 2020-2023 dates, generated pictures and text, nothing personal) and records each `scripts/tapes/*.tape` with vhs into `assets/demo/cli-*.gif`. vhs needs ttyd and ffmpeg; `.github/workflows/demo.yml` renders them on GitHub instead (by hand, or on a push to a branch other than `main` that changes the tapes) and commits the GIFs to that branch.
 
 ---
 

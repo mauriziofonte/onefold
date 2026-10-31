@@ -12,7 +12,6 @@ Common facts:
 |---|---|---|---|
 | T3 | Split the first-catalog cost between Microsoft Defender and the OS cache | Windows administrator rights, reboots | small (measurement + docs) |
 | T4 | Check the double-click launch with Windows Terminal as default terminal | a person at a Windows desktop | small (manual check) |
-| T5 | README demo GIFs of the CLI | install `vhs` and `ttyd` | small to medium |
 
 ---
 
@@ -44,21 +43,3 @@ Common facts:
 6. `onefold.exe config set diag-log off`.
 
 **Done when.** All four launches behave as expected; if one does not, the log lines tell which test (`ownsConsole`, `parentIsExplorer`) misfired: fix it in `main.go` and record the case in a comment.
-
----
-
-## T5. README demo GIFs of the CLI
-
-**State.** The GUI demo exists: `make web-demo` (`scripts/gui-demo.sh`, `internal/gui/web/demo/merge.spec.js`, `internal/gui/web/playwright.demo.config.js`) drives the real binary on a made-up sandbox and writes `assets/demo/gui-merge.gif`, shown in `README.md`. CLI GIFs are missing.
-
-**Why blocked.** They are recorded with `vhs` (charmbracelet), which needs `ttyd` and `ffmpeg`; `vhs` and `ttyd` are not installed on the workstation.
-
-**Steps once installed.**
-
-1. Create `scripts/tapes/` with one `.tape` per GIF and a hidden setup that makes a made-up sandbox in `/tmp` with fixed dates (never personal folders); a `render.sh` that builds `onefold` from the checkout, puts it on `PATH` for the tapes and runs `vhs` on each tape into `assets/demo/`.
-2. Suggested tapes: `merge.tape` (`onefold merge -input A -input B -output O`, then `-execute`), `golden.tape` (`catalog` -> `plan` -> `apply --with-stats` -> `apply --execute`), `match.tape` (`golden-index` -> `match` -> `apply` the sub-plan).
-3. In each tape `Wait` for the prompt before typing, `Sleep` after results; keep each GIF under about 1 MB (width 960-1200, a short run).
-4. Add a `make cli-demo` target, reference the GIFs in `README.md` next to the commands they show.
-5. Optional, once the repository is on GitHub: a workflow with `charmbracelet/vhs-action` (pinned by commit) that renders on changes and uploads the GIFs as an artifact.
-
-**Done when.** The GIFs are in `assets/demo/`, linked from the README, reproducible with one make target.
