@@ -90,6 +90,12 @@ onefold.exe --input D:\FILES --input E:\old-disk --input D:\TMP --output D:\FILE
 
 On Windows a window opens (the console closes); without the WebView2 runtime, the default browser opens instead. From a terminal, on any system: `onefold gui`.
 
+The same merge recorded on the Windows and macOS machines of the CI (the window is the browser page; the paths are the runner's):
+
+| Windows | macOS |
+|---|---|
+| ![The onefold GUI on Windows merging two folders](assets/demo/gui-merge-windows.gif) | ![The onefold GUI on macOS merging two folders](assets/demo/gui-merge-macos.gif) |
+
 - **Guided setup**: the first page on a fresh install, and a button in every mode. It asks what you want to do (bring folders together, tidy up a folder, a photo and video archive from several computers, only find duplicates), scans the folders quickly (names and sizes only) and shows, after every answer, what would happen to a sample of your files, computed by the real engine. At the end it fills the right mode and starts its preview; it also shows the equivalent command (PowerShell) and saves the answers as a recipe.
 - **Every mode of the command line**: merge, rearrange, golden archive, journals and undo, configuration, tool downloads.
 - **Preview, then execute**: Execute runs exactly what the preview showed and asks you to type the number of files a rearrange or a source purge will delete.
