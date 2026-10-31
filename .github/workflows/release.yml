@@ -1,0 +1,138 @@
+# onefold
+# Author: Maurizio Fonte <fonte.maurizio@gmail.com>
+# Copyright (c) 2026 Maurizio Fonte
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Release: pushing a version tag v<VERSION> (SemVer: vMAJOR.MINOR.PATCH, or a
+# pre-release such as v0.0.1-alpha) on a commit of main runs the CI tests
+# (Linux and Windows), builds every binary with `make release`, checks the
+# artifacts and publishes them as the GitHub release of that tag (marked as a
+# pre-release when the version has a suffix), with the notes of its
+# CHANGELOG.md section.
+# Actions are pinned by commit; publishing uses the gh CLI of the runner.
+name: release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+", "v[0-9]+.[0-9]+.[0-9]+-*"]
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: tests
+    uses: $/.github/workflows/ci.yml # self-repository form: pinned to this commit
+    permissions:
+      contents: read
+
+  build:
+    name: build and check
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      CGO_ENABLED: "0"
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # tags and main, for the checks below
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3"
+          cache: false # a release never restores a cache
+
+      - name: the tag names a commit of main and the version of VERSION and CHANGELOG.md
+        run: |
+          test "$(git describe --tags --exact-match)" = "$TAG"
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          test "$TAG" = "v$(cat VERSION)" || { echo "tag $TAG, VERSION says v$(cat VERSION)"; exit 1; }
+          grep -qF "## [$(cat VERSION)]" CHANGELOG.md || { echo "CHANGELOG.md has no section [$(cat VERSION)]"; exit 1; }
+
+      - name: modules match go.sum
+        run: |
+          go mod download
+          go mod verify
+
+      - name: build
+        run: make release DIST=out
+
+      - name: check the artifacts
+        run: |
+          git diff --quiet || { echo "the build changed tracked files"; git status --short; exit 1; }
+          cd out
+          sha256sum -c SHA256SUMS
+          test "$(./onefold-linux-amd64 version | cut -d' ' -f2)" = "$TAG"
+          for f in onefold-linux-amd64 onefold-linux-arm64 onefold-windows-amd64.exe; do
+            go version -m "$f" | grep -qF -- "-X main.version=$TAG\"" || { echo "$f: not built as $TAG"; exit 1; }
+          done
+          # every third-party section carries its license text
+          awk '/^=== /{if (name && n < 3) bad = bad name "\n"; name = $0; n = 0; next} {n++}
+               END {if (n < 3) bad = bad name "\n"; if (bad) {printf "empty notice sections:\n%s", bad; exit 1}}' THIRD_PARTY_NOTICES.txt
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: out/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: publish
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # create the release and upload its assets
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: CHANGELOG.md
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: out
+
+      - name: release notes
+        run: |
+          {
+            echo "onefold $TAG"
+            echo
+            # this version's CHANGELOG.md section, without its heading
+            awk -v v="## [${TAG#v}]" 'index($0, v) == 1 {on = 1; next} /^## \[/ {on = 0} on' CHANGELOG.md
+            echo
+            echo "- Windows: \`onefold-windows-amd64.exe\` (double-click opens the GUI; optional tools: \`onefold tools install all\` or the Doctor page)."
+            echo "- Linux: \`onefold-linux-amd64\`, \`onefold-linux-arm64\` (static, no dependencies)."
+            echo "- Checksums: \`sha256sum -c SHA256SUMS\`."
+            echo "- License: AGPL-3.0-or-later (\`LICENSE\`); third-party components: \`THIRD_PARTY_NOTICES.txt\`."
+          } > notes.md
+          (cd out && sha256sum -c SHA256SUMS)
+
+      - name: publish
+        if: ${{ !env.ACT }} # act (local test runs) stops here
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          pre=()
+          case "$TAG" in *-*) pre=(--prerelease) ;; esac
+          gh release create "$TAG" out/* --repo "$REPO" --title "onefold $TAG" --notes-file notes.md --verify-tag "${pre[@]}"
+
+      - name: what would be published (act)
+        if: ${{ env.ACT }}
+        run: |
+          ls -l out
+          cat notes.md

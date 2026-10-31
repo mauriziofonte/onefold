@@ -1,0 +1,19 @@
+# onefold
+# Author: Maurizio Fonte <fonte.maurizio@gmail.com>
+# Copyright (c) 2026 Maurizio Fonte
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Keeps the commit pins of the workflow actions current. Go modules are left
+# out on purpose: several are pinned for the go 1.22 directive (bumping them is
+# a deliberate change, never an automatic one).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]

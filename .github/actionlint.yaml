@@ -1,0 +1,12 @@
+# onefold
+# Author: Maurizio Fonte <fonte.maurizio@gmail.com>
+# Copyright (c) 2026 Maurizio Fonte
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# actionlint 1.7.12 does not know the self-repository form `uses: $/...` yet,
+# which GitHub supports and recommends since 2026-07-30
+# (https://github.blog/changelog/2026-07-30-reference-same-repository-actions-with-self-repository-syntax/).
+paths:
+  .github/workflows/release.yml:
+    ignore:
+      - 'reusable workflow call "\$/.+" at "uses" is not following the format'
