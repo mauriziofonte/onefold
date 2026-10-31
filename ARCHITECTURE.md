@@ -1733,8 +1733,8 @@ Run the suite with `TZ=America/New_York go test ./...` and `TZ=UTC go test ./...
 - Comments say why, in full; they do not reference planning notes outside the repository.
 - No extension literals or extension switches outside `internal/kinds` (`TestChokePoint`).
 - Every external command through `internal/tools`; every no-clobber publish through `fsx.RenameNoReplace`; every time string parsed in `meta.Zone()`.
-- gofmt, `go vet` for Linux and Windows (`GOOS=windows go vet ./...`); CI checks both, the test suite does not.
-- Code, comments, docs and commit messages in English; commits are one line, `<feat|fix|chore|test|docs>: <subject>`, at most 72 characters.
+- gofmt, `go vet` for Linux, Windows and macOS (`GOOS=windows go vet ./...`, `GOOS=darwin go vet ./...`) and staticcheck (`make lint`); CI checks them all, the test suite does not.
+- Code, comments, docs and commit messages in English; commits are one line, `<feat|fix|chore|test|docs|ci|build>: <subject>`, at most 72 characters.
 
 ### 28.2 Recipes
 
@@ -1754,7 +1754,7 @@ Run the suite with `TZ=America/New_York go test ./...` and `TZ=UTC go test ./...
 
 ### 28.3 Before saying done
 
-`make test`; `gofmt -l .` empty; `go vet` for both OSes; the Windows test binaries of the touched packages when paths, renames, time or console output changed; `make web-e2e` when the GUI, the run control, the report sink or the engine hooks changed; the time-zone runs when times changed; the docs (`README.md`, `LLMS.md`, this file) updated when commands, files or guarantees changed.
+`make test`; `gofmt -l .` empty; `go vet` for linux, windows and darwin; `make lint`; the Windows test binaries of the touched packages when paths, renames, time or console output changed; `make web-e2e` when the GUI, the run control, the report sink or the engine hooks changed; the time-zone runs when times changed; the docs (`README.md`, `LLMS.md`, this file) updated when commands, files or guarantees changed.
 
 ---
 

@@ -1,0 +1,58 @@
+# onefold
+# Author: Maurizio Fonte <fonte.maurizio@gmail.com>
+# Copyright (c) 2026 Maurizio Fonte
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+name: Alpha test report
+description: Tell us how a run went, good or bad
+labels: [alpha-test]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing onefold. A report that says "it worked" is useful too: it tells us which systems and archive sizes run clean.
+        Do not paste personal file names or listings.
+  - type: input
+    id: version
+    attributes:
+      label: onefold version
+      placeholder: output of `onefold version`
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [Windows 11, Windows 10, macOS (Apple Silicon), macOS (Intel), Linux, Other]
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: What you tried
+      multiple: true
+      options: [GUI guided setup, merge, purge-sources, rearrange, "photo archive (catalog, plan, apply)", "golden-index and match", similar, reclaim, backup, push, other]
+    validations:
+      required: true
+  - type: input
+    id: size
+    attributes:
+      label: Size of the run
+      placeholder: "e.g. 3 folders, 120 000 files, 400 GB, USB HDD + NAS"
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options: [Worked as expected, Worked but something was confusing, Something looked wrong, It failed]
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Details
+      description: How long it took, what was confusing, what looked wrong. Commands and GUI steps help.
+  - type: input
+    id: credit
+    attributes:
+      label: How to credit you in CONTRIBUTORS.md
+      placeholder: "name and/or GitHub handle, or 'no credit'"

@@ -1,0 +1,34 @@
+# onefold
+# Author: Maurizio Fonte <fonte.maurizio@gmail.com>
+# Copyright (c) 2026 Maurizio Fonte
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.go]
+indent_style = tab
+
+[Makefile]
+indent_style = tab
+
+[*.{js,mjs,svelte,html,css,json,yml,yaml,sh}]
+indent_style = space
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{bat,cmd,ps1}]
+end_of_line = crlf
+
+[testdata/**]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset

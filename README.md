@@ -1,5 +1,10 @@
 # onefold
 
+[![ci](https://github.com/mauriziofonte/onefold/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mauriziofonte/onefold/actions/workflows/ci.yml)
+[![release](https://img.shields.io/github/v/release/mauriziofonte/onefold?include_prereleases&sort=semver)](https://github.com/mauriziofonte/onefold/releases)
+[![license: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)](LICENSE)
+[![Go Reference](https://pkg.go.dev/badge/github.com/mauriziofonte/onefold.svg)](https://pkg.go.dev/github.com/mauriziofonte/onefold)
+
 Your files are spread over a laptop, an old PC, a phone backup, two external drives and a NAS. The same photo exists five times under five names; some copies were resized, some renamed by tools that added `(1)` or a date in front. onefold finds what is the same, keeps one copy of every distinct thing and puts it under a predictable name, without ever touching the originals unless you ask.
 
 ![The onefold GUI merging two folders: preview, then execute](assets/demo/gui-merge.gif)
@@ -22,6 +27,7 @@ One static binary for Linux (amd64, arm64) and Windows (amd64), with a local GUI
 - [Windows notes](#windows-notes)
 - [Documentation](#documentation)
 - [Build from source](#build-from-source)
+- [Contributing](#contributing)
 - [License](#license)
 
 ## What it does
@@ -297,6 +303,8 @@ On Windows (x64), `onefold tools install all` (or the Doctor page of the GUI) do
 | [LLMS.md](LLMS.md) | contributors and coding agents: build, layout, invariants, conventions in short |
 | [TODOS.md](TODOS.md) | open work that needs a decision or a person |
 | [CHANGELOG.md](CHANGELOG.md) | what changed in each version |
+| [CONTRIBUTING.md](CONTRIBUTING.md), [CONTRIBUTORS.md](CONTRIBUTORS.md) | how to test or change onefold, who did |
+| [SECURITY.md](SECURITY.md) | how to report a vulnerability privately |
 | `onefold help`, `onefold naming`, `onefold doctor` | flags, naming patterns, your platform and tools |
 
 ## Build from source
@@ -314,6 +322,10 @@ make release    # all targets, LICENSE, third-party notices and SHA256SUMS
 The GUI frontend is prebuilt and embedded; Node is needed only to change it (`make web`, `make web-e2e`).
 
 Versions follow [Semantic Versioning](https://semver.org); the current one is in [`VERSION`](VERSION), the history in [CHANGELOG.md](CHANGELOG.md). `onefold version` prints the version of a binary: a build that is not an exact release says so (`v0.0.1-alpha+dev.<commit>`). Every release tag is built and tested on Linux and Windows by GitHub Actions and published with its checksums; versions with a suffix such as `-alpha` are marked as pre-releases.
+
+## Contributing
+
+onefold is in alpha and looks for **developers** who want to work on it regularly (Go, Svelte, macOS and Windows internals, binary file formats) and for **alpha testers** on every OS, especially macOS and large archives. Start with [CONTRIBUTORS.md](CONTRIBUTORS.md) (what is wanted) and [CONTRIBUTING.md](CONTRIBUTING.md) (how). Code contributions are made under a [Contributor License Agreement](CLA.md); everyone follows the [Code of Conduct](CODE_OF_CONDUCT.md). Security problems: [SECURITY.md](SECURITY.md).
 
 ## License
 
