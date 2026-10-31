@@ -49,9 +49,11 @@ func moveToTrash(p string) error {
 	op := shFileOpStruct{wFunc: foDelete, pFrom: &from[0], fFlags: fofAllowUndo | fofNoConfirmation | fofSilent | fofNoErrorUI}
 	r, _, _ := procSHFileOperationW.Call(uintptr(unsafe.Pointer(&op)))
 	if r != 0 {
+		//lint:ignore ST1005 "Recycle Bin" is the name Windows shows, a proper noun
 		return fmt.Errorf("Recycle Bin: SHFileOperation error 0x%x", r)
 	}
 	if op.fAnyOperationsAborted != 0 {
+		//lint:ignore ST1005 "Recycle Bin" is the name Windows shows, a proper noun
 		return fmt.Errorf("Recycle Bin: operation aborted")
 	}
 	return nil

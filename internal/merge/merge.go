@@ -775,8 +775,9 @@ func verifyHash(p string, buf []byte, uncached bool) (string, error) {
 		return hashFile(p, buf) // filesystem without uncached reads (tmpfs, network): the cached proof
 	}
 	defer f.Close()
-	ab := alignedBufs.Get().([]byte)
-	defer alignedBufs.Put(ab)
+	abp := alignedBufs.Get().(*[]byte)
+	defer alignedBufs.Put(abp)
+	ab := *abp
 	h := xxh3.New()
 	for {
 		n, err := f.Read(ab)
@@ -792,7 +793,8 @@ func verifyHash(p string, buf []byte, uncached bool) (string, error) {
 }
 
 // alignedBufs: read buffers for uncached reads (aligned, 4 MiB).
-var alignedBufs = sync.Pool{New: func() any { return fsx.AlignedBuffer(4 << 20) }}
+// The pool holds pointers so that Put does not allocate a slice header.
+var alignedBufs = sync.Pool{New: func() any { b := fsx.AlignedBuffer(4 << 20); return &b }}
 
 // cachedVerify counts the verifications that fell back to the cache.
 var cachedVerify atomic.Int64

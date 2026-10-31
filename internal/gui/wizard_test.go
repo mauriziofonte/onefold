@@ -118,7 +118,7 @@ func TestWizardPreview(t *testing.T) {
 		t.Errorf("golden cloud: %+v", x)
 	}
 
-	rows, err = previewSample(wizardPreviewReq{Goal: "merge", Sample: s.Sample, Rules: rules, Fams: []string{"img"},
+	_, err = previewSample(wizardPreviewReq{Goal: "merge", Sample: s.Sample, Rules: rules, Fams: []string{"img"},
 		Naming: "photo,image={EXT/{stem-norm}"})
 	if err == nil {
 		t.Fatal("an invalid selector map must be reported")

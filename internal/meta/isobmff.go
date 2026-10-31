@@ -160,8 +160,7 @@ func (r *boxReader) walk(start, end int64, depth int, info *isobmffInfo, parent 
 		case typ == "stsd" && bodyLen >= 44:
 			// first sample entry of a video track: coded width/height (what ffprobe reports)
 			b, _ := r.readAt(body, int(min64(bodyLen, 64)))
-			fmt4 := string(b[12:16])
-			if len(b) >= 44 && visualCodec[fmt4] {
+			if len(b) >= 44 && visualCodec[string(b[12:16])] {
 				if w, h := int(binary.BigEndian.Uint16(b[40:42])), int(binary.BigEndian.Uint16(b[42:44])); w > 0 && h > 0 {
 					info.codedW, info.codedH = w, h
 				}
