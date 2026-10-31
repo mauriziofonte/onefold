@@ -1371,7 +1371,7 @@ Rules: naming precedence `template` > `families` > `naming` (+`clean`) > `layout
 
 One instance per state dir: a second launch finds `gui.json` (pid + session URL), checks that the link answers and opens that instance.
 
-On Windows, `onefold.exe` with no arguments opens the GUI when it was started by a double-click (the process is alone on its console, or its parent is `explorer.exe`): the console is freed and the window opens. From a terminal it prints the usage. Without the WebView2 runtime the window cannot be created and the default browser gets the URL (`TestWindowFallsBackToBrowser`).
+On Windows, `onefold.exe` with no arguments opens the GUI when it was started by a double-click (the process is alone on its console, or its parent is `explorer.exe`): the console is freed and the window opens. The manifest asks for `consoleAllocationPolicy` `detached` (Windows 11 24H2 and later): Explorer then gives the exe no console at all, so no terminal window or Windows Terminal tab flashes before the GUI (the parent test decides); older Windows ignore it and show the console for a moment. From a terminal it prints the usage. Checked by hand on Windows 11 build 26300 with Windows Terminal and with the Windows Console Host as default terminal: double-click opens the GUI, a terminal gets the usage. Without the WebView2 runtime the window cannot be created and the default browser gets the URL (`TestWindowFallsBackToBrowser`).
 
 ### 22.2 Security
 

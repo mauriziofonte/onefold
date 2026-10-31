@@ -6,6 +6,7 @@ The version being prepared is in the `VERSION` file; a release is the tag `v<VER
 
 ## [Unreleased]
 
+- Windows 11 24H2 and later: a double-click on onefold.exe no longer flashes a console window or a Windows Terminal tab before the GUI opens.
 - Measured: right after a reboot, the first catalog of 5,384 files took 52 s with Microsoft Defender scanning and 3 s with onefold excluded (README, Windows notes).
 - Fixed: among byte-identical photos or videos with no sub-second time, the copy kept could change from one run to the next (it followed the order the catalog workers finished in); it is now the one with a clean name, then the oldest, then the shortest path.
 - Fixed: the exiftool readers of a catalog run were never stopped and kept running, polling, after onefold exited (Linux and macOS; on Windows they ended with it).
