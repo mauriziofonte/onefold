@@ -213,6 +213,14 @@ func (j *Job) snapshot() *Job {
 		p := *j.Progress
 		c.Progress = &p
 	}
+	// run() fills Summary in place under the lock; the copy is read (and
+	// marshalled) after the lock is released, so it must own its own map.
+	if j.Summary != nil {
+		c.Summary = make(map[string]any, len(j.Summary))
+		for k, v := range j.Summary {
+			c.Summary[k] = v
+		}
+	}
 	return &c
 }
 
