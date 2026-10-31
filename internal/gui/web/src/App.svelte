@@ -91,7 +91,7 @@
     </div>
     {#if store.info}
       <div class="ml-4 flex items-center gap-2 text-xs">
-        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{store.info.os === 'windows' ? 'Windows' : store.info.os === 'linux' ? 'Linux' : store.info.os} · {store.info.cpus} CPU</span>
+        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{store.info.os === 'windows' ? 'Windows' : store.info.os === 'linux' ? 'Linux' : store.info.os === 'darwin' ? 'macOS' : store.info.os} · {store.info.cpus} CPU</span>
         <button class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700 hover:bg-emerald-100" onclick={() => (settings.view = 'doctor')}>
           {tools ? t('header.tools', { n: tools, total: toolsTotal }) : t('header.toolsNone')}
         </button>
