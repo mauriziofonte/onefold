@@ -27,7 +27,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 # Static by default: CGO off so the binary runs on any host with zero deps.
 export CGO_ENABLED := 0
 
-.PHONY: version build test vet all linux windows linux-arm64 release notices winres workflows-check dist-clean web web-e2e web-demo
+.PHONY: version build test vet lint race all linux windows linux-arm64 release notices winres workflows-check dist-clean web web-e2e web-demo
 
 version: ## the version a build of this tree gets
 	@echo $(VERSION)
@@ -40,6 +40,15 @@ test:
 
 vet:
 	go vet ./...
+
+# What CI runs besides the tests: staticcheck (pinned) for every target OS, and
+# the race detector (needs cgo and a C compiler, unlike the product builds).
+STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.8.2
+lint:
+	for goos in linux windows darwin; do GOOS=$$goos go run $(STATICCHECK) ./... || exit 1; done
+
+race:
+	CGO_ENABLED=1 go test -race -count=1 ./...
 
 # GUI frontend (Svelte + Vite): rebuilds internal/gui/web/dist, which the Go
 # binary embeds and which is committed (go build/test need no Node).
