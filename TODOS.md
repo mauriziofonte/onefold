@@ -22,13 +22,7 @@ Common facts:
 
 **Why blocked.** Telling Defender's cost apart from the OS file cache needs the exclusion on and off and cold caches: administrator rights and reboots.
 
-**Steps (administrator PowerShell, a non-personal tree such as the one above).**
-
-1. Reboot (cold cache). Run the catalog command above with `-perf`; save the output.
-2. `Add-MpPreference -ExclusionProcess "<full path>\onefold.exe"`.
-3. Reboot. Run the same command; save the output.
-4. `Remove-MpPreference -ExclusionProcess "<full path>\onefold.exe"`.
-5. Compare the `open` lines (count, cumulative seconds, average, max) and the wall time.
+**Steps.** `scripts/defender-measure.ps1` does the whole measurement: from an administrator PowerShell, `powershell -ExecutionPolicy Bypass -File scripts\defender-measure.ps1 -Onefold C:\path\to\onefold.exe` (`-Tree DIR` for another non-personal folder). It reboots twice by itself (save your work first), runs the catalog above on a cold cache with Defender as configured and then with a process exclusion for onefold.exe, removes the exclusion and its scheduled task, and writes `%LOCALAPPDATA%\onefold-defender-measure\summary.txt`. Paste that file into an issue or the project thread.
 
 **Done when.** The two measurements are recorded next to the existing one in the README paragraph about Defender (one sentence: the share of the first-run cost due to scanning), no code change expected.
 

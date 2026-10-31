@@ -78,6 +78,16 @@ jobs:
           go run ./cmd/onefold tools install all
           printf '%s\\tools\n' "$ONEFOLD_STATE_DIR" >> "$GITHUB_PATH"
 
+      - name: PowerShell scripts parse
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach ($f in Get-ChildItem scripts -Filter *.ps1) {
+            $errs = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$errs) | Out-Null
+            if ($errs) { $errs | Format-List; exit 1 }
+          }
+
       - name: format
         if: runner.os == 'Linux'
         run: |
