@@ -4,14 +4,19 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 # Renders the CLI demo GIFs of the README (scripts/tapes/render.sh, vhs) on a
-# made-up sandbox and commits them to the branch it runs on. Started by hand
-# (Actions > demo > Run workflow, or `gh workflow run demo.yml --ref BRANCH`),
-# never on main directly: the GIFs reach main through a reviewed pull request.
+# made-up sandbox and commits them to the branch it runs on. Runs on a push to
+# a branch other than main that changes the tapes, or by hand (Actions > demo >
+# Run workflow, or `gh workflow run demo.yml --ref BRANCH`); never on main: the
+# GIFs reach main through a reviewed pull request. Its own commit, made with
+# the workflow token, does not start workflows again.
 # Actions are pinned by commit.
 name: demo
 
 on:
   workflow_dispatch:
+  push:
+    branches-ignore: [main]
+    paths: ["scripts/tapes/**", ".github/workflows/demo.yml"]
 
 permissions: {}
 
