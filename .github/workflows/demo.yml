@@ -3,12 +3,14 @@
 # Copyright (c) 2026 Maurizio Fonte
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-# Renders the CLI demo GIFs of the README (scripts/tapes/render.sh, vhs) on a
-# made-up sandbox and commits them to the branch it runs on. Runs on a push to
-# a branch other than main that changes the tapes, or by hand (Actions > demo >
-# Run workflow, or `gh workflow run demo.yml --ref BRANCH`); never on main: the
-# GIFs reach main through a reviewed pull request. Its own commit, made with
-# the workflow token, does not start workflows again.
+# Renders the README demo GIFs on made-up sandboxes and commits them to the
+# branch it runs on: the CLI with vhs (scripts/tapes/render.sh, Linux) and the
+# GUI with Playwright screenshots on Windows and macOS (scripts/gui-demo.sh),
+# assembled with ffmpeg on Linux (scripts/gif-from-frames.sh). Runs on a push
+# to a branch other than main that changes a demo, or by hand (Actions > demo
+# > Run workflow, or `gh workflow run demo.yml --ref BRANCH`); never on main:
+# the GIFs reach main through a reviewed pull request. Its own commit, made
+# with the workflow token, does not start workflows again.
 # Actions are pinned by commit.
 name: demo
 
@@ -16,7 +18,13 @@ on:
   workflow_dispatch:
   push:
     branches-ignore: [main]
-    paths: ["scripts/tapes/**", ".github/workflows/demo.yml"]
+    paths:
+      - "scripts/tapes/**"
+      - "scripts/gui-demo.sh"
+      - "scripts/gif-from-frames.sh"
+      - "internal/gui/web/demo/**"
+      - "internal/gui/web/playwright.demo.config.js"
+      - ".github/workflows/demo.yml"
 
 permissions: {}
 
@@ -31,7 +39,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
-      contents: write # commit the rendered GIFs to this branch
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -55,7 +63,100 @@ jobs:
       - name: render
         run: scripts/tapes/render.sh
 
-      - name: commit the GIFs to this branch
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: demo-cli
+          path: assets/demo/cli-*.gif
+          if-no-files-found: error
+          retention-days: 7
+
+  gui:
+    name: GUI frames (${{ matrix.name }})
+    if: github.server_url == 'https://github.com' && github.ref != 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-2025, name: windows }
+          - { os: macos-15, name: macos }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3"
+          cache: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Playwright and its Chromium
+        working-directory: internal/gui/web
+        run: |
+          npm ci --ignore-scripts
+          npx playwright install chromium
+
+      - name: record (screenshots of the real binary)
+        env:
+          FRAMES_ONLY: "1"
+          DEMO_OUT: ${{ runner.temp }}/demo
+          # a short, readable path in the GIF: the home folder of the runner
+          DEMO_ROOT_NAME: onefold-demo
+        run: |
+          export DEMO_ROOT="$HOME/$DEMO_ROOT_NAME"
+          if command -v cygpath >/dev/null; then DEMO_ROOT="$(cygpath -w "$DEMO_ROOT")"; fi
+          scripts/gui-demo.sh
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: demo-gui-${{ matrix.name }}
+          path: ${{ runner.temp }}/demo/frames
+          if-no-files-found: error
+          retention-days: 7
+
+  commit:
+    name: commit the GIFs to this branch
+    needs: [cli, gui]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write # commit the rendered GIFs to this branch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends ffmpeg
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/demo
+          pattern: demo-*
+
+      - name: assemble
+        env:
+          DEMO: ${{ runner.temp }}/demo
+        run: |
+          cp "$DEMO"/demo-cli/cli-*.gif assets/demo/
+          for os in windows macos; do
+            scripts/gif-from-frames.sh "$DEMO/demo-gui-$os" "assets/demo/gui-merge-$os.gif"
+          done
+
+      - name: commit
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -64,5 +165,5 @@ jobs:
           git add assets/demo
           if git diff --cached --quiet; then echo "GIFs unchanged"; exit 0; fi
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit -m "docs: render the CLI demo GIFs"
+            commit -m "docs: render the demo GIFs"
           git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}"

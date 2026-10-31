@@ -228,7 +228,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 │   ├── fixtures/           real-file corpus (documents, archives, media, sheets...)
 │   └── media-synth/        synthetic photos/videos pinning the media rules
 ├── VERSION, CHANGELOG.md   version being prepared; release notes
-├── scripts/                fixture generators, workflow check, GUI demo
+├── scripts/                fixture generators, workflow check, demo GIFs
 ├── assets/demo/            README demo GIFs
 ├── .github/                CI and release workflows
 ├── Makefile, go.mod, go.sum
@@ -1460,9 +1460,9 @@ The first page on a fresh install, and a button in every mode. It asks the goal 
 
 ### 22.11 README demo
 
-`make web-demo` (`scripts/gui-demo.sh`) runs `internal/gui/web/demo/merge.spec.js` with `playwright.demo.config.js`: the real binary merges two made-up folders (written by the spec, dated 2023) while screenshots are taken every ~200 ms; the system ffmpeg assembles them into `assets/demo/gui-merge.gif`.
+`make web-demo` (`scripts/gui-demo.sh`) runs `internal/gui/web/demo/merge.spec.js` with `playwright.demo.config.js`: the real binary merges two made-up folders (written by the spec, dated 2023) while screenshots are taken every ~200 ms; `scripts/gif-from-frames.sh` (ffmpeg) assembles them into `assets/demo/gui-merge.gif`. The same script runs on macOS and on Windows (Git Bash); `.github/workflows/demo.yml` records it on `windows-2025` and `macos-15` and assembles `gui-merge-windows.gif` and `gui-merge-macos.gif` on Linux.
 
-`make cli-demo` (`scripts/tapes/render.sh`) builds onefold, makes a made-up sandbox (`scripts/tapes/sandbox.sh`: fixed 2020-2023 dates, generated pictures and text, nothing personal) and records each `scripts/tapes/*.tape` with vhs into `assets/demo/cli-*.gif`. vhs needs ttyd and ffmpeg; `.github/workflows/demo.yml` renders them on GitHub instead (by hand, or on a push to a branch other than `main` that changes the tapes) and commits the GIFs to that branch.
+`make cli-demo` (`scripts/tapes/render.sh`) builds onefold, makes a made-up sandbox (`scripts/tapes/sandbox.sh`: fixed 2020-2023 dates, generated pictures and text, nothing personal) and records each `scripts/tapes/*.tape` with vhs into `assets/demo/cli-*.gif`. vhs needs ttyd and ffmpeg; `.github/workflows/demo.yml` renders them on GitHub instead (by hand, or on a push to a branch other than `main` that changes the tapes) and commits the GIFs to that branch, together with the GUI GIFs of Windows and macOS.
 
 ---
 

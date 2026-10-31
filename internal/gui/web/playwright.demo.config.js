@@ -4,9 +4,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { defineConfig } from '@playwright/test';
+import { existsSync } from 'node:fs';
 
 // The README demo of the GUI (scripts/gui-demo.sh): the real binary on a
-// made-up sandbox, recorded as a video, converted to a GIF by the script.
+// made-up sandbox, recorded as screenshots, converted to a GIF by the script.
+// The browser: DEMO_CHROME, else a chrome-headless-shell installed system-wide,
+// else the Chromium of `npx playwright install chromium`.
+const chrome = process.env.DEMO_CHROME
+  || (existsSync('/usr/local/bin/chrome-headless-shell') ? '/usr/local/bin/chrome-headless-shell' : undefined);
 export default defineConfig({
   testDir: './demo',
   timeout: 5 * 60 * 1000,
@@ -16,6 +21,6 @@ export default defineConfig({
   outputDir: process.env.DEMO_OUT || 'demo-results',
   use: {
     viewport: { width: 1280, height: 760 },
-    launchOptions: { executablePath: '/usr/local/bin/chrome-headless-shell' },
+    launchOptions: chrome ? { executablePath: chrome } : {},
   },
 });
