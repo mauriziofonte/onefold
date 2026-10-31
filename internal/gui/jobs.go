@@ -502,14 +502,17 @@ func (m *Manager) run(j *Job, stage string, resume bool, g *runctl.Gate) {
 	}
 	m.active, m.gate = nil, nil
 	m.st.saveJob(j)
+	// read under the lock: once it is released the job may start its next
+	// stage (Execute after a preview) and change them
+	status, msg := j.Status, j.Error
 	m.mu.Unlock()
-	switch j.Status {
+	switch status {
 	case stFailed:
-		m.log(j, LogEntry{Level: "error", Key: "log.jobFailed", Msg: j.Error})
+		m.log(j, LogEntry{Level: "error", Key: "log.jobFailed", Msg: msg})
 	case stStopped:
 		m.log(j, LogEntry{Level: "warn", Key: "log.jobStopped"})
 	default:
-		m.log(j, LogEntry{Level: "info", Key: "log.jobFinished", Args: map[string]any{"status": j.Status}})
+		m.log(j, LogEntry{Level: "info", Key: "log.jobFinished", Args: map[string]any{"status": status}})
 	}
 	m.broadcastJob(j)
 }
