@@ -5,43 +5,15 @@ Open work that needs a person (a decision, administrator rights, a desktop, or a
 Common facts:
 
 - onefold is a Go CLI + local GUI that dedups photo/video archives and other files and builds a canonical "golden" tree (`README.md`).
-- Hard rules (`LLMS.md`): sources are read-only (only exceptions: `rearrange` duplicate deletion, `purge-sources`); the media naming and winner rules are frozen and pinned by `TestMediaSynthRegression` (`internal/plan/synth_test.go`) and `TestGenericPlanRegression`; external transport binaries (rsync, ssh) are never executed by onefold; `go 1.22` is the language directive and pinned dependencies are only bumped on purpose.
+- Hard rules (`LLMS.md`): sources are read-only (only exceptions: `rearrange` duplicate deletion, `purge-sources`); the media naming and winner rules are frozen and pinned by `TestMediaSynthRegression` (`internal/plan/synth_test.go`) and `TestGenericPlanRegression`; external transport binaries (rsync, ssh) are never executed by onefold; dependencies are bumped on purpose only (Dependabot pull requests, merged by a person) and `govulncheck` is a blocking CI job.
 - Windows-native is the primary target: changes touching paths, rename, time or console must also pass the Windows test binaries (`GOOS=windows go test -c ./<pkg>` run on Windows from the package directory).
 
 | ID | Item | Blocked on | Effort once unblocked |
 |---|---|---|---|
-| T1 | Bump dependencies flagged by govulncheck | owner decision (may raise the `go` directive) | small to medium |
 | T2 | Byte-original golden profile (`apply-golden`) | owner decision between 3 options | medium (option B) to large (option A) |
 | T3 | Split the first-catalog cost between Microsoft Defender and the OS cache | Windows administrator rights, reboots | small (measurement + docs) |
 | T4 | Check the double-click launch with Windows Terminal as default terminal | a person at a Windows desktop | small (manual check) |
 | T5 | README demo GIFs of the CLI | install `vhs` and `ttyd` | small to medium |
-
----
-
-## T1. Bump the dependencies govulncheck flags
-
-**State.** CI has a job `vulncheck` in `.github/workflows/ci.yml` that runs `go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...` with `continue-on-error: true` (report only, the run stays green). A local run on 2026-10-31 found 13 vulnerabilities whose vulnerable code is reachable from onefold:
-
-| Module | Pinned (`go.mod`) | Fixed in | Reached through |
-|---|---|---|---|
-| `golang.org/x/crypto` | v0.31.0 | >= v0.56.0 (11 advisories, GO-2025-3487 ... GO-2026-6355) | `internal/remote` (SSH/SFTP push: `ssh.Dial`, `sftp.NewClient`) |
-| `golang.org/x/text` | v0.21.0 | >= v0.39.0 (GO-2026-5970) | text normalization |
-| `github.com/ulikunitz/xz` | v0.5.12 (indirect, via `github.com/bodgit/sevenzip`) | >= v0.5.15 (GO-2025-3922) | 7z listing (`internal/meta`), pinned tool install (`internal/tooldl`) |
-
-**Why blocked.** The project pins `go 1.22` and its dependencies on purpose; newer `golang.org/x/*` releases may require a newer `go` directive in their own `go.mod` (not verified). Raising the directive or a pin is the owner's call.
-
-**Decision needed.** Bump (recommended) and accept a newer `go` directive if required, or keep the pins and accept the advisories.
-
-**Steps once decided.**
-
-1. `go get golang.org/x/crypto@latest golang.org/x/text@latest github.com/ulikunitz/xz@latest` (or the minimum fixed versions above), `go mod tidy`.
-2. If `go.mod`'s `go` line had to change, check every place that names the Go version: `go.mod`, `.github/workflows/ci.yml` and `release.yml` (`go-version`), `LLMS.md`, `README.md` build section.
-3. `go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...` must report no reachable vulnerability.
-4. `make test`, `GOOS=windows go vet ./...`, Windows test binaries of `internal/remote`, `internal/meta`, `internal/tooldl`.
-5. Remove `continue-on-error: true` from the `vulncheck` job (and its comment) so CI fails on new advisories; check the workflow with actionlint and zizmor (`scripts/check-workflows.sh` does both).
-6. Regenerate `THIRD_PARTY_NOTICES.txt` content check: `make notices` must succeed (it reads the licenses of the new versions).
-
-**Done when.** govulncheck is clean, `vulncheck` is a blocking CI job, all tests green on Linux and Windows.
 
 ---
 

@@ -1,6 +1,6 @@
 module github.com/mauriziofonte/onefold
 
-go 1.22
+go 1.26.0
 
 require (
 	github.com/abema/go-mp4 v1.7.1
@@ -16,10 +16,10 @@ require (
 	github.com/skeema/knownhosts v1.3.0
 	github.com/vbauerster/mpb/v8 v8.9.3
 	github.com/zeebo/xxh3 v1.1.0
-	golang.org/x/crypto v0.31.0
-	golang.org/x/sys v0.30.0
-	golang.org/x/term v0.27.0
-	golang.org/x/text v0.21.0
+	golang.org/x/crypto v0.58.0
+	golang.org/x/sys v0.49.0
+	golang.org/x/term v0.47.0
+	golang.org/x/text v0.43.0
 )
 
 require (
@@ -44,6 +44,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/tinylib/msgp v1.2.5 // indirect
-	github.com/ulikunitz/xz v0.5.12 // indirect
+	github.com/ulikunitz/xz v0.5.15 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 )

@@ -4,6 +4,10 @@ All notable changes to onefold are listed here, newest first. Versions follow [S
 
 The version being prepared is in the `VERSION` file; a release is the tag `v<VERSION>` (see section 5.4 of `ARCHITECTURE.md`).
 
+## [Unreleased]
+
+- Security: `golang.org/x/crypto` v0.58.0 (SSH and SFTP push), `golang.org/x/text` v0.43.0 and `github.com/ulikunitz/xz` v0.5.15 (7z listing) replace versions with known advisories; building from source now needs Go 1.26 or newer.
+
 ## [0.0.1-alpha] - 2026-10-31
 
 First public pre-release.

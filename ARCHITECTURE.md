@@ -309,8 +309,8 @@ Leaves: `kinds`, `fsx`, `perf`, `report`, `runctl`, `statedir`, `testfix`, `winr
 
 ### 5.1 Toolchain
 
-- Go module `github.com/mauriziofonte/onefold`, `go 1.22` language directive. Builds use `CGO_ENABLED=0`: the binaries are static, no C toolchain is needed. CI and releases pin the Go toolchain version in the workflows.
-- Pinned dependencies are bumped on purpose only: several newer versions require a newer `go` directive (see `TODOS.md` for the open bump).
+- Go module `github.com/mauriziofonte/onefold`, `go 1.26.0` language directive (raised from 1.22 after 0.0.1-alpha to take the security fixes of `golang.org/x/crypto`, `golang.org/x/text` and `github.com/ulikunitz/xz`). Builds use `CGO_ENABLED=0`: the binaries are static, no C toolchain is needed. CI and releases pin the Go toolchain version in the workflows.
+- Dependencies are bumped on purpose only: Dependabot opens the pull requests (Go modules and action pins, weekly), a person merges them after CI. `govulncheck` (CI job `vulncheck`) fails the build on any advisory whose vulnerable code onefold reaches.
 - Node is needed only to rebuild the GUI frontend. The built frontend (`internal/gui/web/dist`) is committed and embedded with `go:embed`, so `go build` and `go test` never need Node. `TestWebDistInSync` fails when `dist` is older than the sources.
 
 Direct dependencies and what they are for:
@@ -351,9 +351,9 @@ Direct dependencies and what they are for:
 
 ### 5.3 Continuous integration and release
 
-- `.github/workflows/ci.yml` (push to `main`, pull requests, called by the release): matrix Ubuntu + Windows; Linux installs exiftool, ffmpeg, poppler, p7zip, antiword from apt; Windows installs the pinned tools with `go run ./cmd/onefold tools install all`, which also proves the download pins. Steps: gofmt (Linux), `go vet` for both GOOS, `go test -count=1 ./...`, then `TestE2E` again with `-v`: the job fails unless it PASSED (a skip is not a pass). A separate `vulncheck` job runs govulncheck (report-only for now, see `TODOS.md`).
+- `.github/workflows/ci.yml` (push to `main`, pull requests, called by the release): matrix Ubuntu + Windows; Linux installs exiftool, ffmpeg, poppler, p7zip, antiword from apt; Windows installs the pinned tools with `go run ./cmd/onefold tools install all`, which also proves the download pins. Steps: gofmt (Linux), `go vet` for both GOOS, `go test -count=1 ./...`, then `TestE2E` again with `-v`: the job fails unless it PASSED (a skip is not a pass). A separate `vulncheck` job runs govulncheck and fails on any reachable advisory.
 - `.github/workflows/release.yml` (tag `v<VERSION>` on a commit of `main`, section 5.4): runs CI, then `make release`, checks that no tracked file changed, verifies checksums, versions (`go version -m`, `onefold version`) and notices, and publishes the GitHub release with the binaries, `LICENSE`, `THIRD_PARTY_NOTICES.txt` and `SHA256SUMS`.
-- Actions are pinned by commit; `.github/dependabot.yml` keeps the pins current. Workflows run only on github.com (`if: github.server_url == 'https://github.com'`), so mirrors on other forges stay quiet.
+- Actions are pinned by commit; `.github/dependabot.yml` keeps the pins and the Go modules current through weekly pull requests. Workflows run only on github.com (`if: github.server_url == 'https://github.com'`), so mirrors on other forges stay quiet.
 
 ### 5.4 Versions and releasing
 

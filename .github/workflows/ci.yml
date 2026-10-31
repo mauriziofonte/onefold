@@ -44,7 +44,7 @@ jobs:
 
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: "1.27.3" # toolchain pin (workstations too); go.mod keeps the go 1.22 language directive
+          go-version: "1.27.3" # toolchain pin (workstations too); go.mod holds the language directive
           cache: false
 
       - name: external tools (Linux)
@@ -86,9 +86,6 @@ jobs:
     if: github.server_url == 'https://github.com'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    # report only until the pinned dependencies are bumped (a decision kept
-    # with the go 1.22 directive): the findings show in the log, the run stays green
-    continue-on-error: true
     env:
       CGO_ENABLED: "0"
     steps:
