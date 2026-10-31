@@ -11,6 +11,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
+
+	"github.com/mauriziofonte/onefold/internal/fsx"
 )
 
 // Reasons of the user's exclusions after a preview.
@@ -111,18 +114,20 @@ func CompileGlobs(ps []string) ([]Glob, error) {
 	return out, nil
 }
 
-// CleanExcludePaths makes every excluded path absolute and clean.
+// CleanExcludePaths gives every excluded path its canonical spelling
+// (fsx.Canonical), the one the rooms and their records use: an exclusion
+// typed through a link or a short name still matches.
 func CleanExcludePaths(ps []string) ([]string, error) {
 	var out []string
 	for _, p := range ps {
 		if strings.TrimSpace(p) == "" {
 			continue
 		}
-		a, err := filepath.Abs(strings.TrimSpace(p))
+		a, err := fsx.Canonical(strings.TrimSpace(p))
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, filepath.Clean(a))
+		out = append(out, a)
 	}
 	return out, nil
 }
@@ -147,9 +152,15 @@ func (o Options) UserExclusion(room, p string) string {
 			return ReasonExclude
 		}
 	}
-	for _, e := range o.ExcludePaths {
-		if underPath(p, e) {
-			return ReasonExcludePath
+	if len(o.ExcludePaths) > 0 {
+		// the exclusions are canonical (CleanExcludePaths); the path is
+		// compared as given and as reached from the canonical room, so a
+		// room walked through a link or a short name still matches
+		cp := filepath.Join(canonicalCached(room), rel)
+		for _, e := range o.ExcludePaths {
+			if underPath(p, e) || underPath(cp, canonicalCached(e)) {
+				return ReasonExcludePath
+			}
 		}
 	}
 	if rel != "" {
@@ -165,4 +176,20 @@ func (o Options) UserExclusion(room, p string) string {
 // HasUserExclusions reports whether any user exclusion is set.
 func (o Options) HasUserExclusions() bool {
 	return len(o.Exclude) > 0 || len(o.ExcludePaths) > 0 || len(o.ExcludeGlobs) > 0
+}
+
+// canonCache caches fsx.Canonical of rooms and excluded paths: UserExclusion
+// runs once per file and folder.
+var canonCache sync.Map
+
+func canonicalCached(p string) string {
+	if c, ok := canonCache.Load(p); ok {
+		return c.(string)
+	}
+	c, err := fsx.Canonical(p)
+	if err != nil {
+		c = filepath.Clean(p)
+	}
+	canonCache.Store(p, c)
+	return c
 }

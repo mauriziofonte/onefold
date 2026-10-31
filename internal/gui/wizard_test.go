@@ -17,7 +17,7 @@ import (
 
 func wizardTree(t *testing.T) string {
 	t.Helper()
-	d := t.TempDir()
+	d := testfix.TempDir(t)
 	old := time.Date(2020, 3, 4, 5, 6, 7, 0, time.Local)
 	mk := func(rel string, f func(string) error) {
 		p := filepath.Join(d, filepath.FromSlash(rel))

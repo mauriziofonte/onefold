@@ -1493,6 +1493,8 @@ Units are bytes (apply, push, merge copies, verify) or items (catalog, rearrange
 - `RenameNoReplace(src, dst)`: Linux `renameat2(..., RENAME_NOREPLACE)`; Windows `MoveFileEx` without `MOVEFILE_REPLACE_EXISTING`, with `MOVEFILE_WRITE_THROUGH` and the `\\?\` prefix for long paths; where the platform call is unsupported (some filesystems, other OSes) a hard link then removal of the source, and as the last resort a stat-then-rename (not atomic: only where neither primitive exists). An existing destination returns `fsx.ErrExists`. Cross-volume renames fail (rearrange relies on it).
 - Temp names: `TempSuffix = ".onefold-tmp"`, `TempFor(dst, keepExt)`, `IsTemp(name)` (section 6.6).
 - `OpenUncached(path)` and `AlignedBuffer(n)`: reads that bypass the OS cache (merge `-verify-uncached`).
+- `LinkNoReplace(src, dst)`: a hard link that refuses an existing name (`os.Link`), `ErrCrossVolume` across volumes (`apply -link`, section 14.5).
+- `Canonical(path)`: the one spelling every path comparison uses: absolute, clean, symbolic links and Windows 8.3 short names (`C:\Users\RUNNER~1`) resolved; a path that does not exist yet is resolved through its longest existing ancestor. merge (output, inputs), catalog exclusions and skip folders, purge (output, rooms, listed files: folders resolved, a file's own name kept) and the GUI list filters go through it, so a folder reached through a link or a short name still counts as inside the output or an input. Tests compare against `testfix.TempDir` (a temp dir already canonical: macOS reaches `/var` through `/private/var`).
 
 Anything that must not clobber uses `RenameNoReplace`, never `os.Rename`.
 

@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -64,6 +65,9 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	bin = filepath.Join(dir, "onefold")
+	if runtime.GOOS == "windows" {
+		bin += ".exe" // exec finds a Windows program only by its extension
+	}
 	cmd := exec.Command("go", "build", "-o", bin, ".")
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -167,7 +171,7 @@ func byName(acts []plan.Action) map[string]plan.Action {
 // two-host corpus and checks the contract end to end.
 func TestE2E(t *testing.T) {
 	need(t, "exiftool", "ffmpeg", "ffprobe")
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	A, B := filepath.Join(root, "roomA"), filepath.Join(root, "roomB")
 	ts := time.Date(2021, 6, 1, 9, 30, 0, 0, time.UTC)
 	old := time.Date(2015, 3, 3, 3, 3, 3, 0, time.Local)
@@ -210,7 +214,7 @@ func TestE2E(t *testing.T) {
 	}
 	before := snapshot(t, root)
 
-	work := t.TempDir()
+	work := testfix.TempDir(t)
 	ma, mb := filepath.Join(work, "a.jsonl"), filepath.Join(work, "b.jsonl")
 
 	// Default scope is media only: the golden scope, here p1.jpg, clip.mp4, logo.png
@@ -445,9 +449,9 @@ func canon(recs []catalog.Record) string {
 // TestCLIValidation: bad flags fail fast with a non-zero exit.
 func TestCLIValidation(t *testing.T) {
 	for _, args := range [][]string{
-		{"catalog", "-preset", "nope", t.TempDir()},
-		{"catalog", "-category", "bogus", t.TempDir()},
-		{"catalog", "-min-size", "12Q", t.TempDir()},
+		{"catalog", "-preset", "nope", testfix.TempDir(t)},
+		{"catalog", "-category", "bogus", testfix.TempDir(t)},
+		{"catalog", "-min-size", "12Q", testfix.TempDir(t)},
 		{"plan", "-layout", "bogus", "x.jsonl"},
 		{"apply", "-execute", "missing.jsonl"},
 		{"export-text", "plan.jsonl"},
@@ -457,7 +461,7 @@ func TestCLIValidation(t *testing.T) {
 		}
 	}
 	// naming regimes: refused without -allow-mixed, exit 2, nothing written
-	in, out := t.TempDir(), filepath.Join(t.TempDir(), "o")
+	in, out := testfix.TempDir(t), filepath.Join(testfix.TempDir(t), "o")
 	for _, args := range [][]string{
 		{"catalog", "-preset", "all", "-o", filepath.Join(out, "m.jsonl"), in},
 		{"catalog", "-preset", "media,document", "-o", filepath.Join(out, "m.jsonl"), in},
@@ -480,7 +484,7 @@ func TestCLIValidation(t *testing.T) {
 		t.Error("a refused command wrote its output")
 	}
 	for _, args := range [][]string{
-		{"catalog", "-preset", "video", "-o", filepath.Join(t.TempDir(), "m.jsonl"), in},
+		{"catalog", "-preset", "video", "-o", filepath.Join(testfix.TempDir(t), "m.jsonl"), in},
 		{"merge", "-input", in, "-output", out, "-preset", "image,video", "-naming", "music"},
 		{"merge", "-input", in, "-output", out, "-preset", "media", "-layout", "dedupe", "-allow-mixed"},
 	} {
@@ -506,7 +510,7 @@ func TestCorpusFlow(t *testing.T) {
 		t.Skip("testdata/fixtures missing")
 	}
 	before := snapshot(t, corpus)
-	w := t.TempDir()
+	w := testfix.TempDir(t)
 	m, p, g, x := filepath.Join(w, "m.jsonl"), filepath.Join(w, "p.jsonl"), filepath.Join(w, "golden"), filepath.Join(w, "text")
 	out := dd(t, "catalog", "-preset", "all", "-allow-mixed", "-host", "fx", "-o", m, corpus)
 	if !strings.Contains(out, "assets:       39") {
@@ -570,7 +574,7 @@ func TestCorpusFlow(t *testing.T) {
 
 // TestMergeCLI: the <EXT>/<YEAR> tree as output and input, dry-run, execute, idempotent re-run.
 func TestMergeCLI(t *testing.T) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	O, B := filepath.Join(root, "FILES"), filepath.Join(root, "B")
 	old := time.Date(2012, 1, 2, 3, 4, 5, 0, time.Local)
 	must(t, testfix.File(filepath.Join(O, "TXT", "2012", "a.txt"), "alpha", old))
@@ -609,7 +613,7 @@ func TestMergeCLI(t *testing.T) {
 
 // TestRearrangeCLI: dry-run, execute, idempotent re-run, undo via the journal.
 func TestRearrangeCLI(t *testing.T) {
-	root := filepath.Join(t.TempDir(), "FILES")
+	root := filepath.Join(testfix.TempDir(t), "FILES")
 	must(t, testfix.File(filepath.Join(root, "TXT", "2020", "[Desktop] note -- frev.1.txt"), "note", time.Date(2019, 5, 5, 5, 5, 5, 0, time.Local)))
 	must(t, testfix.File(filepath.Join(root, "MP4", "clip.mp4"), "clip", time.Date(2018, 1, 1, 1, 1, 1, 0, time.Local)))
 	must(t, testfix.File(filepath.Join(root, "OLD", "clip copy.mp4"), "clip", time.Date(2020, 1, 1, 1, 1, 1, 0, time.Local)))
@@ -656,7 +660,7 @@ func TestRearrangeCLI(t *testing.T) {
 // name, a settings file, the GUI's command (settings.Args) read back by
 // -print-settings, then purge-sources.
 func TestDesktopArchiveCLI(t *testing.T) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	desk, O := filepath.Join(root, "Desktop"), filepath.Join(root, "OUT")
 	mt := time.Date(2021, 4, 5, 6, 7, 8, 0, time.Local)
 	for f, body := range map[string]string{"desktop.ini": "[.ShellClassInfo]", "Chrome.lnk": "L", "Sito.url": "[InternetShortcut]",
@@ -737,7 +741,7 @@ func jsonEsc(p string) string { return strings.ReplaceAll(p, `\`, `\\`) }
 // The GUI's "copy command" (settings.Args) read back by the CLI gives the same
 // settings.
 func TestSettingsArgsRoundTrip(t *testing.T) {
-	d := t.TempDir()
+	d := testfix.TempDir(t)
 	m := settings.Merge{Kind: "merge", Inputs: []string{filepath.Join(d, "a b"), filepath.Join(d, "c")}, Output: filepath.Join(d, "o"),
 		Filters: catalog.Filters{MaxSize: "2G", Exclude: "Backup old,.trash", Rules: map[string]bool{"shortcuts": false, "junk": false},
 			ExcludePaths: []string{filepath.Join(d, "a b", "DRIVERS")}, ExcludeGlobs: []string{"*.data", "**/node cache/**"}},
@@ -762,7 +766,7 @@ func TestSettingsArgsRoundTrip(t *testing.T) {
 
 // Package folders are flagged with the flags that leave them out.
 func TestPackagesCLI(t *testing.T) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	in, O := filepath.Join(root, "IN"), filepath.Join(root, "OUT")
 	mt := time.Date(2021, 4, 5, 6, 7, 8, 0, time.Local)
 	for _, f := range []string{"COMP1/DRIVERS/Display/nv.inf", "COMP1/DRIVERS/Display/nv.sys", "COMP1/DRIVERS/Display/license.txt", "COMP1/notes.txt"} {
@@ -785,7 +789,7 @@ func TestPackagesCLI(t *testing.T) {
 // adds it, and nothing already in the tree changes.
 func TestGoldenDeltaCLI(t *testing.T) {
 	corpus := filepath.Join("..", "..", "testdata", "media-synth")
-	w := t.TempDir()
+	w := testfix.TempDir(t)
 	G := filepath.Join(w, "golden")
 	mA, mB, pA := filepath.Join(w, "a.jsonl"), filepath.Join(w, "b.jsonl"), filepath.Join(w, "pa.jsonl")
 	ix, sub, rep := filepath.Join(w, "index.jsonl"), filepath.Join(w, "sub.jsonl"), filepath.Join(w, "match.json")
@@ -865,7 +869,7 @@ func TestGoldenDeltaCLI(t *testing.T) {
 // (same file as the source, original bytes, source mtime untouched), needs no
 // external tool, and a re-run changes nothing.
 func TestApplyLinkCLI(t *testing.T) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	src, G := filepath.Join(root, "src"), filepath.Join(root, "golden")
 	old := time.Date(2012, 1, 2, 3, 4, 5, 0, time.Local)
 	writeJPEG(t, filepath.Join(src, "IMG_20120102_030405.jpg"), 7)

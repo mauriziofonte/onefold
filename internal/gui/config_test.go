@@ -19,15 +19,16 @@ import (
 
 	"github.com/mauriziofonte/onefold/internal/config"
 	"github.com/mauriziofonte/onefold/internal/plan"
+	"github.com/mauriziofonte/onefold/internal/testfix"
 )
 
 func TestConfigAPI(t *testing.T) {
 	if !loopbackOK() {
 		t.Skip("this host blocks loopback connections for this process (environment, see TRAPS)")
 	}
-	cfgPath := filepath.Join(t.TempDir(), config.FileName)
+	cfgPath := filepath.Join(testfix.TempDir(t), config.FileName)
 	var seen []config.Config
-	s, err := New(Options{Port: -1, StateDir: t.TempDir(), Version: "v1.2.3", ConfigPath: cfgPath,
+	s, err := New(Options{Port: -1, StateDir: testfix.TempDir(t), Version: "v1.2.3", ConfigPath: cfgPath,
 		OnConfig: func(c config.Config) { seen = append(seen, c) },
 		Static:   fstest.MapFS{"index.html": {Data: []byte("<!doctype html>")}}})
 	if err != nil {
@@ -69,11 +70,11 @@ func TestConfigAPI(t *testing.T) {
 // preview showed.
 func TestJobsUseConfig(t *testing.T) {
 	m := newTestManager(t)
-	m.cfgPath, m.version = filepath.Join(t.TempDir(), config.FileName), "v1.2.3"
+	m.cfgPath, m.version = filepath.Join(testfix.TempDir(t), config.FileName), "v1.2.3"
 	if err := config.SaveTo(m.cfgPath, config.Config{Artist: "Jane Doe", Language: "eng"}); err != nil {
 		t.Fatal(err)
 	}
-	d := t.TempDir()
+	d := testfix.TempDir(t)
 	src := filepath.Join(d, "a.txt")
 	writeFile(t, src, "x")
 	pl := filepath.Join(d, "plan.jsonl")
@@ -98,7 +99,7 @@ func TestJobsUseConfig(t *testing.T) {
 func TestApplyNeedsTools(t *testing.T) {
 	t.Setenv("ONEFOLD_NO_EXTERNAL", "1")
 	m := newTestManager(t)
-	d := t.TempDir()
+	d := testfix.TempDir(t)
 	src := filepath.Join(d, "IMG_1.jpg")
 	writeFile(t, src, "not really a jpeg")
 	pl := filepath.Join(d, "plan.jsonl")

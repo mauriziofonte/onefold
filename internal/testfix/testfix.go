@@ -18,6 +18,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"testing"
 	"time"
 )
 
@@ -191,4 +192,17 @@ func File(p, body string, mtime time.Time) error {
 		return err
 	}
 	return os.Chtimes(p, mtime, mtime)
+}
+
+// TempDir is t.TempDir with symbolic links and Windows short names resolved:
+// the canonical spelling the engines report (fsx.Canonical). Without it a
+// test comparing a reported path with its own temp path fails where the temp
+// folder is reached through a link (macOS: /var -> /private/var) or a short
+// name (Windows runners: C:\Users\RUNNER~1).
+func TempDir(t testing.TB) string {
+	d := t.TempDir()
+	if r, err := filepath.EvalSymlinks(d); err == nil {
+		return r
+	}
+	return d
 }

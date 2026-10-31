@@ -182,16 +182,10 @@ func (o *Options) collect(label string, rooms []string, co catalog.Options) ([]c
 	return catalog.Collect(rooms, co)
 }
 
-func cleanAbs(p string) (string, error) {
-	a, err := filepath.Abs(p)
-	if err != nil {
-		return "", err
-	}
-	if r, err := filepath.EvalSymlinks(a); err == nil {
-		a = r
-	}
-	return filepath.Clean(a), nil
-}
+// cleanAbs is fsx.Canonical: one spelling per folder, also for an output
+// that does not exist yet (resolved through its existing parent), so that a
+// link or a short name cannot hide that the output is inside an input.
+func cleanAbs(p string) (string, error) { return fsx.Canonical(p) }
 
 // fold normalizes a path for comparisons: case-insensitive on Windows.
 func fold(p string) string {
