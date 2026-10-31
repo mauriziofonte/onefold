@@ -8,6 +8,7 @@ package fsx
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -40,5 +41,34 @@ func TestCanonical(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(real, "data", "out")); !os.IsNotExist(err) {
 		t.Fatal("Canonical created a folder")
+	}
+}
+
+// On a Mac volume that ignores case and normalization, a folder typed in
+// another case or normalization is spelled as stored, so comparisons with
+// walked paths hold.
+func TestCanonicalStoredSpelling(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	root = onDiskName(root)
+	stored := filepath.Join(root, "Pics", "Café") // NFC, as typed on most keyboards
+	if err := os.MkdirAll(stored, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	typed := filepath.Join(root, "pics", "Café") // other case, NFD
+	if _, err := os.Lstat(typed); err != nil {
+		t.Skip("this volume tells case or normalization apart: nothing to fold")
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows folds case in its comparisons, not in Canonical")
+	}
+	got, err := Canonical(filepath.Join(typed, "new"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(stored, "new"); got != want {
+		t.Fatalf("Canonical = %q, want %q", got, want)
 	}
 }

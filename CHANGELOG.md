@@ -6,6 +6,7 @@ The version being prepared is in the `VERSION` file; a release is the tag `v<VER
 
 ## [Unreleased]
 
+- macOS: a folder typed in another case or Unicode normalization than the one stored on disk (`/users/me/pics` for `/Users/me/Pics`) is recognized as the same folder by the output-inside-input check, exclusions and purge.
 - macOS: files are published with `renamex_np(RENAME_EXCL)`, one atomic call that refuses to replace, instead of the link-and-remove fallback.
 - macOS droppings on drives (`._name` AppleDouble files, `Icon\r`, `.Spotlight-V100`, `.Trashes`, `.fseventsd` and similar) are never treated as content, also with the dotfile filters off.
 - macOS: release binaries for Apple Silicon and Intel (`onefold-darwin-arm64`, `onefold-darwin-amd64`); `onefold gui` opens the browser (`open`); the state lives in `~/Library/Application Support/onefold`; tools installed with Homebrew are found even when onefold is not started from a shell.

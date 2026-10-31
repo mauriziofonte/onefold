@@ -16,6 +16,10 @@ import (
 // through a link, a short name or its real name must compare equal, or
 // "output inside an input" checks, exclusions and purge refusals would miss.
 //
+// On macOS, whose volumes usually ignore case and Unicode normalization, the
+// existing part is also spelled as stored on disk (/users/me/pics is
+// /Users/me/Pics), as Windows comparisons fold case.
+//
 // A path that does not exist yet (an output folder to create) is resolved
 // through its longest existing ancestor, and the missing part is appended
 // as given. Canonical never fails because of a missing path; it fails only
@@ -29,7 +33,7 @@ func Canonical(p string) (string, error) {
 	head, tail := a, ""
 	for {
 		if r, err := filepath.EvalSymlinks(head); err == nil {
-			return filepath.Clean(filepath.Join(r, tail)), nil
+			return filepath.Clean(filepath.Join(onDiskName(r), tail)), nil
 		}
 		if _, err := os.Lstat(head); err == nil {
 			// exists but cannot be resolved (permission denied on a parent):
