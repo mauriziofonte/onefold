@@ -27,7 +27,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 # Static by default: CGO off so the binary runs on any host with zero deps.
 export CGO_ENABLED := 0
 
-.PHONY: version build test vet lint race all linux windows linux-arm64 release notices winres workflows-check dist-clean web web-e2e web-demo
+.PHONY: version build test vet lint race cli-demo all linux windows linux-arm64 release notices winres workflows-check dist-clean web web-e2e web-demo
 
 version: ## the version a build of this tree gets
 	@echo $(VERSION)
@@ -60,6 +60,11 @@ web:
 # README demo of the GUI: assets/demo/gui-merge.gif (Node, ffmpeg)
 web-demo:
 	scripts/gui-demo.sh
+
+# README demos of the CLI: assets/demo/cli-*.gif (vhs with ttyd, ffmpeg, exiftool;
+# in CI: the manual workflow .github/workflows/demo.yml)
+cli-demo:
+	scripts/tapes/render.sh
 
 web-e2e:
 	go build -o $${TMPDIR:-/tmp}/onefold-e2e ./cmd/onefold

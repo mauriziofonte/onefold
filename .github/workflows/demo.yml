@@ -1,0 +1,63 @@
+# onefold
+# Author: Maurizio Fonte <fonte.maurizio@gmail.com>
+# Copyright (c) 2026 Maurizio Fonte
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Renders the CLI demo GIFs of the README (scripts/tapes/render.sh, vhs) on a
+# made-up sandbox and commits them to the branch it runs on. Started by hand
+# (Actions > demo > Run workflow, or `gh workflow run demo.yml --ref BRANCH`),
+# never on main directly: the GIFs reach main through a reviewed pull request.
+# Actions are pinned by commit.
+name: demo
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: demo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cli:
+    name: CLI GIFs (vhs)
+    if: github.server_url == 'https://github.com' && github.ref != 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write # commit the rendered GIFs to this branch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3"
+          cache: false
+
+      - name: exiftool and ffmpeg (sandbox pictures, stamping)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends libimage-exiftool-perl ffmpeg
+
+      - uses: charmbracelet/vhs-action@f6d7db07a432fcd3b06772628d36a57f96d95dcf # v2.1.1
+        with:
+          version: v0.12.1
+          install-fonts: true
+
+      - name: render
+        run: scripts/tapes/render.sh
+
+      - name: commit the GIFs to this branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          git add assets/demo
+          if git diff --cached --quiet; then echo "GIFs unchanged"; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "docs: render the CLI demo GIFs"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${BRANCH}"
