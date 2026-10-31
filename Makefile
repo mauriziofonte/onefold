@@ -27,7 +27,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 # Static by default: CGO off so the binary runs on any host with zero deps.
 export CGO_ENABLED := 0
 
-.PHONY: version build test vet lint race cli-demo all linux windows linux-arm64 release notices winres workflows-check dist-clean web web-e2e web-demo
+.PHONY: version build test vet lint race cli-demo all linux windows linux-arm64 darwin release notices winres workflows-check dist-clean web web-e2e web-demo
 
 version: ## the version a build of this tree gets
 	@echo $(VERSION)
@@ -74,9 +74,9 @@ all: linux windows ## the two targets we actually deploy
 
 # Release artifacts: every deploy target, the license, the third-party notices,
 # SHA-256 sums (.github/workflows/release.yml publishes them on a version tag).
-release: linux windows linux-arm64 notices
+release: linux windows linux-arm64 darwin notices
 	cp LICENSE $(DIST)/LICENSE
-	cd $(DIST) && sha256sum $(BIN)-linux-amd64 $(BIN)-windows-amd64.exe $(BIN)-linux-arm64 LICENSE THIRD_PARTY_NOTICES.txt > SHA256SUMS
+	cd $(DIST) && sha256sum $(BIN)-linux-amd64 $(BIN)-windows-amd64.exe $(BIN)-linux-arm64 $(BIN)-darwin-arm64 $(BIN)-darwin-amd64 LICENSE THIRD_PARTY_NOTICES.txt > SHA256SUMS
 
 # Licenses of everything linked or bundled into the binaries: Go standard
 # library, every module onefold imports on Linux and Windows, the GUI bundle.
@@ -115,6 +115,10 @@ windows: ## native Windows (amd64) — indexes D:\ without 9P
 
 linux-arm64: ## (e.g. an ARM NAS) — trivial extra target
 	GOOS=linux   GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o $(DIST)/$(BIN)-linux-arm64      $(PKG)
+
+darwin: ## macOS, Apple Silicon and Intel (the linker signs arm64 ad hoc, as macOS requires)
+	GOOS=darwin  GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o $(DIST)/$(BIN)-darwin-arm64     $(PKG)
+	GOOS=darwin  GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(DIST)/$(BIN)-darwin-amd64     $(PKG)
 
 dist-clean:
 	go clean

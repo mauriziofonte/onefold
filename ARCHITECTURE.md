@@ -339,8 +339,8 @@ Direct dependencies and what they are for:
 | `make vet` | `go vet ./...` |
 | `make lint` | staticcheck (pinned) for `GOOS=linux`, `windows`, `darwin` |
 | `make race` | `go test -race` (cgo and a C compiler needed) |
-| `make linux`, `make windows`, `make linux-arm64` | `dist/onefold-<os>-<arch>[.exe]` with the version of 5.4; `make windows` regenerates the exe resources with the build version (section 25.4) and restores the committed file afterwards |
-| `make release` | the three builds, `THIRD_PARTY_NOTICES.txt` (`make notices`), `SHA256SUMS`; `DIST=<dir>` to build elsewhere |
+| `make linux`, `make windows`, `make linux-arm64`, `make darwin` | `dist/onefold-<os>-<arch>[.exe]` (`darwin`: arm64 and amd64; the Go linker signs arm64 ad hoc, which macOS requires) with the version of 5.4; `make windows` regenerates the exe resources with the build version (section 25.4) and restores the committed file afterwards |
+| `make release` | every build above (five binaries), `THIRD_PARTY_NOTICES.txt` (`make notices`), `SHA256SUMS`; `DIST=<dir>` to build elsewhere |
 | `make notices` | the Go standard library license, the license of every linked module, the licenses bundled in the GUI |
 | `make winres` | `go generate ./cmd/onefold`: rewrites `cmd/onefold/rsrc_windows_amd64.syso` (committed) |
 | `make web` | rebuilds `internal/gui/web/dist` (Node) |
@@ -1357,7 +1357,7 @@ Rules: naming precedence `template` > `families` > `naming` (+`clean`) > `layout
 
 ## 22. The GUI
 
-`onefold gui` (or a double-click on the Windows exe) starts a local web server and opens the page: in a native WebView2 window on Windows, in the default browser elsewhere. Every mode of the CLI is available with a preview-first flow, live progress, pause/resume/stop, persistent runs and a guided setup.
+`onefold gui` (or a double-click on the Windows exe) starts a local web server and opens the page: in a native WebView2 window on Windows, in the default browser elsewhere (`open` on macOS, `xdg-open` on Linux; the URL is also printed). Every mode of the CLI is available with a preview-first flow, live progress, pause/resume/stop, persistent runs and a guided setup.
 
 ### 22.1 Launch
 
@@ -1382,7 +1382,7 @@ On Windows, `onefold.exe` with no arguments opens the GUI when it was started by
 
 ### 22.3 State dir
 
-`$ONEFOLD_STATE_DIR`, else `%LOCALAPPDATA%\onefold` (Windows), else `$XDG_STATE_HOME/onefold`, else `~/.local/state/onefold`; never a temporary folder, because a run must survive a reboot.
+`$ONEFOLD_STATE_DIR`, else `%LOCALAPPDATA%\onefold` (Windows), `~/Library/Application Support/onefold` (macOS), else `$XDG_STATE_HOME/onefold`, else `~/.local/state/onefold`; never a temporary folder, because a run must survive a reboot.
 
 | Path | Content |
 |---|---|
@@ -1505,7 +1505,7 @@ Anything that must not clobber uses `RenameNoReplace`, never `os.Rename`.
 
 The registry of optional programs: `exiftool ffprobe ffmpeg pdfinfo pdftotext antiword 7z unrar`.
 
-- Lookup, cached per process: `PATH`, the exe's folder, `<exe folder>/tools`, then `<state dir>/tools` (downloads). On Windows the candidates are `.exe`, `.bat`, `.cmd` (and `exiftool(-k).exe`). `tools.Reset` clears the cache after an install.
+- Lookup, cached per process: `PATH`, the exe's folder, `<exe folder>/tools`, `<state dir>/tools` (downloads), then on macOS the Homebrew folders `/opt/homebrew/bin` and `/usr/local/bin` (a program started from Finder has no Homebrew on `PATH`; `TestHomebrewWithoutPath`). On Windows the candidates are `.exe`, `.bat`, `.cmd` (and `exiftool(-k).exe`). `tools.Reset` clears the cache after an install.
 - `ONEFOLD_NO_EXTERNAL=1` makes every tool missing (parity tests).
 - `Command` returns nil when the tool is missing; on Windows the child gets no console window.
 - `StartTree(cmd)` starts a tool so that a kill also ends every process it started (on Windows a job object with kill-on-close: the pinned exiftool is a launcher running Perl, and killing only the launcher left Perl holding the pipes).
@@ -1530,7 +1530,7 @@ Install: download into `<state dir>/tools/.download/<id>-<version>.onefold-tmp` 
 
 ### 24.4 `statedir`
 
-`statedir.Dir()`: `ONEFOLD_STATE_DIR`, else `%LOCALAPPDATA%\onefold`, else `$XDG_STATE_HOME/onefold`, else `~/.local/state/onefold`. Shared by the GUI, the downloaded tools and the user config. `onefold gui -state DIR` moves only the GUI state.
+`statedir.Dir()`: `ONEFOLD_STATE_DIR`, else `%LOCALAPPDATA%\onefold` (Windows), `~/Library/Application Support/onefold` (macOS), else `$XDG_STATE_HOME/onefold`, else `~/.local/state/onefold`. Shared by the GUI, the downloaded tools and the user config. `onefold gui -state DIR` moves only the GUI state.
 
 ### 24.5 `runctl`
 
@@ -1779,5 +1779,4 @@ Run the suite with `TZ=America/New_York go test ./...` and `TZ=UTC go test ./...
 - `similar` cannot decode HEIC, RAW, WebP or TIFF (no pure-Go decoder); `-docs` needs `pdftotext` for PDFs.
 - Two `apply` runs on the same target at the same time (CLI and GUI together) could interfere through deterministic temp names; one run per target.
 - The rearrange journal stores absolute paths: a moved or remounted tree cannot be resumed or undone in place.
-- The Windows double-click detection with Windows Terminal as the default terminal is written for that case but not yet checked by hand (`TODOS.md`).
-- macOS builds are not produced; the code compiles, but the state dir and the browser opener are not adapted to macOS.
+- macOS binaries are not notarized (it needs a paid Apple Developer account): the first start needs the Gatekeeper steps of the README. The GUI runs in the browser (no native window).

@@ -59,7 +59,8 @@ How it decides that two files are the same:
 Download the binary for your system from the [releases page](https://github.com/mauriziofonte/onefold/releases) and check it:
 
 ```bash
-sha256sum -c SHA256SUMS --ignore-missing
+sha256sum -c SHA256SUMS --ignore-missing         # Linux, Windows (Git Bash)
+shasum -a 256 -c SHA256SUMS --ignore-missing     # macOS
 ```
 
 | System | File |
@@ -67,8 +68,20 @@ sha256sum -c SHA256SUMS --ignore-missing
 | Windows 10/11 x64 | `onefold-windows-amd64.exe` |
 | Linux x64 (also WSL, most NAS) | `onefold-linux-amd64` |
 | Linux ARM64 (Raspberry Pi 4/5, ARM NAS) | `onefold-linux-arm64` |
+| macOS Apple Silicon (M1 and later) | `onefold-darwin-arm64` |
+| macOS Intel | `onefold-darwin-amd64` |
 
 Nothing to install: put the file anywhere (rename it to `onefold.exe` or `onefold` if you like). The optional helper tools are covered [below](#optional-tools).
+
+On macOS the binaries are not notarized (that needs a paid Apple Developer account), so the first start is blocked by Gatekeeper. Either remove the download mark once, from Terminal:
+
+```bash
+chmod +x onefold-darwin-arm64
+xattr -d com.apple.quarantine onefold-darwin-arm64
+./onefold-darwin-arm64 gui
+```
+
+or run it once, then allow it in System Settings > Privacy & Security ("Allow Anyway") and run it again. On macOS the GUI opens in your default browser (`onefold gui` from Terminal).
 
 ## Quick start
 

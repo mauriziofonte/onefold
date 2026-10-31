@@ -6,6 +6,7 @@ The version being prepared is in the `VERSION` file; a release is the tag `v<VER
 
 ## [Unreleased]
 
+- macOS: release binaries for Apple Silicon and Intel (`onefold-darwin-arm64`, `onefold-darwin-amd64`); `onefold gui` opens the browser (`open`); the state lives in `~/Library/Application Support/onefold`; tools installed with Homebrew are found even when onefold is not started from a shell.
 - Windows 11 24H2 and later: a double-click on onefold.exe no longer flashes a console window or a Windows Terminal tab before the GUI opens.
 - Measured: right after a reboot, the first catalog of 5,384 files took 52 s with Microsoft Defender scanning and 3 s with onefold excluded (README, Windows notes).
 - Fixed: among byte-identical photos or videos with no sub-second time, the copy kept could change from one run to the next (it followed the order the catalog workers finished in); it is now the one with a clean name, then the oldest, then the shortest path.

@@ -71,7 +71,7 @@ jobs:
           cd out
           sha256sum -c SHA256SUMS
           test "$(./onefold-linux-amd64 version | cut -d' ' -f2)" = "$TAG"
-          for f in onefold-linux-amd64 onefold-linux-arm64 onefold-windows-amd64.exe; do
+          for f in onefold-linux-amd64 onefold-linux-arm64 onefold-windows-amd64.exe onefold-darwin-arm64 onefold-darwin-amd64; do
             go version -m "$f" | grep -qF -- "-X main.version=$TAG\"" || { echo "$f: not built as $TAG"; exit 1; }
           done
           # every third-party section carries its license text
@@ -116,6 +116,7 @@ jobs:
             echo
             echo "- Windows: \`onefold-windows-amd64.exe\` (double-click opens the GUI; optional tools: \`onefold tools install all\` or the Doctor page)."
             echo "- Linux: \`onefold-linux-amd64\`, \`onefold-linux-arm64\` (static, no dependencies)."
+            echo "- macOS: \`onefold-darwin-arm64\` (Apple Silicon), \`onefold-darwin-amd64\` (Intel); not notarized, see the README (Install) for the first start."
             echo "- Checksums: \`sha256sum -c SHA256SUMS\`."
             echo "- License: AGPL-3.0-or-later (\`LICENSE\`); third-party components: \`THIRD_PARTY_NOTICES.txt\`."
           } > notes.md
