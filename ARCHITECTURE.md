@@ -1570,7 +1570,7 @@ The GUI window is WebView2 (`jchv/go-webview2`), with the exe icon, sized for th
 
 ### 25.5 Antivirus
 
-Microsoft Defender scans each file the first time it is opened. On a first catalog of thousands of files this dominates: measured on 5,384 program files (2.0 GB), the first run took 21.5 s with 114 s of cumulative `open` time (average 21 ms, max 12.7 s), a second run 0.25 s. onefold opens each small file once (whole-read path, preloaded bytes for every extractor). Excluding the onefold process from real-time scanning is the user's decision, documented in the README; onefold never changes it.
+Microsoft Defender scans each file the first time it is opened. On a first catalog of thousands of files this dominates: measured on 5,384 program files (2.0 GB), the first run took 21.5 s with 114 s of cumulative `open` time (average 21 ms, max 12.7 s), a second run 0.25 s. To separate the scan from the cold OS cache, `scripts/defender-measure.ps1` repeated it right after a reboot (Windows 11 build 26300, 16 CPUs, `-j 8`): with real-time protection 52 s wall, `open` 397 s cumulative (average 74 ms, max 9.8 s); with a process exclusion for onefold.exe 2.8 s wall, `open` 6.9 s cumulative (average 1.3 ms). About 95% of the first-run time is the on-access scan; the cold cache costs a few seconds. onefold opens each small file once (whole-read path, preloaded bytes for every extractor). Excluding the onefold process from real-time scanning is the user's decision, documented in the README; onefold never changes it.
 
 ### 25.6 Recycle Bin, drives, WSL
 

@@ -10,20 +10,7 @@ Common facts:
 
 | ID | Item | Blocked on | Effort once unblocked |
 |---|---|---|---|
-| T3 | Split the first-catalog cost between Microsoft Defender and the OS cache | Windows administrator rights, reboots | small (measurement + docs) |
 | T4 | Check the double-click launch with Windows Terminal as default terminal | a person at a Windows desktop | small (manual check) |
-
----
-
-## T3. Microsoft Defender vs OS cache on the first catalog (Windows)
-
-**State.** The first `catalog` of files Windows has not read recently is slow because of on-access scanning. Measured on 2026-10-31 without administrator rights (real-time protection on), `onefold.exe catalog -preset all -allow-mixed -no-sweep -j 8 -perf` over `C:\Program Files\Microsoft Office\root\Office16` (5384 files, 2.0 GB): first run 21.5 s wall, `open` 114 s cumulative (average 21 ms, max 12.7 s); second run 0.25 s, `open` average 0.06 ms. The README documents the optional process exclusion (`Add-MpPreference -ExclusionProcess`) as the user's choice; onefold never changes Defender settings.
-
-**Why blocked.** Telling Defender's cost apart from the OS file cache needs the exclusion on and off and cold caches: administrator rights and reboots.
-
-**Steps.** `scripts/defender-measure.ps1` does the whole measurement: from an administrator PowerShell, `powershell -ExecutionPolicy Bypass -File scripts\defender-measure.ps1 -Onefold C:\path\to\onefold.exe` (`-Tree DIR` for another non-personal folder). It reboots twice by itself (save your work first), runs the catalog above on a cold cache with Defender as configured and then with a process exclusion for onefold.exe, removes the exclusion and its scheduled task, and writes `%LOCALAPPDATA%\onefold-defender-measure\summary.txt`. Paste that file into an issue or the project thread.
-
-**Done when.** The two measurements are recorded next to the existing one in the README paragraph about Defender (one sentence: the share of the first-run cost due to scanning), no code change expected.
 
 ---
 

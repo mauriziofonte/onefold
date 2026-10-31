@@ -296,7 +296,7 @@ On Windows (x64), `onefold tools install all` (or the Doctor page of the GUI) do
 
 ## Windows notes
 
-- The first pass over files Windows has not read yet is slow: Microsoft Defender scans each file the first time it is opened (on 5,400 program files the first index took 21 s, a second one 0.25 s). If you trust the tool, you can exclude the onefold process from real-time scanning (administrator PowerShell, your decision): `Add-MpPreference -ExclusionProcess "C:\path\to\onefold.exe"`; `Remove-MpPreference -ExclusionProcess "C:\path\to\onefold.exe"` undoes it. onefold never changes this setting itself.
+- The first pass over files Windows has not read yet is slow: Microsoft Defender scans each file the first time it is opened (on 5,400 program files the first index took 21 s, a second one 0.25 s). Measured right after a reboot, so with nothing in the disk cache, the same index took 52 s with Defender scanning and 3 s with onefold excluded: almost all of the first-run cost is the scan, not the disk. If you trust the tool, you can exclude the onefold process from real-time scanning (administrator PowerShell, your decision): `Add-MpPreference -ExclusionProcess "C:\path\to\onefold.exe"`; `Remove-MpPreference -ExclusionProcess "C:\path\to\onefold.exe"` undoes it. onefold never changes this setting itself.
 - Long paths (over 260 characters) are supported.
 - If a double-click seems to do nothing, turn on the diagnostic log (`onefold config set diag-log on`) and read `onefold-gui.log` next to the exe.
 - Explorer shows the version of release builds in the file properties.

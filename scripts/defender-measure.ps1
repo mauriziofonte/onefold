@@ -36,6 +36,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# onefold writes UTF-8: read its output as such
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $Work = Join-Path $env:LOCALAPPDATA "onefold-defender-measure"
 $State = Join-Path $Work "state.txt"
 $TaskName = "onefold-defender-measure"
@@ -74,7 +76,9 @@ function Measure-Catalog([string]$label) {
     try {
         $wall = Measure-Command {
             & $Onefold catalog -preset all -allow-mixed -no-sweep -j 8 -perf -o $manifest $Tree 2>&1 |
-                ForEach-Object { "$_" } | Set-Content -Path $log -Encoding UTF8
+                ForEach-Object {
+                    if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.Exception.Message } else { "$_" }
+                } | Set-Content -Path $log -Encoding UTF8
         }
         $code = $LASTEXITCODE
     } finally {
