@@ -10,38 +10,9 @@ Common facts:
 
 | ID | Item | Blocked on | Effort once unblocked |
 |---|---|---|---|
-| T2 | Byte-original golden profile (`apply-golden`) | owner decision between 3 options | medium (option B) to large (option A) |
 | T3 | Split the first-catalog cost between Microsoft Defender and the OS cache | Windows administrator rights, reboots | small (measurement + docs) |
 | T4 | Check the double-click launch with Windows Terminal as default terminal | a person at a Windows desktop | small (manual check) |
 | T5 | README demo GIFs of the CLI | install `vhs` and `ttyd` | small to medium |
-
----
-
-## T2. Byte-original golden profile (`apply-golden`)
-
-**State.** `apply --execute --target D <plan>` builds the golden tree as copies: each winner is copied under its canonical name and photos/videos are "silvered" (canonical date, device, owner, comment written into the copy with exiftool/ffmpeg). The original design also had a profile that keeps the original bytes. Nothing is implemented.
-
-**Why blocked.** The obvious version moves source files, which breaks the rule "sources are read-only", and the golden would no longer hold silvered copies. Both are owner decisions.
-
-**Options (decide one).**
-
-| Option | What it does | Sources | Extra disk | Main risk |
-|---|---|---|---|---|
-| A. Move | `apply-golden --execute --target D`: per winner, rename within the volume (copy + verify + delete across volumes) to `D/<canonRel>`, journaled like `rearrange` (`.onefold/apply-golden-<ts>.jsonl`, `-resume`, `-undo`); optional `-backup B` copies and verifies each winner first | moved (a new exception to read-only sources) | none on the same volume | a bug moves user data; undo depends on the journal |
-| B. Hard links (recommended) | `apply --execute --link --target D`: one hard link per winner at `D/<canonRel>` (same volume only, `os.Link`, refused across volumes), no silvering, mtime untouched | untouched (names added in the target only) | none | golden and source share bytes: editing either changes both; the consumer (e.g. a photo library) must treat the tree as read-only |
-| C. Status quo | silvered copies only | untouched | one copy | none |
-
-**Steps for B.**
-
-1. `internal/materialize/materialize.go` `ApplyWith`: a link path (`os.Link(a.SrcPath, tmpName)` then the existing no-replace publish, or `os.Link` straight to the final name with `fsx.ErrExists` handling); skip silvering and do not count `unsilvered` (byte-original by request).
-2. `cmd/onefold/main.go` `cmdApply`: flag `-link`; refuse it with a clear error when source and target are on different volumes (`os.Link` returns `EXDEV` / `ERROR_NOT_SAME_DEVICE`); the missing-tools refusal (`materialize.MissingTools`) does not apply with `-link`.
-3. GUI (optional): `internal/gui/runners.go` `ApplyParams.Link` + a checkbox in `internal/gui/web/src/views/Golden.svelte`, then `make web` and `make web-e2e`.
-4. Tests: link created, same inode (Linux `syscall.Stat_t.Ino`, Windows file index), source untouched, idempotent re-run, cross-volume refusal; Windows test binary on NTFS.
-5. Docs: `README.md` workflow section, `LLMS.md`.
-
-**Steps for A.** Write down the new exception to "sources are read-only" first (README first paragraph, `LLMS.md` guarantees), then reuse the journal/undo machinery of `internal/rearrange` and the verified-copy of `internal/merge` (`merge.CopyVerified`); test cross-volume moves on Windows.
-
-**Done when.** The chosen option is implemented and documented, or C is recorded as the decision.
 
 ---
 

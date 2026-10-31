@@ -860,3 +860,47 @@ func TestGoldenDeltaCLI(t *testing.T) {
 		t.Fatal("re-apply of the sub-plan changed the tree")
 	}
 }
+
+// TestApplyLinkCLI: apply -execute -link publishes hard links of the winners
+// (same file as the source, original bytes, source mtime untouched), needs no
+// external tool, and a re-run changes nothing.
+func TestApplyLinkCLI(t *testing.T) {
+	root := t.TempDir()
+	src, G := filepath.Join(root, "src"), filepath.Join(root, "golden")
+	old := time.Date(2012, 1, 2, 3, 4, 5, 0, time.Local)
+	writeJPEG(t, filepath.Join(src, "IMG_20120102_030405.jpg"), 7)
+	must(t, os.Chtimes(filepath.Join(src, "IMG_20120102_030405.jpg"), old, old))
+	must(t, testfix.File(filepath.Join(src, "notes.txt"), "alpha", old))
+	m, p := filepath.Join(root, "m.jsonl"), filepath.Join(root, "p.jsonl")
+	dd(t, "catalog", "-preset", "all", "-allow-mixed", "-host", "pc", "-o", m, src)
+	dd(t, "plan", "-o", p, "-layout", "document", m)
+	before := snapshot(t, src)
+
+	if out := dd(t, "apply", "-link", p); !strings.Contains(out, "link[original bytes") {
+		t.Fatalf("dry-run -link: %s", out)
+	}
+	cmd := exec.Command(bin, "apply", "-execute", "-link", "-target", G, p)
+	cmd.Env = append(os.Environ(), "ONEFOLD_NO_EXTERNAL=1") // links need no tool
+	if b, err := cmd.CombinedOutput(); err != nil || !strings.Contains(string(b), "written 2,") {
+		t.Fatalf("apply -link: %v\n%s", err, b)
+	}
+	acts := loadPlan(t, p)
+	if len(acts) != 2 {
+		t.Fatalf("plan: %d actions", len(acts))
+	}
+	for _, a := range acts {
+		si, err := os.Stat(a.SrcPath)
+		must(t, err)
+		gi, err := os.Stat(filepath.Join(G, filepath.FromSlash(a.CanonRel)))
+		must(t, err)
+		if !os.SameFile(si, gi) {
+			t.Errorf("%s is not a hard link of %s", a.CanonRel, a.SrcPath)
+		}
+	}
+	if out := dd(t, "apply", "-execute", "-link", "-target", G, p); !strings.Contains(out, "written 0, already present 2") {
+		t.Fatalf("second apply -link: %s", out)
+	}
+	if snapshot(t, src) != before {
+		t.Fatal("apply -link modified a source")
+	}
+}

@@ -200,6 +200,8 @@ What ends up in the archive:
 
 Stamping needs exiftool (photos) and ffmpeg (videos): install them before the first `apply` (on Windows: `onefold tools install all`). Without them `apply --execute` refuses to start, because a later run would not stamp copies that already exist; `-allow-unstamped` copies them unchanged anyway and reports how many.
 
+To keep the original bytes and use no extra disk space, add `-link`: each archive name becomes a hard link of its source file (same volume only, on NTFS, APFS, ext4, btrfs and similar file systems). Nothing is stamped, no tool is needed and the sources are not touched, but the archive and the sources then share their bytes: editing a file in either place changes both, so treat the archive as read-only (deleting a source later is safe: the archive name keeps the data).
+
 Useful plan options:
 
 - `-verify-full` reads every candidate duplicate in full before dropping it (run it where the files are readable);

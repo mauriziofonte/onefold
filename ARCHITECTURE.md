@@ -1060,7 +1060,11 @@ There is no default owner. An empty value is not written.
 
 `materialize.MissingTools(actions, target)` names the tools (`exiftool`, `ffmpeg`) needed by the media actions still to be written (not RAW/MPEG-PS, not already in the target) that are not available. `apply --execute` refuses to start (exit 2) when the list is not empty, because those copies would stay unsilvered for good, unless `-allow-unstamped`. The GUI check shows the missing tools and enables Apply only when the user allowed unstamped copies.
 
-### 14.5 Text sidecars
+### 14.5 Byte-original golden (`-link`)
+
+`apply --execute -link --target D` publishes each action as a hard link instead of a copy (`materialize.LinkOriginal`, `RunOptions.Link`): `D/<canonRel>` becomes a second name of the source file through `fsx.LinkNoReplace` (`os.Link`, which refuses an existing name on every OS: atomic, never replacing, no temp file). No silvering, no tools needed (`MissingTools` is not consulted), and no `Chtimes`: the mtime belongs to the shared file, so changing it would change the source. Idempotent: an existing name is skipped. Before anything is written `materialize.CheckLink` links the first source to a onefold temp name in `D` and removes it; a target on another volume (`fsx.ErrCrossVolume`: `EXDEV`, Windows `ERROR_NOT_SAME_DEVICE`) or a filesystem without hard links stops the run with exit 2 and a hint. Sources spread over several volumes fail one by one with the same error. Sources stay untouched (only names are added in `D`); golden and source share bytes, so an edit to either shows in both. Tests: `TestLinkNoReplace`, `TestLinkNoReplaceCrossVolume` (`internal/fsx`), `TestLinkOriginal` (`internal/materialize`), `TestApplyLinkCLI` (`cmd/onefold`). The GUI does not offer it yet.
+
+### 14.6 Text sidecars
 
 `onefold export-text --target T PLAN` writes `T/<canonRel>.txt` for every document and text action: a header (file name, host:path, size, extension, golden path, date and its source, title, author, pages) and the extracted text, cleaned (valid UTF-8, LF newlines, no NUL, at most one blank line). Atomic, idempotent, mtime = plan time.
 
@@ -1078,7 +1082,7 @@ There is no default owner. An empty value is not written.
 
 Nothing extractable -> `[No text content could be extracted]`.
 
-### 14.6 Transfer to another machine
+### 14.7 Transfer to another machine
 
 - `onefold push --host H --user U [--key K] LOCAL REMOTE` (section 16.5) uploads a staged tree over SFTP, resumable.
 - `onefold seed -from STAGING -to DEST -o SCRIPT PLAN` (section 16.4) writes an rsync or robocopy script for a fast first copy.
@@ -1642,6 +1646,7 @@ Go's `flag` package: `-x` and `--x` are equivalent; flags go before positional a
 | | `-j N` | CPUs | photo and generic workers (videos serial) |
 | | `-signature TEXT`, `-lang CODE` | config | silver tags; `-` = none |
 | | `-allow-unstamped` | off | start without exiftool/ffmpeg |
+| | `-link` | off | hard links of the sources instead of copies (section 14.5) |
 | | `--heartbeat D` | 10s | log-mode interval |
 | export-text | `--target T`, `--only-host`, `-j` | | sidecars |
 
@@ -1655,7 +1660,7 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 |---|---|
 | 0 | success |
 | 1 | runtime failure: a file failed (merge `missing after run` > 0, rearrange or purge failures, export-text errors, push failure or conflicts, apply failed actions, backup conflicts or an unclean audit) |
-| 2 | usage errors, invalid flags or config, regime refusals, a purge confirmation mismatch, `apply --execute` without the tools |
+| 2 | usage errors, invalid flags or config, regime refusals, a purge confirmation mismatch, `apply --execute` without the tools, `apply -link` refused by the target |
 
 ### 26.6 Environment variables
 

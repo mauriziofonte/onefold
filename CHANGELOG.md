@@ -6,6 +6,7 @@ The version being prepared is in the `VERSION` file; a release is the tag `v<VER
 
 ## [Unreleased]
 
+- `apply -execute -link`: a byte-original golden tree made of hard links of the sources (same volume, no copy, no stamping, sources untouched).
 - Security: `golang.org/x/crypto` v0.58.0 (SSH and SFTP push), `golang.org/x/text` v0.43.0 and `github.com/ulikunitz/xz` v0.5.15 (7z listing) replace versions with known advisories; building from source now needs Go 1.26 or newer.
 
 ## [0.0.1-alpha] - 2026-10-31

@@ -182,7 +182,7 @@ catalog: -o FILE  -j N  -blocks N  -preset media|all|common|image|audio|video|do
          -min-size SIZE  -limit N  -host LABEL  -reuse OLD.jsonl  -quick
 plan:    -o FILE  -layout dedupe|timeline|document|music|device|<preset>|<template>  -verify-full  -fix-ext  -video-tier  -video-tolerance SEC  -filename-seq  -self-contained=false
          -artist NAME|-  -report FILE(.json|.md)  -extensive
-apply:   -with-stats  -execute -target DIR  -only-host LABEL  -j N  -signature TEXT  -lang ISO639-2  -heartbeat D
+apply:   -with-stats  -execute -target DIR  -only-host LABEL  -j N  -signature TEXT  -lang ISO639-2  -heartbeat D  -allow-unstamped  -link
          -allow-unstamped (start without exiftool/ffmpeg: photos/videos copied without canonical metadata)
 merge:   -input (repeat) -output -execute -naming N (or -layout) -list -report FILE
          -name FAMILY=PRESET[+clean|+raw|+prefix[:N]] (repeat; families img video doc music arch rest, all): the
@@ -443,6 +443,7 @@ func cmdApply(args []string) {
 	signature := fs.String("signature", "", "comment stamped on photo/video copies (default: `onefold config` signature, else \""+config.DefaultSignature(version)+"\"; \""+config.None+"\" = none)")
 	lang := fs.String("lang", "", "ISO 639-2 language stamped on the first video/audio stream of video copies (default: `onefold config` language, none if unset; \""+config.None+"\" = none)")
 	allowUnstamped := fs.Bool("allow-unstamped", false, "with --execute: publish photos/videos without canonical metadata when exiftool/ffmpeg are missing (default: refuse to start)")
+	link := fs.Bool("link", false, "with --execute: publish each winner as a hard link of its source (original bytes, no copy, no canonical metadata, mtime untouched); target and sources on the same volume. Golden and source share their bytes: edit neither")
 	_ = fs.Parse(args)
 	if fs.NArg() != 1 {
 		fmt.Fprintln(os.Stderr, "apply: exactly one <plan.jsonl> required")
@@ -468,7 +469,7 @@ func cmdApply(args []string) {
 		if err := (config.Config{Language: silver.Language}).Validate(); err != nil {
 			fatal(2, err)
 		}
-		cmdApplyExecute(acts, *target, *onlyHost, *heartbeat, *workers, silver, *allowUnstamped)
+		cmdApplyExecute(acts, *target, *onlyHost, *heartbeat, *workers, silver, *allowUnstamped, *link)
 		return
 	}
 
@@ -478,8 +479,12 @@ func cmdApply(args []string) {
 	byTargetTop := map[string]int{}
 	nDrops := 0
 	for _, a := range acts {
-		fmt.Printf("GOLDEN\t%s\t%s:%s\t-> %s\ttime=%s\tdev=%s\tedit=%t\thdr=%t\tsilver[artist=%q,datetime=%s,mtime=set]\n",
-			a.Kind, a.SrcHost, a.SrcPath, a.CanonRel, a.Time, dash(a.Device), a.IsEdit, a.IsHDR, a.Artist, a.Time)
+		mode := fmt.Sprintf("silver[artist=%q,datetime=%s,mtime=set]", a.Artist, a.Time)
+		if *link {
+			mode = "link[original bytes,mtime=source]"
+		}
+		fmt.Printf("GOLDEN\t%s\t%s:%s\t-> %s\ttime=%s\tdev=%s\tedit=%t\thdr=%t\t%s\n",
+			a.Kind, a.SrcHost, a.SrcPath, a.CanonRel, a.Time, dash(a.Device), a.IsEdit, a.IsHDR, mode)
 		for _, d := range a.Drops {
 			fmt.Printf("  DROP\t%s\t%s:%s\t[%s]\t%s\n", a.Kind, d.Host, d.Path, d.Reason, report.HumanBytes(d.Size))
 			reclaim += d.Size
@@ -509,7 +514,7 @@ func cmdApply(args []string) {
 	}
 }
 
-func cmdApplyExecute(acts []plan.Action, target, onlyHost string, heartbeat time.Duration, workers int, silver materialize.Silver, allowUnstamped bool) {
+func cmdApplyExecute(acts []plan.Action, target, onlyHost string, heartbeat time.Duration, workers int, silver materialize.Silver, allowUnstamped, link bool) {
 	// Photos are exiftool/CPU-bound and scale with parallelism; videos are
 	// ffmpeg + sequential reads where parallelism only causes seek contention:
 	// materialize.ApplyAll runs photos in a pool, videos serially, both groups
@@ -527,13 +532,20 @@ func cmdApplyExecute(acts []plan.Action, target, onlyHost string, heartbeat time
 	}
 	// an unsilvered copy stays unsilvered (a later run skips existing files):
 	// without the tools, start only when asked to
-	if missing := materialize.MissingTools(sel, target); len(missing) > 0 && !allowUnstamped {
+	if link {
+		// hard links carry the original bytes: no tools needed, but the target
+		// must accept links of the sources; checked before anything is written
+		if err := materialize.CheckLink(sel, target); err != nil {
+			fmt.Fprintf(os.Stderr, "apply -link: %v\n  -link needs the target on the same volume as the sources, on a filesystem with hard links (NTFS, APFS, ext4, btrfs...).\n  Choose a target on that volume, or run apply without -link to write copies.\n", err)
+			os.Exit(2)
+		}
+	} else if missing := materialize.MissingTools(sel, target); len(missing) > 0 && !allowUnstamped {
 		fmt.Fprintf(os.Stderr, "apply: %s not found: photos/videos would be written without canonical metadata for good.\n"+
 			"  Install the tools (`onefold doctor`; Windows: `onefold tools install all`) or add -allow-unstamped.\n", strings.Join(missing, ", "))
 		os.Exit(2)
 	}
 	rep := report.New(report.Options{Label: "materialize", TotalBytes: total, Heartbeat: heartbeat})
-	st := materialize.ApplyAll(sel, target, materialize.RunOptions{Workers: workers, Progress: rep, Silver: silver})
+	st := materialize.ApplyAll(sel, target, materialize.RunOptions{Workers: workers, Progress: rep, Silver: silver, Link: link})
 	rep.Finish()
 	fmt.Printf("  written %d, already present %d, failed %d\n", st.Written, st.Skipped, st.Failed)
 	if onlyHost != "" && filtered > 0 {
