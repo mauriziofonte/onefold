@@ -96,12 +96,19 @@ test.beforeAll(() => {
   chmodSync(join(root, 'IN3', 'broken', 'locked.pdf'), 0o000);
   writeFileSync(join(root, 'IN3', 'note.txt'), 'a note');
   // rearrange: a scratch copy with duplicates under copy names
-  execFileSync('cp', ['-r', '/usr/share/man/man1', join(root, 'TREE')]);
-  const some = readdirSync(join(root, 'TREE')).slice(0, 5);
+  // -L: on some systems most man pages are links to /etc/alternatives,
+  // which onefold (rightly) never treats as content; a dangling link only
+  // makes cp complain
+  const copyTree = (src, dst) => {
+    try { execFileSync('cp', ['-rL', src, dst], { stdio: 'ignore' }); } catch { /* dangling links */ }
+  };
+  const regular = (d) => readdirSync(d).filter((f) => lstatSync(join(d, f)).isFile());
+  copyTree('/usr/share/man/man1', join(root, 'TREE'));
+  const some = regular(join(root, 'TREE')).slice(0, 5);
   for (const f of some) execFileSync('cp', [join(root, 'TREE', f), join(root, 'TREE', f.replace(/\.gz$/, ' (1).gz'))]);
   // guided setup: another scratch tree with copies, untouched by the rearrange step
-  execFileSync('cp', ['-r', '/usr/share/man/man5', join(root, 'TREE2')]);
-  for (const f of readdirSync(join(root, 'TREE2')).slice(0, 3)) execFileSync('cp', [join(root, 'TREE2', f), join(root, 'TREE2', f.replace(/\.gz$/, ' (1).gz'))]);
+  copyTree('/usr/share/man/man5', join(root, 'TREE2'));
+  for (const f of regular(join(root, 'TREE2')).slice(0, 3)) execFileSync('cp', [join(root, 'TREE2', f), join(root, 'TREE2', f.replace(/\.gz$/, ' (1).gz'))]);
   // a Desktop to archive: content, OS droppings, shortcuts, temp and lock
   // files, unknown and missing extensions; merged, then purged
   for (const [f, body] of Object.entries({
