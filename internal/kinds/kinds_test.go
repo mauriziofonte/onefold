@@ -205,3 +205,20 @@ func TestPackageMarkers(t *testing.T) {
 		t.Error("markers")
 	}
 }
+
+// What macOS leaves on a drive is never content; a real file is.
+func TestMacJunk(t *testing.T) {
+	for _, n := range []string{".DS_Store", "._IMG_0001.JPG", "Icon\r", ".Spotlight-V100", ".Trashes", ".fseventsd", "__MACOSX"} {
+		if !IsJunk(n) {
+			t.Errorf("%q: not junk", n)
+		}
+	}
+	for _, n := range []string{"IMG_0001.JPG", "Icon", "_IMG.jpg", ".profile", "Icon.png"} {
+		if IsJunk(n) {
+			t.Errorf("%q: junk", n)
+		}
+	}
+	if !IsArchiveJunk("__MACOSX/photos/._a.jpg") || !IsArchiveJunk("photos/._a.jpg") || IsArchiveJunk("photos/a.jpg") {
+		t.Error("archive members")
+	}
+}

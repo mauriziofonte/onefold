@@ -581,7 +581,7 @@ GIF, BMP and graphics files are images, not photos: they never enter a golden ar
 | `SystemDirs` | `$Recycle.Bin`, `AppData`, `Program Files`, `Windows`, `Microsoft`, `htdocs`, `Steam`... | `system-dirs` |
 | `CloudDirs` | Dropbox, Google Drive, GDrive, OneDrive, iCloud Drive | `cloud-dirs` |
 | `DevDirs` | `vendor`, `node_modules`, `tmp`, `tests` | `dev-dirs` |
-| `JunkNames` | `__MACOSX`, `.DS_Store`, `.localized`, `Thumbs.db`, `desktop.ini` | `junk` |
+| `JunkNames` | `__MACOSX`, `.DS_Store`, `.localized`, `Thumbs.db`, `desktop.ini`, and what macOS leaves on drives: `.Spotlight-V100`, `.Trashes`, `.fseventsd`, `.DocumentRevisions-V100`, `.TemporaryItems`, `.apdisk`, `.VolumeIcon.icns`; `IsJunk` also matches AppleDouble `._name` files and Finder's `Icon\r` | `junk` |
 | `ArchiveJunkDirs` | `.git`, `.cache`, `vendor`, `node_modules`, `composer`, `tmp` | archive members ignored when dating an archive |
 
 Directory names match a whole path component, case-insensitively.

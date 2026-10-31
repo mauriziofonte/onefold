@@ -275,8 +275,12 @@ var (
 		"WindowsPowerShell", "WindowsUpdate", "Steam", "SteamLibrary", "SteamApps"}
 	CloudDirs = []string{"Dropbox", "Google Drive", "GDrive", "OneDrive", "iCloud Drive"}
 	DevDirs   = []string{"vendor", "node_modules", "tmp", "tests"}
-	// JunkNames are OS/tool droppings, never content (basename or dir component).
-	JunkNames = []string{"__MACOSX", ".DS_Store", ".localized", "Thumbs.db", "desktop.ini"}
+	// JunkNames are OS/tool droppings, never content (basename or dir
+	// component). The macOS ones also cover what Finder and Spotlight leave on
+	// external drives; AppleDouble "._name" files and Finder's "Icon\r" are
+	// matched by IsJunk too.
+	JunkNames = []string{"__MACOSX", ".DS_Store", ".localized", "Thumbs.db", "desktop.ini",
+		".Spotlight-V100", ".Trashes", ".fseventsd", ".DocumentRevisions-V100", ".TemporaryItems", ".apdisk", ".VolumeIcon.icns"}
 	// ArchiveJunkDirs are archive member dir components that never date an
 	// archive (VCS metadata, caches, vendored dependencies).
 	ArchiveJunkDirs = []string{".git", ".cache", "vendor", "node_modules", "composer", "tmp"}
@@ -300,6 +304,9 @@ func IsArchiveJunk(member string) bool {
 
 // IsJunk reports whether a basename is a junk file/dir.
 func IsJunk(base string) bool {
+	if strings.HasPrefix(base, "._") || base == "Icon\r" {
+		return true
+	}
 	for _, j := range JunkNames {
 		if strings.EqualFold(base, j) {
 			return true
