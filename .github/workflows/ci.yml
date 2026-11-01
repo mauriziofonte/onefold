@@ -103,7 +103,6 @@ jobs:
         run: go test -count=1 ./...
 
       - name: Recycle Bin / Trash tests ran (not skipped)
-        if: runner.os != 'Linux'
         run: |
           go test -count=1 -run 'TestTrash' -v ./internal/purge | tee trash.log
           if grep -q -- '--- SKIP' trash.log; then echo "a Trash test was skipped"; exit 1; fi

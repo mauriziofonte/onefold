@@ -38,7 +38,7 @@ onefold is a single static Go binary that deduplicates photo/video archives and 
 | `internal/naming`, `internal/names` | naming templates, presets, `_NN` collision resolver, file families and their naming (`Compose`: preset + file-name mode per family, `[folder]` prefix); name primitives |
 | `internal/merge`, `internal/rearrange` | merge engine; in-place rearrange with journal, resume, undo |
 | `internal/settings` | the merge/rearrange settings schema: GUI job JSON = `-settings` file = what the CLI flags fill; engine options and the equivalent command line |
-| `internal/purge` | deletes the merged input files whose content is in the output, then their emptied folders (journaled, Recycle Bin option on Windows, Trash on macOS via purego) |
+| `internal/purge` | deletes the merged input files whose content is in the output, then their emptied folders (journaled; Recycle Bin option on Windows, Trash on macOS via purego and on Linux per the freedesktop.org spec) |
 | `internal/materialize`, `internal/textexport`, `internal/remote` | golden copy + metadata stamping; text sidecars; pure-Go SFTP push |
 | `internal/sparsehash`, `internal/scan` | XXH128 sparse/full digests; `index` throughput probe |
 | `internal/report`, `internal/planreport`, `internal/perf` | progress output (stdout = results, stderr = progress); plan report; `-perf` telemetry |

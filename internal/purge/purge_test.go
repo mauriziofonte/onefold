@@ -246,6 +246,7 @@ func TestTrashOption(t *testing.T) {
 		if os.Getenv("ONEFOLD_TEST_TRASH") == "" {
 			t.Skip("writes into the Recycle Bin or the Trash: set ONEFOLD_TEST_TRASH=1")
 		}
+		t.Setenv("XDG_DATA_HOME", testfix.TempDir(t)) // Linux: a Trash of its own
 		root := testfix.TempDir(t)
 		A, O, r := mergeDesktop(t, root)
 		res, err := Run(Options{Items: r.Settled, Output: O, Rooms: r.Rooms[1:], Execute: true, Expect: -1, Trash: true})

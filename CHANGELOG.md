@@ -7,6 +7,7 @@ The version being prepared is in the `VERSION` file; a release is the tag `v<VER
 ## [Unreleased]
 
 - macOS: `purge-sources -trash` (and the GUI option) moves the merged sources to the Trash, with Finder's Put Back, instead of deleting them. It uses the system Trash API without cgo, through the new dependency `github.com/ebitengine/purego`.
+- Linux: `purge-sources -trash` (and the GUI option) moves the merged sources to the Trash of the freedesktop.org specification, which desktop file managers and `trash-cli` restore from, on every distribution.
 - macOS: a folder typed in another case or Unicode normalization than the one stored on disk (`/users/me/pics` for `/Users/me/Pics`) is recognized as the same folder by the output-inside-input check, exclusions and purge.
 - macOS: files are published with `renamex_np(RENAME_EXCL)`, one atomic call that refuses to replace, instead of the link-and-remove fallback.
 - macOS droppings on drives (`._name` AppleDouble files, `Icon\r`, `.Spotlight-V100`, `.Trashes`, `.fseventsd` and similar) are never treated as content, also with the dotfile filters off.

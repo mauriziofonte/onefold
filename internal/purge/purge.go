@@ -47,7 +47,7 @@ type Options struct {
 	Rooms   []string       // the merge input rooms (sources live there)
 	Execute bool
 	// Trash moves the files to the Recycle Bin (Windows) or the Trash
-	// (macOS) instead of deleting them.
+	// (macOS, Linux) instead of deleting them.
 	Trash bool
 	// Expect, when >= 0, must equal the number of files an execute deletes
 	// (the typed confirmation); checked before anything is touched.
@@ -87,7 +87,7 @@ type Result struct {
 }
 
 // ErrTrashUnsupported: the Trash option on an OS where onefold has none.
-var ErrTrashUnsupported = errors.New("the Recycle Bin / Trash option is available on Windows and macOS only")
+var ErrTrashUnsupported = errors.New("the Recycle Bin / Trash option is available on Windows, macOS and Linux only")
 
 // TrashSupported reports whether this OS has the Trash option.
 const TrashSupported = trashSupported
