@@ -6,6 +6,7 @@
 package meta
 
 import (
+	"runtime"
 	"testing"
 )
 
@@ -76,5 +77,24 @@ func TestDayLastDates(t *testing.T) {
 		if got != c.want || ok != (c.want != "") {
 			t.Errorf("%s (order %q) = %q %t, want %q", c.name, c.order, got, ok, c.want)
 		}
+	}
+}
+
+// On macOS and Windows the host always names its zone (macOS: the
+// /etc/localtime link into /var/db/timezone/zoneinfo; Windows: the registry),
+// and the name loads.
+func TestHostZoneName(t *testing.T) {
+	if runtime.GOOS != "darwin" && runtime.GOOS != "windows" {
+		t.Skip("Linux images may lack /etc/localtime: ErrNoZone there is covered by TestResolveZone")
+	}
+	n, err := hostZoneName()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadZone(n); err != nil {
+		t.Fatalf("host zone %q: %v", n, err)
+	}
+	if got := zoneNameFromPath("/var/db/timezone/zoneinfo/Europe/Rome"); got != "Europe/Rome" {
+		t.Fatalf("macOS link target: %q", got)
 	}
 }
