@@ -585,7 +585,7 @@ export default {
   'purge.title': 'Svuota le sorgenti',
   'purge.hint': 'dopo l\'unione, facoltativo',
   'purge.desc': '<b>{n}</b> file degli input hanno ora il loro contenuto nell\'output. Svuotare le sorgenti li elimina dalle cartelle di input, poi rimuove le cartelle rimaste vuote (anche quando restano solo desktop.ini o Thumbs.db). I file che hanno avuto problemi, i file esclusi dai filtri e l\'output non vengono mai toccati; prima di ogni eliminazione il file e la sua copia nell\'output vengono riletti per intero e confrontati.',
-  'purge.trash': 'Sposta nel Cestino invece di eliminare (sulle unità di rete Windows li elimina)',
+  'purge.trash': 'Sposta nel Cestino invece di eliminare (si possono ripristinare)',
   'purge.preview': 'Anteprima dello svuotamento',
   'purge.execute': 'Elimina…',
   'purge.candidates': 'Da eliminare',

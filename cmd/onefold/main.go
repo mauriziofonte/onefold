@@ -191,7 +191,7 @@ merge:   -input (repeat) -output -execute -naming N (or -layout) -list -report F
          -settings FILE (JSON, GUI export; flags override it)  -print-settings
          -trust-sparse -no-verify-copy -no-fsync -no-cache -copy-j N + every catalog filter flag (default -preset all)
 rearrange: -execute -naming N | -name ... -settings FILE -dupes delete|report -keep-empty-dirs -no-cache -move-j N -list -report FILE
-purge-sources: -from MERGE-REPORT -list -execute -expect N (the dry run's count) -trash (Windows, local fixed drives) -j N
+purge-sources: -from MERGE-REPORT -list -execute -expect N (the dry run's count) -trash (Recycle Bin on Windows local fixed drives, Trash on macOS) -j N
 all:     -perf (telemetry table)  -perf-out FILE.json
 
 Run 'onefold <command> -h' for per-command flag help.

@@ -131,7 +131,7 @@ The only files onefold writes are:
 Two operations delete source files, both only when asked explicitly, both dry runs by default:
 
 - `rearrange -execute` renames files inside its root and deletes duplicates confirmed on their full content (keeper and duplicate re-read right before the deletion). Every run writes an fsync'ed journal first; moves can be undone.
-- `purge-sources -execute -expect N` deletes the input files of an executed merge whose copy in the output is read again in full and found equal right before, after the user typed the number of files the preview listed. It is journaled. With `-trash` on Windows the files go to the Recycle Bin.
+- `purge-sources -execute -expect N` deletes the input files of an executed merge whose copy in the output is read again in full and found equal right before, after the user typed the number of files the preview listed. It is journaled. With `-trash` the files go to the Recycle Bin (Windows) or the Trash (macOS).
 
 `reclaim` never deletes: it writes a script the user may run.
 
@@ -327,6 +327,7 @@ Direct dependencies and what they are for:
 | `github.com/pkg/sftp`, `golang.org/x/crypto/ssh`, `github.com/skeema/knownhosts` | SFTP push |
 | `github.com/vbauerster/mpb/v8`, `github.com/rs/zerolog`, `golang.org/x/term` | progress bar, heartbeat logs, TTY detection |
 | `github.com/jchv/go-webview2` | the Windows GUI window |
+| `github.com/ebitengine/purego` | macOS only: calls the Foundation Trash API without cgo (`purge-sources -trash`) |
 | `golang.org/x/sys`, `golang.org/x/text` | OS calls; Unicode normalization |
 
 ### 5.2 Make targets
@@ -354,7 +355,7 @@ Direct dependencies and what they are for:
 
 ### 5.3 Continuous integration and release
 
-- `.github/workflows/ci.yml` (push to `main`, pull requests, called by the release, weekly on Mondays, by hand): matrix Ubuntu, Windows, macOS arm64 (`macos-15`) and macOS Intel (`macos-15-intel`), all four required; macOS installs exiftool, ffmpeg and poppler from Homebrew; Linux installs exiftool, ffmpeg, poppler, p7zip, antiword from apt; Windows installs the pinned tools with `go run ./cmd/onefold tools install all`, which also proves the download pins. Steps: gofmt (Linux), `go vet` for linux, windows and darwin, `go test -count=1 ./...`, then `TestE2E` again with `-v`: the job fails unless it PASSED (a skip is not a pass). Separate jobs: `race` (`go test -race` on Ubuntu with cgo, coverage of every package uploaded as the `coverage` artifact: `coverage.out`, a per-function `coverage.txt`, `coverage.html`), `lint` (staticcheck v0.8.2 for each target GOOS; suppressions are inline `//lint:ignore` with the reason), `vulncheck` (govulncheck, fails on any reachable advisory).
+- `.github/workflows/ci.yml` (push to `main`, pull requests, called by the release, weekly on Mondays, by hand): matrix Ubuntu, Windows, macOS arm64 (`macos-15`) and macOS Intel (`macos-15-intel`), all four required; macOS installs exiftool, ffmpeg and poppler from Homebrew; Linux installs exiftool, ffmpeg, poppler, p7zip, antiword from apt; Windows installs the pinned tools with `go run ./cmd/onefold tools install all`, which also proves the download pins. Steps: gofmt (Linux), `go vet` for linux, windows and darwin, `go test -count=1 ./...`, then `TestE2E` again with `-v`: the job fails unless it PASSED (a skip is not a pass). On Windows and macOS the Recycle Bin / Trash tests run the same way (`ONEFOLD_TEST_TRASH=1`; a skip fails the job). Separate jobs: `race` (`go test -race` on Ubuntu with cgo, coverage of every package uploaded as the `coverage` artifact: `coverage.out`, a per-function `coverage.txt`, `coverage.html`), `lint` (staticcheck v0.8.2 for each target GOOS; suppressions are inline `//lint:ignore` with the reason), `vulncheck` (govulncheck, fails on any reachable advisory).
 - `.github/workflows/release.yml` (tag `v<VERSION>` on a commit of `main`, section 5.4): runs CI, then `make release`, checks that no tracked file changed, verifies checksums, versions (`go version -m`, `onefold version`) and notices, and publishes the GitHub release with the binaries, `LICENSE`, `THIRD_PARTY_NOTICES.txt` and `SHA256SUMS`.
 - Actions are pinned by commit; `.github/dependabot.yml` keeps the pins and the Go modules current through weekly pull requests. Workflows run only on github.com (`if: github.server_url == 'https://github.com'`), so mirrors on other forges stay quiet.
 
@@ -1251,12 +1252,16 @@ Every settled item is a candidate unless refused: not an absolute path, listed t
 
 - `-execute` requires `-expect N`, the count of the dry run: a mismatch exits 2 before anything is touched (the folders changed since).
 - A journal `<output>/.onefold/purge-<ts>.jsonl` is opened first; every event is fsync'ed. If the journal stops being writable, every remaining candidate fails and no folder is removed: no deletion without its journal line.
-- Per candidate, in parallel workers: the source missing -> `gone` (a resumed run); not a regular file -> failed; source and copy are read in full and must be equal to each other and to the recorded content hash, else failed `content differs from its copy in the output: NOT deleted`; then the file is deleted, or moved to the Recycle Bin with `-trash` (Windows).
+- Per candidate, in parallel workers: the source missing -> `gone` (a resumed run); not a regular file -> failed; source and copy are read in full and must be equal to each other and to the recorded content hash, else failed `content differs from its copy in the output: NOT deleted`; then the file is deleted, or moved to the Recycle Bin (Windows) or the Trash (macOS) with `-trash`.
 - Then the folders left empty: ancestors of deleted files strictly below their input folder, never the output or a folder holding it, deepest first; a folder holding only OS droppings (`desktop.ini`, `Thumbs.db`...) counts as empty (the droppings go with it).
 
-### 18.3 Recycle Bin
+### 18.3 Recycle Bin and Trash
 
-`-trash` uses `SHFileOperationW` with `FOF_ALLOWUNDO`. It is refused off Windows, and refused on Windows when a source is on a volume without a Recycle Bin (a UNC share, or a drive whose type is not a local fixed disk: network, removable, optical, RAM disk), because Windows would delete those files for good.
+- Windows: `-trash` uses `SHFileOperationW` with `FOF_ALLOWUNDO`. It is refused when a source is on a volume without a Recycle Bin (a UNC share, or a drive whose type is not a local fixed disk: network, removable, optical, RAM disk), because Windows would delete those files for good.
+- macOS: `-trash` uses `-[NSFileManager trashItemAtURL:resultingItemURL:error:]`, the call Finder uses, so Finder's Put Back restores each file. The Objective-C runtime and Foundation are loaded with `purego` (no cgo) on the first trashed file only. macOS picks the Trash of each volume itself; where a volume has none the call returns an error, the file stays and is reported as failed.
+- Linux: refused (`the Recycle Bin / Trash option is available on Windows and macOS only`).
+
+The journal and the content check before each file are the same as for a deletion.
 
 ---
 
@@ -1420,7 +1425,7 @@ Exclusions after a preview: from the Plan tab a file, a folder, a pattern or "th
 | `/api/events` | GET | server-sent events: `hello`, `job` snapshots (at most every 250 ms), `log` entries, `tools` snapshots; ping every 20 s |
 | `/api/log` | GET | session log ring, or a job's persisted log |
 | `/api/fs` | GET | sub-folders of a path and the roots (drives, home, `/mnt/*`, `/media/*`) for the folder picker |
-| `/api/naming` | GET | presets, aliases, placeholders, catalog presets, families, generic presets, stem modes, skip rules, Recycle Bin availability |
+| `/api/naming` | GET | presets, aliases, placeholders, catalog presets, families, generic presets, stem modes, skip rules, Recycle Bin / Trash availability |
 | `/api/naming/preview` | POST | the composed naming of a form and up to 6 real files of the folders with their target |
 | `/api/cli` | POST | the settings as CLI arguments and a PowerShell line |
 | `/api/wizard/scan` | POST | quick scan of folders (names and sizes, bounded) for the guided setup |
@@ -1574,7 +1579,7 @@ Microsoft Defender scans each file the first time it is opened. On a first catal
 
 ### 25.6 Recycle Bin, drives, WSL
 
-- `purge-sources -trash` only on local fixed drives (section 18.3).
+- `purge-sources -trash` only on local fixed drives (section 18.3); on macOS any volume with a Trash.
 - Writing targets on WSL's Windows mounts (`/mnt/<drive>`) is unreliable for large files and for ffmpeg's mp4 muxer (it seeks back): materialize to a native filesystem and transfer, or run the Windows exe.
 - The loopback between WSL and Windows differs per machine: some Windows processes started from WSL cannot reach 127.0.0.1 listeners, so some GUI HTTP tests skip there.
 
@@ -1679,7 +1684,7 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 | `LOCALAPPDATA`, `XDG_STATE_HOME` | state dir defaults |
 | `ONEFOLD_BIN` | tests: the binary to test (cross-compiled Windows exe) |
 | `ONEFOLD_TEST_COPY_DELAY` | tests: a delay before each merge copy |
-| `ONEFOLD_TEST_TRASH=1` | tests: allow the Windows Recycle Bin test |
+| `ONEFOLD_TEST_TRASH=1` | tests: allow the Recycle Bin (Windows) and Trash (macOS) tests; CI sets it, and fails if they skip |
 | `E2E_ROOT`, `DEMO_ROOT` | GUI tests and demo: scratch folders |
 
 ---

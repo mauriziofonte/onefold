@@ -46,8 +46,8 @@ type Options struct {
 	Output  string         // the merge output (keepers live there)
 	Rooms   []string       // the merge input rooms (sources live there)
 	Execute bool
-	// Trash moves the files to the Recycle Bin instead of deleting them
-	// (Windows only).
+	// Trash moves the files to the Recycle Bin (Windows) or the Trash
+	// (macOS) instead of deleting them.
 	Trash bool
 	// Expect, when >= 0, must equal the number of files an execute deletes
 	// (the typed confirmation); checked before anything is touched.
@@ -86,8 +86,11 @@ type Result struct {
 	Stopped      bool     `json:"stopped,omitempty"`
 }
 
-// ErrTrashUnsupported: the Recycle Bin option on an OS without one.
-var ErrTrashUnsupported = errors.New("the Recycle Bin option is available on Windows only")
+// ErrTrashUnsupported: the Trash option on an OS where onefold has none.
+var ErrTrashUnsupported = errors.New("the Recycle Bin / Trash option is available on Windows and macOS only")
+
+// TrashSupported reports whether this OS has the Trash option.
+const TrashSupported = trashSupported
 
 func fold(p string) string {
 	if runtime.GOOS == "windows" {
@@ -406,7 +409,7 @@ func removeEmptyDirs(o Options, res *Result, deleted []string, j *journal) (dirs
 	return dirs, junk
 }
 
-// removeDir removes an empty directory (to the Recycle Bin with trash: it
+// removeDir removes an empty directory (to the Recycle Bin / Trash with trash: it
 // stays restorable with its files).
 func removeDir(d string, trash bool) error {
 	if trash {

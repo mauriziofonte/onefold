@@ -13,7 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -24,6 +23,7 @@ import (
 	"github.com/mauriziofonte/onefold/internal/meta"
 	"github.com/mauriziofonte/onefold/internal/naming"
 	"github.com/mauriziofonte/onefold/internal/plan"
+	"github.com/mauriziofonte/onefold/internal/purge"
 	"github.com/mauriziofonte/onefold/internal/settings"
 )
 
@@ -97,7 +97,7 @@ func (s *Server) handleNaming(w http.ResponseWriter, r *http.Request) {
 	writeJSONResp(w, 200, map[string]any{"presets": ps, "aliases": naming.LayoutAliases, "placeholders": naming.Placeholders,
 		"catalogPresets": cps, "cleanSuffix": naming.CleanSuffix, "families": naming.Families, "genericPresets": naming.GenericPresets,
 		"stemModes": naming.StemModes, "maxOriginLevel": naming.MaxOriginLevel, "rules": catalog.Rules,
-		"trash": runtime.GOOS == "windows"})
+		"trash": purge.TrashSupported})
 }
 
 // Sample is a source file and its rendered target.

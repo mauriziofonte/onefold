@@ -40,6 +40,8 @@ jobs:
     timeout-minutes: 40
     env:
       CGO_ENABLED: "0"
+      # throwaway runners: the Recycle Bin / Trash tests may write there
+      ONEFOLD_TEST_TRASH: "1"
     defaults:
       run:
         shell: bash
@@ -99,6 +101,13 @@ jobs:
 
       - name: test
         run: go test -count=1 ./...
+
+      - name: Recycle Bin / Trash tests ran (not skipped)
+        if: runner.os != 'Linux'
+        run: |
+          go test -count=1 -run 'TestTrash' -v ./internal/purge | tee trash.log
+          if grep -q -- '--- SKIP' trash.log; then echo "a Trash test was skipped"; exit 1; fi
+          grep -q -- '--- PASS: TestTrashOption' trash.log
 
       - name: end-to-end ran (not skipped)
         run: |

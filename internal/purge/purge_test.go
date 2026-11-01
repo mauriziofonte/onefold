@@ -242,9 +242,9 @@ func TestPurgeReport(t *testing.T) {
 }
 
 func TestTrashOption(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if trashSupported {
 		if os.Getenv("ONEFOLD_TEST_TRASH") == "" {
-			t.Skip("writes into the Recycle Bin: set ONEFOLD_TEST_TRASH=1")
+			t.Skip("writes into the Recycle Bin or the Trash: set ONEFOLD_TEST_TRASH=1")
 		}
 		root := testfix.TempDir(t)
 		A, O, r := mergeDesktop(t, root)

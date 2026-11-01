@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/mauriziofonte/onefold/internal/purge"
 	"github.com/mauriziofonte/onefold/internal/report"
@@ -21,7 +22,7 @@ func cmdPurgeSources(args []string) {
 	from := fs.String("from", "", "merge report (JSON) of an executed merge: onefold merge -execute -report FILE")
 	execute := fs.Bool("execute", false, "ACTUALLY delete (default: dry-run, nothing touched); needs -expect")
 	expect := fs.Int("expect", -1, "with -execute: the number of files the dry run listed (typed confirmation)")
-	trash := fs.Bool("trash", false, "move the files to the Recycle Bin instead of deleting them (Windows, local fixed drives only)")
+	trash := fs.Bool("trash", false, "move the files to the Recycle Bin (Windows, local fixed drives only) or the Trash (macOS) instead of deleting them")
 	workers := fs.Int("j", 0, "verify/delete workers (0 = NumCPU)")
 	list := fs.Bool("list", false, "print every file to delete and every refused one (TSV)")
 	heartbeat := fs.Duration("heartbeat", report.DefaultHeartbeat, "progress log interval when output is not a terminal")
@@ -49,6 +50,9 @@ func cmdPurgeSources(args []string) {
 	how := "deleted"
 	if *trash {
 		how = "moved to the Recycle Bin"
+		if runtime.GOOS == "darwin" {
+			how = "moved to the Trash"
+		}
 	}
 	fmt.Printf("\npurge-sources %s\n", mode)
 	fmt.Printf("output:            %s\n", res.Output)
