@@ -54,7 +54,7 @@ func TestOpenUncached(t *testing.T) {
 	}
 	f, err := OpenUncached(p)
 	if err != nil {
-		if runtime.GOOS == "linux" || runtime.GOOS == "windows" {
+		if runtime.GOOS == "linux" || runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
 			t.Fatal(err)
 		}
 		t.Skip(err)

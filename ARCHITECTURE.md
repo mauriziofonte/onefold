@@ -1208,7 +1208,7 @@ The second run over the same folders reuses the cache and takes seconds.
 4. copy with a 4 MiB buffer while hashing the source bytes;
 5. compare with the cataloged full/content hash when known (a mismatch fails the copy: the source changed);
 6. fsync (`-no-fsync` skips);
-7. read the temp back and compare its hash (`-no-verify-copy` skips); with `-verify-uncached` the read bypasses the OS cache (Linux: cached pages of the fsync'ed file dropped with `fadvise(DONTNEED)`; Windows: `FILE_FLAG_NO_BUFFERING` with aligned buffers), proving the media rather than the write path; a filesystem that refuses an uncached read falls back to the cached read, counted and printed;
+7. read the temp back and compare its hash (`-no-verify-copy` skips); with `-verify-uncached` the read bypasses the OS cache (Linux: cached pages of the fsync'ed file dropped with `fadvise(DONTNEED)`; Windows: `FILE_FLAG_NO_BUFFERING` with aligned buffers; macOS: cached pages invalidated with `msync(MS_INVALIDATE)` on a read-only mapping, then `F_NOCACHE` on the descriptor), proving the media rather than the write path; a filesystem that refuses an uncached read falls back to the cached read, counted and printed;
 8. set the source mtime;
 9. `fsx.RenameNoReplace` to the final name.
 

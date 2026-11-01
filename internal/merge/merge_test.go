@@ -438,7 +438,7 @@ func TestVerifyUncached(t *testing.T) {
 	if r.Missing() != 0 || r.Copied != 6 || len(r.Failed) != 0 {
 		t.Fatalf("result: copied=%d missing=%d failed=%v cached=%d", r.Copied, r.Missing(), r.Failed, r.CachedVerify)
 	}
-	if (runtime.GOOS == "linux" || runtime.GOOS == "windows") && r.CachedVerify != 0 {
+	if (runtime.GOOS == "linux" || runtime.GOOS == "windows" || runtime.GOOS == "darwin") && r.CachedVerify != 0 {
 		t.Errorf("%d copies verified through the cache", r.CachedVerify)
 	}
 }

@@ -6,6 +6,7 @@ The version being prepared is in the `VERSION` file; a release is the tag `v<VER
 
 ## [Unreleased]
 
+- macOS: `merge -verify-uncached` reads each copy back past the cache (`msync(MS_INVALIDATE)`, then `F_NOCACHE`) instead of falling back to the cached read.
 - macOS: `purge-sources -trash` (and the GUI option) moves the merged sources to the Trash, with Finder's Put Back, instead of deleting them. It uses the system Trash API without cgo, through the new dependency `github.com/ebitengine/purego`.
 - Linux: `purge-sources -trash` (and the GUI option) moves the merged sources to the Trash of the freedesktop.org specification, which desktop file managers and `trash-cli` restore from, on every distribution.
 - macOS: a folder typed in another case or Unicode normalization than the one stored on disk (`/users/me/pics` for `/Users/me/Pics`) is recognized as the same folder by the output-inside-input check, exclusions and purge.
