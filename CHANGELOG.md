@@ -4,6 +4,10 @@ All notable changes to onefold are listed here, newest first. Versions follow [S
 
 The version being prepared is in the `VERSION` file; a release is the tag `v<VERSION>` (see section 5.4 of `ARCHITECTURE.md`).
 
+## [Unreleased]
+
+- Fixed: the GUI job bar read "Merge· execute" instead of "Merge · execute".
+
 ## [0.0.2-alpha] - 2026-11-01
 
 - The version is shown where people look for it: `onefold --version` and `-V` (with the commit and its date), the first line of `onefold help` and of the GUI's start message, and in the GUI an About card on the Doctor page (version, build, platform, license, source address), reached from the version next to the logo.

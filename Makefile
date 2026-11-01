@@ -58,12 +58,13 @@ web:
 
 # GUI end-to-end on Linux: real binary (built to a temp path, the host build
 # ./onefold stays untouched), real browser (Playwright), scratch data under E2E_ROOT.
-# README demo of the GUI: assets/demo/gui-merge.gif (Node, ffmpeg)
+# README demo of the GUI: assets/demo/gui-merge.gif (Node, ffmpeg; in CI, with
+# the Windows and macOS GIFs: .github/workflows/demo.yml)
 web-demo:
 	scripts/gui-demo.sh
 
 # README demos of the CLI: assets/demo/cli-*.gif (vhs with ttyd, ffmpeg, exiftool;
-# in CI: the manual workflow .github/workflows/demo.yml)
+# in CI: .github/workflows/demo.yml)
 cli-demo:
 	scripts/tapes/render.sh
 

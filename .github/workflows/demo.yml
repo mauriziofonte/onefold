@@ -5,8 +5,9 @@
 
 # Renders the README demo GIFs on made-up sandboxes and commits them to the
 # branch it runs on: the CLI with vhs (scripts/tapes/render.sh, Linux) and the
-# GUI with Playwright screenshots on Windows and macOS (scripts/gui-demo.sh),
-# assembled with ffmpeg on Linux (scripts/gif-from-frames.sh). Runs on a push
+# GUI with Playwright screenshots on Linux, Windows and macOS
+# (scripts/gui-demo.sh), assembled with ffmpeg on Linux
+# (scripts/gif-from-frames.sh). All five GIFs come from here. Runs on a push
 # to a branch other than main that changes a demo, or by hand (Actions > demo
 # > Run workflow, or `gh workflow run demo.yml --ref BRANCH`); never on main:
 # the GIFs reach main through a reviewed pull request. Its own commit, made
@@ -77,6 +78,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - { os: ubuntu-24.04, name: linux }
           - { os: windows-2025, name: windows }
           - { os: macos-15, name: macos }
     runs-on: ${{ matrix.os }}
@@ -105,7 +107,11 @@ jobs:
         working-directory: internal/gui/web
         run: |
           npm ci --ignore-scripts
-          npx playwright install chromium
+          if [ "$RUNNER_OS" = Linux ]; then
+            npx playwright install --with-deps chromium
+          else
+            npx playwright install chromium
+          fi
 
       - name: record (screenshots of the real binary)
         env:
@@ -152,6 +158,8 @@ jobs:
           DEMO: ${{ runner.temp }}/demo
         run: |
           cp "$DEMO"/demo-cli/cli-*.gif assets/demo/
+          # Linux is the README's first GIF, gui-merge.gif (also `make web-demo`)
+          scripts/gif-from-frames.sh "$DEMO/demo-gui-linux" assets/demo/gui-merge.gif
           for os in windows macos; do
             scripts/gif-from-frames.sh "$DEMO/demo-gui-$os" "assets/demo/gui-merge-$os.gif"
           done

@@ -54,7 +54,7 @@
         <CircleAlert size={16} class={job.status === 'failed' ? 'text-rose-600' : 'text-amber-500'} />
       {/if}
       <button class="font-semibold text-slate-800 hover:underline" onclick={() => onopen?.(job)} data-testid="jobbar-title">
-        {t('kind.' + job.kind)}{#if job.kind !== 'stats'} · {t('stage.' + job.stage)}{/if}
+        {t('kind.' + job.kind)}{#if job.kind !== 'stats'}{' · ' + t('stage.' + job.stage)}{/if}
       </button>
       <span class="pill {job.status === 'failed' ? 'bg-rose-100 text-rose-700' : job.status === 'paused' || job.status === 'stopped' || job.status === 'interrupted' ? 'bg-amber-100 text-amber-800' : job.status === 'running' ? 'bg-brand-50 text-brand-700' : 'bg-emerald-50 text-emerald-700'}" data-testid="jobbar-status">{t('status.' + job.status)}</span>
       <div class="flex flex-wrap items-center gap-1">
