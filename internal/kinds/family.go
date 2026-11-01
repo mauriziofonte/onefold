@@ -26,22 +26,30 @@ const (
 var Families = []string{FamPhotos, FamVideos, FamAudio, FamDocuments, FamArchives, FamCode, FamApps, FamDesign,
 	FamGames, FamData, FamOther}
 
-var familyOfCategory = map[string]string{
-	"raster_image": FamPhotos, "camera_raw": FamPhotos,
-	"video": FamVideos, "subtitle": FamVideos,
-	"audio": FamAudio, "audio_project": FamAudio, "playlist": FamAudio,
-	"word_processing": FamDocuments, "spreadsheet": FamDocuments, "presentation": FamDocuments,
-	"page_layout": FamDocuments, "ebook": FamDocuments, "text": FamDocuments, "email": FamDocuments,
-	"personal_info": FamDocuments,
-	"compressed": FamArchives, "disk_image": FamArchives, "backup": FamArchives, "encoded": FamArchives,
-	"developer": FamCode, "source_code": FamCode, "web": FamCode,
-	"executable": FamApps, "system": FamApps, "settings": FamApps, "plugin": FamApps, "font": FamApps,
-	"certificate": FamApps,
-	"vector_image": FamDesign, "3d_image": FamDesign, "cad": FamDesign, "gis": FamDesign, "image_editing": FamDesign,
-	"game": FamGames,
-	"data": FamData, "database": FamData,
-	"misc": FamOther,
+// categoriesOf lists the categories of each family.
+var categoriesOf = map[string][]string{
+	FamPhotos:    {"raster_image", "camera_raw"},
+	FamVideos:    {"video", "subtitle"},
+	FamAudio:     {"audio", "audio_project", "playlist"},
+	FamDocuments: {"word_processing", "spreadsheet", "presentation", "page_layout", "ebook", "text", "email", "personal_info"},
+	FamArchives:  {"compressed", "disk_image", "backup", "encoded"},
+	FamCode:      {"developer", "source_code", "web"},
+	FamApps:      {"executable", "system", "settings", "plugin", "font", "certificate"},
+	FamDesign:    {"vector_image", "3d_image", "cad", "gis", "image_editing"},
+	FamGames:     {"game"},
+	FamData:      {"data", "database"},
+	FamOther:     {"misc"},
 }
+
+var familyOfCategory = func() map[string]string {
+	m := map[string]string{}
+	for f, cats := range categoriesOf {
+		for _, c := range cats {
+			m[c] = f
+		}
+	}
+	return m
+}()
 
 // FamilyOfCategory maps a category to its family (unknown: other).
 func FamilyOfCategory(cat string) string {
