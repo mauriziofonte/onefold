@@ -18,7 +18,7 @@ Your files are spread over a laptop, an old PC, a phone backup, two external dri
 
 ![The onefold GUI merging two folders: preview, then execute](assets/demo/gui-merge.gif)
 
-One static binary for Linux (amd64, arm64), macOS (Apple Silicon, Intel) and Windows (amd64), with a local GUI and a full command line. Current version: 0.0.1-alpha, an early pre-release ([CHANGELOG.md](CHANGELOG.md)).
+One static binary for Linux (amd64, arm64), macOS (Apple Silicon, Intel) and Windows (amd64), with a local GUI and a full command line. Current version: 0.0.2-alpha, an early pre-release ([CHANGELOG.md](CHANGELOG.md)).
 
 ## Contents
 

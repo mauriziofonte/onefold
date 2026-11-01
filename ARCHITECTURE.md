@@ -381,14 +381,14 @@ onefold follows [Semantic Versioning](https://semver.org): `MAJOR.MINOR.PATCH`, 
 | tag `v<VERSION>` | marks the released commit on `main` |
 | `Makefile` | `VERSION` variable: a clean checkout of the tag `v<VERSION>` builds as `v<VERSION>`; any other tree as `v<VERSION>+dev.<commit>[.dirty]`, so a development binary never passes for the release; `make VERSION=...` overrides; `make version` prints it |
 | `-ldflags -X main.version=...` | the version inside the binary: `onefold version` (`--version`, `-V`; with the commit and commit date Go records from git, `runtime/debug.ReadBuildInfo`), the first line of `help`, `doctor` and the GUI's start message, the default comment stamped into media copies (`Onefold v<version>`), the Windows file version (`major.minor.patch.0`, the full string in FileVersion/ProductVersion), the GUI header and the About card of its Doctor page (`/api/info`: `version`, `build`, `go`) |
-| `TestVersionFile` (`cmd/onefold/version_test.go`) | `VERSION` is valid SemVer and `CHANGELOG.md` has its section |
+| `TestVersionFile` (`cmd/onefold/version_test.go`) | `VERSION` is valid SemVer, `CHANGELOG.md` has its section and `README.md` names it as the current version |
 | `.github/workflows/release.yml` | runs on tags `vX.Y.Z` and `vX.Y.Z-*`; refuses a tag that is not `v` + `VERSION`, not on `main`, or without a CHANGELOG section; publishes as a pre-release when the version has a suffix |
 
 A plain `go build` (without `make`) has the version `dev`.
 
 Releasing:
 
-1. Set the next version in `VERSION` (for example `0.0.2-alpha`, `0.1.0`, `1.0.0-rc.1`) and add its `## [<version>] - <date>` section to `CHANGELOG.md` (what changed for users; call out any change to archive names or file formats).
+1. Set the next version in `VERSION` (for example `0.0.2-alpha`, `0.1.0`, `1.0.0-rc.1`) and add its `## [<version>] - <date>` section to `CHANGELOG.md` (what changed for users; call out any change to archive names or file formats); set `Current version:` near the top of `README.md`.
 2. `make test`, commit (`chore: release v<version>`), push `main`.
 3. `git tag v$(cat VERSION) && git push origin v$(cat VERSION)`: the release workflow tests, builds, checks and publishes.
 4. After the release, development builds read `v<version>+dev.<commit>` until `VERSION` moves to the next version.

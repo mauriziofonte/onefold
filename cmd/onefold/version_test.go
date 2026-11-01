@@ -17,8 +17,9 @@ import (
 // metadata: that is added to development builds by the Makefile).
 var reSemVer = regexp.MustCompile(`^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
 
-// VERSION holds one SemVer version and CHANGELOG.md has its section: the
-// release workflow refuses a tag otherwise, this catches it before tagging.
+// VERSION holds one SemVer version, CHANGELOG.md has its section (the release
+// workflow refuses a tag otherwise, this catches it before tagging) and the
+// README names it as the current version (it went stale once).
 func TestVersionFile(t *testing.T) {
 	b, err := os.ReadFile(filepath.Join("..", "..", "VERSION"))
 	if err != nil {
@@ -34,5 +35,12 @@ func TestVersionFile(t *testing.T) {
 	}
 	if !strings.Contains(string(cl), "\n## ["+v+"]") {
 		t.Fatalf("CHANGELOG.md has no section ## [%s]", v)
+	}
+	readme, err := os.ReadFile(filepath.Join("..", "..", "README.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(readme), "Current version: "+v+",") {
+		t.Fatalf("README.md does not say \"Current version: %s,\"", v)
 	}
 }
