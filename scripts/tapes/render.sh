@@ -6,7 +6,8 @@
 
 # Renders the CLI demo GIFs of the README (assets/demo/cli-*.gif) with vhs:
 # builds onefold from this checkout, makes the made-up sandbox of sandbox.sh
-# in a temp folder, and runs every tape there with that onefold on PATH.
+# in a temp folder, and runs every tape there with that onefold on PATH. The
+# binary carries the version of VERSION, as the GUI demo (scripts/gui-demo.sh).
 # Needs vhs (with ttyd), ffmpeg, exiftool. In CI: .github/workflows/demo.yml.
 #
 # Usage: scripts/tapes/render.sh [TAPE...]   (default: every scripts/tapes/*.tape)
@@ -18,7 +19,7 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/onefold-tapes.XXXXXX")
 trap 'rm -rf -- "$work"' EXIT
 
 mkdir -p "$work/bin" assets/demo
-CGO_ENABLED=0 go build -o "$work/bin/onefold" ./cmd/onefold
+CGO_ENABLED=0 go build -ldflags "-X main.version=v$(cat VERSION)" -o "$work/bin/onefold" ./cmd/onefold
 export PATH="$work/bin:$PATH" ONEFOLD_STATE_DIR="$work/state" TZ=UTC
 
 tapes=("$@")
