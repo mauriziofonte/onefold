@@ -22,7 +22,7 @@ onefold is a Go project with a Svelte GUI, and it is looking for people who want
 
 | Area | What it involves | Skills |
 |---|---|---|
-| macOS platform | no-replace renames on APFS/HFS+, the Trash, Finder launch, testing on real Macs | Go, macOS internals |
+| macOS platform | APFS/HFS+ and exFAT behaviour, the Trash, launching from Finder, a native window: testing and hardening on real Macs | Go, macOS internals |
 | Windows platform | long paths, Recycle Bin, Defender behaviour, the WebView2 window | Go, Win32 |
 | File-format readers | fuzzing and hardening the pure-Go parsers (EXIF, ISO-BMFF, Matroska, RAR, OLE, PDF) | Go, binary formats |
 | Robustness | crash-safety and scale tests: a million files, power cuts mid-copy, hostile names | Go, testing |
@@ -40,4 +40,4 @@ You do not need to write code. You need a computer, some folders worth tidying, 
 - **Linux** users with archives on USB disks, NAS shares or mixed file systems.
 - Big archives: hundreds of thousands of files, hundreds of GB, many duplicates from phone backups and old computers.
 
-What to try, roughly in order: `onefold doctor`; the GUI guided setup; `merge` of two folders (preview, then execute); `rearrange` of a copy of a messy folder; the photo archive (`catalog`, `plan`, `apply`). Tell us how long it took, what was confusing, and anything that looked wrong, however small.
+What to try, roughly in order: `onefold doctor`; the GUI guided setup; the Statistics view (or `onefold stats`) on a disk; `merge` of two folders (preview, then execute); `rearrange` of a copy of a messy folder; the photo archive (`catalog`, `plan`, `apply`). Tell us how long it took, what was confusing, and anything that looked wrong, however small.

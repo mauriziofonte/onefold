@@ -62,8 +62,8 @@ How it decides that two files are the same:
 - **Sources are read-only.** Two operations delete files, only when you ask for them: `rearrange` deletes duplicates confirmed on their full content, and `purge-sources` deletes merged input files whose copy in the output was read again and found equal. Both are dry runs until you add `-execute`, and both write a journal first.
 - **Nothing is overwritten.** Every file is written under a temporary name, verified, and only then given its final name with a rename that refuses to replace an existing file.
 - **Run it again to finish.** Every command is idempotent: an interrupted run, a power cut, a closed laptop lid are fixed by running the same command again.
-- **Preview first.** Commands that write do nothing without `-execute`; the GUI always shows a preview and executes exactly what you reviewed.
-- **Local only.** The GUI listens on 127.0.0.1, behind a per-session link. Nothing is sent anywhere.
+- **Preview first.** Commands that copy, move or delete files (`merge`, `rearrange`, `purge-sources`, `apply`, `backup`) do nothing without `-execute`; the GUI always shows a preview and executes exactly what you reviewed.
+- **Local only.** The GUI listens on 127.0.0.1, behind a per-session link. Nothing leaves your computer unless you ask: `push` uploads to your own server, `onefold tools install` downloads the optional tools.
 
 ## Install
 
@@ -171,13 +171,13 @@ onefold.exe --input C:\Users\me\Desktop --output D:\STUFF --execute --report D:\
 :: preview: lists the files, deletes nothing
 onefold.exe purge-sources -from D:\desktop.json
 
-:: do it: type the number of files the preview listed (-trash: to the Recycle Bin instead)
+:: do it: type the number of files the preview listed (-trash: to the Recycle Bin or Trash instead)
 onefold.exe purge-sources -from D:\desktop.json -execute -expect 123
 ```
 
 - Only files whose copy in the output is read again and found identical right before are deleted; files that failed to copy, files left out by the filters and everything in the output are never touched.
 - Folders left empty go too, also when only `desktop.ini` or `Thumbs.db` remain in them; the input folder itself stays.
-- Every deletion is written to a journal in the output's `.onefold` folder. Deleted files cannot be restored, except with `-trash` (Windows, local fixed drives only: on a network share or a network or removable drive Windows would delete them for good, so onefold refuses to start).
+- Every deletion is written to a journal in the output's `.onefold` folder. Deleted files cannot be restored, except with `-trash`, which moves them to the Recycle Bin (Windows) or the Trash (macOS, Linux) instead, from where the file manager puts them back. On Windows it works on local fixed drives only: on a network share or a network or removable drive Windows would delete the files for good, so onefold refuses to start. On macOS and Linux a volume where no Trash can be made keeps its files and reports them as failed.
 
 ## Reorganize a folder in place
 
@@ -341,9 +341,9 @@ onefold config                            # what is set and where the file lives
 
 No external program is required: metadata of photos (jpg, heic, png, webp, tiff, camera RAW), videos (mp4/mov/3gp, mkv/webm, flv), documents (including Word, Excel and PowerPoint 97-2003), archives (zip, 7z, rar, iso, tar) and audio is read natively, also on Windows.
 
-Optional helpers, used when found on PATH or next to the executable (`tools\` folder): `ffprobe`, `ffmpeg` and `exiftool` (needed to stamp photo and video copies), `pdfinfo`, `pdftotext` (PDF text), `antiword`, `7z`, `unrar`. `onefold doctor` shows what is available.
+Optional helpers, used when found on PATH, next to the executable (or in its `tools` folder) or, on macOS, in the Homebrew folders: `ffprobe`, `ffmpeg` and `exiftool` (needed to stamp photo and video copies), `pdfinfo`, `pdftotext` (PDF text), `antiword`, `7z`, `unrar`. `onefold doctor` shows what is available.
 
-On Windows (x64), `onefold tools install all` (or the Doctor page of the GUI) downloads exiftool, ffmpeg/ffprobe, the Xpdf tools and 7-Zip from their official sources. Each file has a fixed version and is installed only if its SHA-256 matches the one written in onefold. The tools go into a onefold folder, nothing is installed system-wide, and an interrupted download resumes. On Linux use your package manager (for example `apt install libimage-exiftool-perl ffmpeg poppler-utils p7zip-full`).
+On Windows (x64), `onefold tools install all` (or the Doctor page of the GUI) downloads exiftool, ffmpeg/ffprobe, the Xpdf tools and 7-Zip from their official sources. Each file has a fixed version and is installed only if its SHA-256 matches the one written in onefold. The tools go into a onefold folder, nothing is installed system-wide, and an interrupted download resumes. On Linux and macOS use your package manager (for example `apt install libimage-exiftool-perl ffmpeg poppler-utils p7zip-full`, or `brew install exiftool ffmpeg poppler p7zip`).
 
 ## Windows notes
 
@@ -360,8 +360,9 @@ On Windows (x64), `onefold tools install all` (or the Doctor page of the GUI) do
 | [LLMS.md](LLMS.md) | contributors and coding agents: build, layout, invariants, conventions in short |
 | [CHANGELOG.md](CHANGELOG.md) | what changed in each version |
 | [CONTRIBUTING.md](CONTRIBUTING.md), [CONTRIBUTORS.md](CONTRIBUTORS.md) | how to test or change onefold, who did |
+| [LICENSING.md](LICENSING.md), [TRADEMARKS.md](TRADEMARKS.md) | the two licenses; the use of the name and the logos |
 | [SECURITY.md](SECURITY.md) | how to report a vulnerability privately |
-| `onefold help`, `onefold naming`, `onefold doctor` | flags, naming patterns, your platform and tools |
+| `onefold help`, `onefold naming`, `onefold doctor`, `onefold version` | flags, naming patterns, your platform and tools, the build you run |
 
 ## Build from source
 
@@ -372,12 +373,13 @@ make build      # ./onefold for this system
 make test       # the test suite
 make linux      # dist/onefold-linux-amd64
 make windows    # dist/onefold-windows-amd64.exe (with version information)
+make darwin     # dist/onefold-darwin-arm64 and dist/onefold-darwin-amd64
 make release    # all targets, LICENSE, third-party notices and SHA256SUMS
 ```
 
 The GUI frontend is prebuilt and embedded; Node is needed only to change it (`make web`, `make web-e2e`).
 
-Versions follow [Semantic Versioning](https://semver.org); the current one is in [`VERSION`](VERSION), the history in [CHANGELOG.md](CHANGELOG.md). `onefold version` (also `--version`, `-V`) prints the version of a binary with its commit, build date, platform and Go version; a build that is not an exact release says so (`v0.0.1-alpha+dev.<commit>`). `onefold help` and `onefold doctor` start with it; in the GUI it is next to the logo and, with the build, the license and the source address, at the bottom of the Doctor page. Every release tag is built and tested on Linux and Windows by GitHub Actions and published with its checksums; versions with a suffix such as `-alpha` are marked as pre-releases.
+Versions follow [Semantic Versioning](https://semver.org); the current one is in [`VERSION`](VERSION), the history in [CHANGELOG.md](CHANGELOG.md). `onefold version` (also `--version`, `-V`) prints the version of a binary with its commit, build date, platform and Go version; a build that is not an exact release says so (`v<version>+dev.<commit>`). `onefold help` and `onefold doctor` start with it; in the GUI it is next to the logo and, with the build, the license and the source address, at the bottom of the Doctor page. Every release tag is tested on Linux, Windows and macOS (Apple Silicon and Intel) by GitHub Actions, built and published with its checksums; versions with a suffix such as `-alpha` are marked as pre-releases.
 
 ## Contributing
 
