@@ -51,6 +51,7 @@ export const defaults = () => ({
     plan: '', target: '', onlyHost: '', allowUnstamped: false, indexJobId: '', planJobId: '', applyJobId: '', autoIndex: false,
   },
   journals: { root: '' },
+  stats: { roots: [], dups: 'fast', allVolumes: false, jobId: '' },
 });
 
 // fill completes saved settings with the defaults (new versions add keys).
