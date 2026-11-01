@@ -72,7 +72,7 @@
                     {#if pr.phase === 'download'}<span class="whitespace-nowrap font-mono">{bytes(pr.done)} / {bytes(pr.total)} · {pct(pr)}%</span>{/if}
                   </div>
                   <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                    <div class="h-full transition-all {pr.phase === 'queued' ? 'bg-slate-300' : 'stripes bg-indigo-600'}" style="width:{pr.phase === 'extract' ? 100 : pct(pr)}%" data-testid={'tools-bar-' + p.id}></div>
+                    <div class="h-full transition-all {pr.phase === 'queued' ? 'bg-slate-300' : 'stripes bg-brand-600'}" style="width:{pr.phase === 'extract' ? 100 : pct(pr)}%" data-testid={'tools-bar-' + p.id}></div>
                   </div>
                 {:else}
                   <div class="flex items-center gap-2">

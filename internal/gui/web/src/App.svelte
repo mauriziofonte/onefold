@@ -137,7 +137,7 @@
           </div>
         {/if}
         {#if settings.notice}
-          <div class="banner mx-auto mb-4 max-w-6xl border-indigo-200 bg-indigo-50 text-indigo-800" data-testid="notice">
+          <div class="banner mx-auto mb-4 max-w-6xl border-brand-200 bg-brand-50 text-brand-800" data-testid="notice">
             <Info size={16} class="shrink-0" /><span class="flex-1">{t(settings.notice)}</span>
             <button class="icon-btn" onclick={() => (settings.notice = '')}><X size={14} /></button>
           </div>

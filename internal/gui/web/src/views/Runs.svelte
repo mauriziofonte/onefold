@@ -39,7 +39,7 @@
     store.jobLog = { id: j.id.slice(0, 15), entries: r.entries || [] };
     settings.drawerOpen = true;
   }
-  const tone = { failed: 'tag-rose', interrupted: 'tag-amber', stopped: 'tag-amber', paused: 'tag-amber', running: 'tag-indigo', done: 'tag-emerald', previewed: 'tag-emerald' };
+  const tone = { failed: 'tag-rose', interrupted: 'tag-amber', stopped: 'tag-amber', paused: 'tag-amber', running: 'tag-brand', done: 'tag-emerald', previewed: 'tag-emerald' };
 </script>
 
 <section class="mx-auto max-w-6xl space-y-5">

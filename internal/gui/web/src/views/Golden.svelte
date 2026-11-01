@@ -124,7 +124,7 @@
       <ul class="scroll-thin max-h-40 space-y-1 overflow-auto text-xs">
         {#each [...new Set([...cfg.manifests, ...manifests.map((m) => m.path)])] as p (p)}
           {@const f = manifests.find((m) => m.path === p)}
-          <li class="flex items-center gap-2 mini"><input type="checkbox" class="accent-indigo-600" checked={cfg.manifests.includes(p)} onchange={() => toggleManifest(p)} /><span class="mono flex-1">{f ? f.name : p}</span>{#if f}<span class="text-slate-400">{bytes(f.size)}</span>{/if}</li>
+          <li class="flex items-center gap-2 mini"><input type="checkbox" class="accent-brand-600" checked={cfg.manifests.includes(p)} onchange={() => toggleManifest(p)} /><span class="mono flex-1">{f ? f.name : p}</span>{#if f}<span class="text-slate-400">{bytes(f.size)}</span>{/if}</li>
         {/each}
       </ul>
       <form class="flex gap-2" onsubmit={(e) => { e.preventDefault(); if (typedManifest.trim()) toggleManifest(typedManifest.trim()); typedManifest = ''; }}>

@@ -31,7 +31,7 @@
         <button class="shrink-0" title={t('filters.removeExclusion')} onclick={() => onchange(paths.filter((x) => x !== p), globs)} data-testid="exclusion-remove"><X size={11} /></button></span>
     {/each}
     {#each globs as g (g)}
-      <span class="tag-indigo" title={t('filters.pattern')}><span class="font-mono">{g}</span>
+      <span class="tag-brand" title={t('filters.pattern')}><span class="font-mono">{g}</span>
         <button title={t('filters.removeExclusion')} onclick={() => onchange(paths, globs.filter((x) => x !== g))} data-testid="exclusion-remove"><X size={11} /></button></span>
     {/each}
     {#if !paths.length && !globs.length}<span class="text-xs text-slate-400">{t('filters.noExclusions')}</span>{/if}

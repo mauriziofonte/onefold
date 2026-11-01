@@ -137,21 +137,20 @@ func TestSysoLayout(t *testing.T) {
 
 func TestLogo(t *testing.T) {
 	img := Logo(48)
-	if c := img.NRGBAAt(0, 0); c.A != 0 {
-		t.Fatalf("corner must be transparent: %v", c)
-	}
-	if c := img.NRGBAAt(24, 2); c.A != 0xff || c.B < 0xe0 || c.R > 0x70 { // top of the gradient
-		t.Fatalf("background: %v", c)
-	}
-	if c := img.NRGBAAt(28, 30); c != white { // the stem of the "1"
-		t.Fatalf("stem: %v", c)
-	}
-	if c := img.NRGBAAt(22, 16); c != flapColor { // the folded flap
-		t.Fatalf("flap: %v", c)
-	}
-	top, bottom := img.NRGBAAt(4, 12), img.NRGBAAt(4, 36)
-	if top.R <= bottom.R || top.G <= bottom.G { // lighter at the top
-		t.Fatalf("gradient: %v -> %v", top, bottom)
+	for _, c := range []struct {
+		x, y int
+		want color.NRGBA
+		what string
+	}{
+		{0, 0, color.NRGBA{}, "transparent corner"},
+		{46, 46, color.NRGBA{}, "transparent corner"},
+		{10, 30, backColor, "back square"},
+		{36, 12, frontColor, "front square"},
+		{24, 22, overColor, "overlap"},
+	} {
+		if got := img.NRGBAAt(c.x, c.y); got != c.want {
+			t.Errorf("%s at %d,%d: %v, want %v", c.what, c.x, c.y, got, c.want)
+		}
 	}
 }
 

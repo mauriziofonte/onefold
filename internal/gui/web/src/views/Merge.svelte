@@ -237,7 +237,7 @@
     <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7" data-testid="merge-result">
       <Stat label={t('merge.distinct')} value={num(s.distinct)} />
       <Stat label={t('merge.already')} value={num(s.alreadyPresent)} />
-      <Stat label={t('merge.toCopy')} value={num(s.toCopy)} sub={bytes(s.copyBytes)} tone="text-indigo-700" ring="ring-indigo-200" testid="merge-tocopy" />
+      <Stat label={t('merge.toCopy')} value={num(s.toCopy)} sub={bytes(s.copyBytes)} tone="text-brand-700" ring="ring-brand-200" testid="merge-tocopy" />
       <Stat label={t('merge.renamed')} value={num(s.renamed)} sub={t('merge.renamedHint')} />
       <Stat label={t('merge.blocked')} value={num(s.blocked)} sub={t('merge.blockedHint')} tone={s.blocked ? 'text-rose-600' : ''} />
       <Stat label={t('merge.outDupes')} value={num(s.outputDupFiles)} sub={t('merge.outDupesHint')} />
