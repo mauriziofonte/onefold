@@ -6,7 +6,7 @@
 -->
 
 <script>
-  import { GitMerge, FolderTree, Sparkles, History, Stethoscope, BookOpen, WifiOff, CircleAlert, X, Settings, Wand, Info, CircleCheck } from '@lucide/svelte';
+  import { GitMerge, FolderTree, Sparkles, History, Stethoscope, BookOpen, WifiOff, CircleAlert, X, Settings, Wand, Info, CircleCheck, ChartPie } from '@lucide/svelte';
   import Logo from './components/Logo.svelte';
   import { onMount } from 'svelte';
   import { store, init, jobsSorted } from './lib/store.svelte.js';
@@ -25,6 +25,7 @@
   import Doctor from './views/Doctor.svelte';
   import Config from './views/Config.svelte';
   import Wizard from './views/Wizard.svelte';
+  import Stats from './views/Stats.svelte';
 
   let ready = $state(false);
   let error = $state('');
@@ -61,6 +62,7 @@
   const nav = [
     { group: 'nav.start', items: [['wizard', Wand]] },
     { group: 'nav.modes', items: [['merge', GitMerge], ['rearrange', FolderTree], ['golden', Sparkles]] },
+    { group: 'nav.analyze', items: [['stats', ChartPie]] },
     { group: 'nav.history', items: [['runs', History], ['journals', BookOpen]] },
     { group: 'nav.system', items: [['config', Settings], ['doctor', Stethoscope]] },
   ];
@@ -75,6 +77,9 @@
       settings.merge.purgeJobId = j.id;
       settings.merge.tab = 'plan';
       settings.view = 'merge';
+    } else if (j.kind === 'stats') {
+      settings.stats.jobId = j.id;
+      settings.view = 'stats';
     } else if (j.kind === 'recover') {
       settings.view = 'journals';
     } else {
@@ -146,6 +151,7 @@
         {:else if settings.view === 'merge'}<Merge />
         {:else if settings.view === 'rearrange'}<Rearrange />
         {:else if settings.view === 'golden'}<Golden />
+        {:else if settings.view === 'stats'}<Stats />
         {:else if settings.view === 'runs'}<Runs onopen={openJob} />
         {:else if settings.view === 'journals'}<Journals />
         {:else if settings.view === 'config'}<Config />

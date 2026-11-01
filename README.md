@@ -30,6 +30,7 @@ One static binary for Linux (amd64, arm64), macOS (Apple Silicon, Intel) and Win
 - [Merge folders](#merge-folders)
 - [Empty the sources after a merge](#empty-the-sources-after-a-merge)
 - [Reorganize a folder in place](#reorganize-a-folder-in-place)
+- [Statistics](#statistics)
 - [Photo and video archive](#photo-and-video-archive)
 - [Configuration](#configuration)
 - [Optional tools](#optional-tools)
@@ -45,6 +46,7 @@ One static binary for Linux (amd64, arm64), macOS (Apple Silicon, Intel) and Win
 |---|---|---|
 | Merge folders | one folder holding every distinct file of several folders exactly once, named by a pattern you choose | `merge`, then optionally `purge-sources` |
 | Reorganize in place | the same folder, files renamed and moved to a pattern, exact duplicates removed | `rearrange` |
+| Statistics | what fills a disk or a set of folders (file types, folders, years, sizes) and how much space duplicates waste, read-only | `stats` |
 | Photo and video archive | a "golden" tree with one file per photo or video, canonical names such as `PICTURES/JPG/2021/IMG_20210506_070809.jpg`, the capture date and device written into each copy | `catalog`, `plan`, `apply`; later `golden-index`, `match` |
 
 Around them: lists of look-alike photos and same-text documents to review (`similar`), a verified list of leftover copies with a deletion script you run yourself (`reclaim`), a copy for a disk you put away with a later integrity check (`backup`), plain-text copies of documents (`export-text`), transfer helpers (`push` over SFTP, `seed` scripts for rsync or robocopy).
@@ -119,7 +121,8 @@ The same merge recorded on the Windows and macOS machines of the CI (the window 
 | ![The onefold GUI on Windows merging two folders](assets/demo/gui-merge-windows.gif) | ![The onefold GUI on macOS merging two folders](assets/demo/gui-merge-macos.gif) |
 
 - **Guided setup**: the first page on a fresh install, and a button in every mode. It asks what you want to do (bring folders together, tidy up a folder, a photo and video archive from several computers, only find duplicates), scans the folders quickly (names and sizes only) and shows, after every answer, what would happen to a sample of your files, computed by the real engine. At the end it fills the right mode and starts its preview; it also shows the equivalent command (PowerShell) and saves the answers as a recipe.
-- **Every mode of the command line**: merge, rearrange, golden archive, journals and undo, configuration, tool downloads.
+- **Every mode of the command line**: merge, rearrange, golden archive, statistics, journals and undo, configuration, tool downloads.
+- **Statistics**: pick whole volumes from their cards, or folders, and see what fills them: a family chart (photos, videos, documents...) to click for its categories, extensions and largest files, a folder map to zoom into, bytes per year and per size band, and the duplicates: how much space they waste, by family and extension, the groups of copies with every path, and the pairs of folders sharing the most files, each with a button that opens Merge on those two folders. The charts fill in live while the scan runs.
 - **Preview, then execute**: Execute runs exactly what the preview showed and asks you to type the number of files a rearrange or a source purge will delete.
 - **Naming per kind of file**: for photos and images, videos, documents, music, archives and everything else you pick a layout and what happens to the file name (normalized, clean, original, or with the name of a folder in front, like `[merge] posta.mbox`). The filters show every rule; the preview lists the files left out with the reason. "Export settings" saves them for `onefold merge -settings FILE`; "Copy command" gives the same run as a command line.
 - **Plan review**: after a preview the Plan tab lists every file (or groups them by folder, with counts and sizes), sorted and filtered by extension. Leave out a file, a folder or a pattern such as `*.data` from there: the plan updates at once, without scanning the disks again. Folders that look like driver or installer packages are pointed out, with a button to leave them all out.
@@ -199,6 +202,26 @@ onefold.exe rearrange -resume D:\FILES\.onefold\rearrange-<date>.jsonl
 - Flags go before the folder: `onefold rearrange -execute D:\FILES`, not after it.
 
 In `merge` and `rearrange` photos and videos are files like the others: copied or moved unchanged and named by the pattern. Canonical photo and video names belong to the archive below; its scope and tree presets are refused here unless you add `-allow-mixed`.
+
+## Statistics
+
+See what fills a disk or some folders before deciding what to merge or clean up. Nothing is written:
+
+```bat
+:: the volumes (drives, mounted file systems) with their size and free space
+onefold.exe stats -mounts
+
+:: a whole drive and two folders: families, categories, extensions, years, sizes, heaviest folders and files, duplicates
+onefold.exe stats D:\ C:\Users\me\Pictures E:\old-disk
+
+:: duplicates confirmed on the whole content, everything as JSON
+onefold.exe stats -dups full -json report.json D:\
+```
+
+- Several folders or volumes are measured together; a folder inside another given one is counted once.
+- Duplicates: files of the same size are compared on a sample of their content (`-dups fast`, the default), on their whole content (`-dups full`), or not at all (`-dups off`). The result tells how much space the extra copies take, by family and extension, the largest groups of copies with their paths, and the pairs of folders that hold copies of the same files (good candidates for a merge).
+- A hard-linked file is counted once. On Linux and macOS a walk stays on the volume of its folder (the volumes mounted below it are listed, `-one-volume=false` enters them) and the space used on disk is shown next to the size; Windows reports neither hard links nor the space on disk.
+- The JSON (`-json FILE`, `-` for the standard output) holds every breakdown, the folder tree (`-depth`, default 6 levels) and up to 100 largest files and duplicate groups; the tables print `-top` rows.
 
 ## Photo and video archive
 

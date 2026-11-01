@@ -110,6 +110,8 @@ func main() {
 		cmdPush(os.Args[2:])
 	case "export-text":
 		cmdExportText(os.Args[2:])
+	case "stats":
+		cmdStats(os.Args[2:])
 	case "version", "--version", "-version", "-V":
 		fmt.Println(versionLine())
 	case "-h", "--help", "help":
@@ -173,6 +175,8 @@ usage:
   onefold seed -from S -to D -o F <plan>    bulk-copy script (rsync or robocopy) of a materialized tree (runs nothing)
   onefold export-text --target D <plan>     .txt sidecars for document/text assets
   onefold push --host H --user U [--key K] <local> <remote>   SFTP upload (idempotent; ssh-agent without --key)
+  onefold stats [flags] <folder|volume>... what a disk holds: families, extensions, years, folders, duplicates (read-only)
+  onefold stats -mounts                    list the volumes
   onefold hash <file> | index <dir> | version
 
 catalog: -o FILE  -j N  -blocks N  -preset media|all|common|image|audio|video|document|archive (CSV, default media)
@@ -192,6 +196,7 @@ merge:   -input (repeat) -output -execute -naming N (or -layout) -list -report F
          -trust-sparse -no-verify-copy -no-fsync -no-cache -copy-j N + every catalog filter flag (default -preset all)
 rearrange: -execute -naming N | -name ... -settings FILE -dupes delete|report -keep-empty-dirs -no-cache -move-j N -list -report FILE
 purge-sources: -from MERGE-REPORT -list -execute -expect N (the dry run's count) -trash (Recycle Bin on Windows local fixed drives, Trash on macOS and Linux) -j N
+stats:   -dups off|fast|full  -dup-min SIZE  -one-volume=false  -depth N  -top N  -json FILE|-  -j N
 all:     -perf (telemetry table)  -perf-out FILE.json
 
 Run 'onefold <command> -h' for per-command flag help.

@@ -98,6 +98,7 @@ These words have one meaning everywhere in the code, the docs and the GUI.
 | settled | after an executed merge: every input file whose content is now in the output, with the output file holding it |
 | skip rule | a named, switchable reason a file or folder is left out of a catalog (`system-dirs`, `junk`, `transient`...) |
 | family | a group of file types with its own naming in merge and rearrange: `img`, `video`, `doc`, `music`, `arch`, `rest` |
+| stats family | the heading a category is counted under in `stats` and its charts: `photos videos audio documents archives code apps design games data other` (`kinds.Family`) |
 | stem mode | what happens to a file name in merge/rearrange: `norm`, `clean`, `raw`, `prefix[:N]` |
 | naming regime | golden (canonical names, media scope) versus template (naming engine, every file generic); never mixed |
 | preview | a dry run: computes everything, writes nothing to the trees |
@@ -239,8 +240,8 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 
 | Package | Role | Main entry points |
 |---|---|---|
-| `cmd/onefold` | parses commands and flags, wires packages into the pipelines, prints summaries (stdout) and progress (stderr), sets exit codes | `main`, `cmdCatalog`, `cmdPlan`, `cmdApply`, `cmdMerge`, `cmdRearrange`, `cmdPurgeSources`, `cmdGoldenIndex`, `cmdMatch`, `cmdSimilar`, `cmdReclaim`, `cmdBackup`, `cmdSeed`, `cmdGUI`... |
-| `internal/kinds` | the only source of file-type knowledge | `Lookup`, `KindOf`, `Format`, `Group`, `NormalizeExt`, `PresetExts`, `SniffFile` |
+| `cmd/onefold` | parses commands and flags, wires packages into the pipelines, prints summaries (stdout) and progress (stderr), sets exit codes | `main`, `cmdCatalog`, `cmdPlan`, `cmdApply`, `cmdMerge`, `cmdRearrange`, `cmdPurgeSources`, `cmdGoldenIndex`, `cmdMatch`, `cmdSimilar`, `cmdReclaim`, `cmdBackup`, `cmdSeed`, `cmdStats`, `cmdGUI`... |
+| `internal/kinds` | the only source of file-type knowledge | `Lookup`, `KindOf`, `Format`, `Group`, `NormalizeExt`, `PresetExts`, `SniffFile`, `Family` |
 | `internal/meta` | one file -> its canonical metadata | `ExtractWith`, `Zone`, `SetZone`, `CanonicalDevice`, `VendorSlug`, `DeduceFromFilename` |
 | `internal/sparsehash` | file identity | `HashFile`, `HashFileWhole`, `HashBytes`, `FullFile` |
 | `internal/catalog` | rooms -> records / manifest | `Build`, `Collect`, `Walk`, `Filters`, `LoadManifest` |
@@ -258,6 +259,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 | `internal/merge` | merge engine | `Run`, `CopyVerified`, `WriteCache` |
 | `internal/rearrange` | in-place rearrange | `Run`, `RecoverWith` |
 | `internal/purge` | delete merged sources | `Plan`, `Run`, `ReadReport` |
+| `internal/stats` | what folders and volumes hold, duplicates included (read-only) | `Run`, `Mounts`, `VolumeOf` |
 | `internal/settings` | merge/rearrange settings | `Merge.Options`, `Rearrange.Options`, `Load`, `Args` |
 | `internal/config` | per-user config | `Load`, `SaveTo`, `Apply`, `Override` |
 | `internal/runctl` | pause/stop | `New`, `Gate.Wait` |
@@ -1175,6 +1177,18 @@ The script is POSIX sh (`rm -- '...'`, `set -e`) or PowerShell (`Remove-Item -Li
 - per file: an existing remote file of the same size is skipped (resume), of another size is a conflict (listed, exit 1, untouched); else upload to `<remote>.part`, check the size, set the source mtime, rename;
 - local onefold temp files are never uploaded; keepalive every 30 s; on error the CLI reconnects up to `--retries` times with growing back-off.
 
+### 16.6 `stats`: what fills a disk
+
+`onefold stats [flags] FOLDER|MOUNT...` and `onefold stats -mounts` measure; they never write into the measured folders. `internal/stats` is shared by the CLI and the GUI's Statistics view (a `stats` job, section 22).
+
+- Roots: made absolute and clean; a missing one is refused; a root inside another given root is dropped (it would be counted twice).
+- Pass 1 (scan): `fastwalk` over every root, regular files only (symbolic links counted, never followed). Each file is added to every breakdown: family (`kinds.Family`, from the category of `types.tsv`), category, extension (unknown extensions apart, `""` = none), year of last change (before 1980 or more than two days ahead: year 0, shown as unknown), size band, the largest files overall and per family, and the folder tree. Empty files and OS droppings (`kinds.IsJunk`) are counted apart as well. A file with more than one hard link is counted once per volume and inode (Linux, macOS). With `OneVolume` (the CLI default and the GUI's unless "Enter volumes mounted inside") a folder on another device than its root is not entered and listed in `otherVolumes`; Windows walks never enter mounted folders (reparse points). Space on disk (`allocated`, from `st_blocks`) exists on Linux and macOS only.
+- Pass 2 (duplicates; `-dups off|fast|full`, default `fast`): the files whose size occurs at least twice (and is at least `-dup-min`) are walked again and hashed in parallel: `fast` takes the sparse digest (`sparsehash.HashFile`, section 8.1), `full` then reads every file of a sparse group in full (`sparsehash.FullFile`) and only full-equal files stay grouped (`verified`). Wasted bytes = (copies - 1) x size per group. Folder pairs: for every group of at most 64 copies, every pair of the folders holding them gains the group's file and bytes; pairs of two different folders sharing more than one file come first. Sizes are counted again in pass 2, so a size left unique by a file gone since pass 1 is skipped; a file that cannot be read gets no hash and is counted in `dups.errors`.
+- Limits of the result: the folder tree keeps `-depth` levels (default 6) and the 40 heaviest subfolders of each folder (the rest summed in `more*`, `deeper` marks a cut); 100 largest files and duplicate groups (50 paths each), 25 largest files per family, 300 extensions, 150 unknown extensions, 100 folder pairs, 200 problems.
+- Live: `OnSnapshot` receives a partial result every second during the scan (the GUI shows the charts filling in); pause and stop go through `runctl` (a stopped run returns what it read, `stopped: true`).
+- `Mounts()`: the volumes with size and free space. Linux reads `/proc/self/mountinfo` (pseudo file systems such as `proc`, `sysfs`, `tmpfs`, `overlay` left out; network file systems marked remote), macOS `getfsstat`, Windows the logical drives with their type and label.
+- `-json FILE` (`-` = standard output) writes the whole `Result` (`version` 1); without it the CLI prints tables of `-top` rows.
+
 ---
 
 ## 17. Merge
@@ -1404,10 +1418,10 @@ On Windows, `onefold.exe` with no arguments opens the GUI when it was started by
 
 ### 22.4 Jobs
 
-A job has an id, a kind (`merge rearrange recover index plan apply purge`), a stage (`preview`, `execute`), a status (`running paused previewed done failed stopped interrupted`), phases, params (the request), a summary, an error, a journal path, counters and live progress (label, unit, done, total, rate, ETA).
+A job has an id, a kind (`merge rearrange recover index plan apply purge stats`), a stage (`preview`, `execute`), a status (`running paused previewed done failed stopped interrupted`), phases, params (the request), a summary, an error, a journal path, counters and live progress (label, unit, done, total, rate, ETA).
 
 - One job at a time: another start answers 409. A tool download and a job exclude each other.
-- merge, rearrange, apply and purge start with a preview; recover, index and plan run directly.
+- merge, rearrange, apply and purge start with a preview; recover, index, plan and stats run directly. A stats job's phases are `scan` and `dups`; its result is saved in the state dir and served by `/api/jobs/{id}/stats` (while it runs: the latest live snapshot, `null` before the first).
 - Execute (previewed jobs only) re-plans with `BeforeExecute` and requires the plan to equal the confirmed preview's fingerprint (merge: source + target + size per copy; rearrange: moves and deletes; purge: source + keeper per candidate). Otherwise the job fails with "the folders changed since the preview" and nothing is written. A rearrange execute also needs the typed number of deletions, a purge the typed number of files.
 - Continue (interrupted, stopped, failed): a preview is run again; an execute resumes: merge re-plans and the plan must be a subset of the confirmed one (done copies are present now), rearrange runs `RecoverWith` on its journal, index reuses its partial manifest, apply re-runs (idempotent).
 - Pause, Resume, Stop act on the job's gate (`runctl`); the status follows and is persisted at each change. Closing the window or Ctrl+C pauses and persists the active job; at the next start it is listed as interrupted and resumable, also after a power loss.
@@ -1437,6 +1451,8 @@ Exclusions after a preview: from the Plan tab a file, a folder, a pattern or "th
 | `/api/jobs/{id}/items`, `/tree`, `/exts` | GET | result lists: pages with search, extension, folder and order; the folder tree; extension counts |
 | `/api/jobs/{id}/{execute,continue,pause,resume,stop}` | POST | job actions |
 | `/api/jobs/{id}/exclude` | POST | exclusions and instant re-plan |
+| `/api/jobs/{id}/stats` | GET | the result of a stats job (`stats.Result`), live while it runs |
+| `/api/mounts` | GET | the volumes a stats job can measure (`stats.Mounts`) |
 | `/api/tools`, `/api/tools/install`, `/api/tools/cancel` | GET, POST | pinned tool downloads (Windows) |
 
 Errors are JSON `{error}` with 400 (bad input), 404 (unknown job), 409 (busy or wrong state).
@@ -1451,13 +1467,13 @@ The first page on a fresh install, and a button in every mode. It asks the goal 
 
 ### 22.8 Frontend
 
-`internal/gui/web`: Svelte 5, Vite, Tailwind, Lucide icons; English and Italian (the default follows the browser language). Layout: header (version, platform, tools pill, language switch), a job bar under it on every view (phases, progress, rate, ETA, errors, Pause/Resume/Stop), a sidebar (Guided setup, Merge, Rearrange, Golden archive, Runs, Journals, Config, Doctor), a collapsible log drawer. Merge and Rearrange have a Settings tab (folders, families with layout and file-name mode, live naming preview, filter rules, exclusions, safety switches) and a Plan tab (funnel, stats, package banner, paged result lists with list or folder-tree view, extension filter, order, search, exclusion menus; after a merge the "Purge the sources" card). Every confirmation is a styled dialog: native browser dialogs are a bug (the end-to-end test fails on them). Settings persist in the browser storage, migrated from older versions.
+`internal/gui/web`: Svelte 5, Vite, Tailwind, Lucide icons; English and Italian (the default follows the browser language). Layout: header (version, platform, tools pill, language switch), a job bar under it on every view (phases, progress, rate, ETA, errors, Pause/Resume/Stop), a sidebar (Guided setup, Merge, Rearrange, Golden archive, Statistics, Runs, Journals, Config, Doctor), a collapsible log drawer. Merge and Rearrange have a Settings tab (folders, families with layout and file-name mode, live naming preview, filter rules, exclusions, safety switches) and a Plan tab (funnel, stats, package banner, paged result lists with list or folder-tree view, extension filter, order, search, exclusion menus; after a merge the "Purge the sources" card). The Statistics view: volume cards (`/api/mounts`) and a folder list, the duplicates mode, then a dashboard drawn in SVG by small components (`components/charts`: donut, squarified treemap, stacked year bars, horizontal bars; one color per stats family in `lib/charts.js`): headline numbers, a family donut whose selection highlights that family in every chart and opens its categories, extensions and largest files, a treemap of the folder tree with breadcrumb zoom and "Analyze this folder" for a deeper run, years, size bands, duplicates (wasted space by family and extension, folder pairs with a button that fills Merge with the two folders, expandable groups of copies), a searchable extension table. Every confirmation is a styled dialog: native browser dialogs are a bug (the end-to-end test fails on them). Settings persist in the browser storage, migrated from older versions.
 
 `make web` rebuilds `dist` (also `dist/THIRD_PARTY_LICENSES.md` and `dist/.source-hash`, whose algorithm equals `gui.SourceHash`); `dist` is committed and embedded.
 
 ### 22.9 Server tests
 
-`go test ./internal/gui` covers the guard, previews and executes of every kind, the fingerprint refusal, pause/resume, interrupted jobs, rearrange confirmation and journal, purge jobs, exclusions and re-plan, list queries and trees, the config API, regime refusals, the guided setup scan and preview, the tool API, the apply tool check, and that `dist` is in sync.
+`go test ./internal/gui` covers the guard, previews and executes of every kind, the fingerprint refusal, pause/resume, interrupted jobs, rearrange confirmation and journal, purge jobs, exclusions and re-plan, list queries and trees, the config API, regime refusals, the guided setup scan and preview, the tool API, the apply tool check, a stats job with its result and the volume list, and that `dist` is in sync.
 
 ### 22.10 End-to-end test
 
@@ -1609,6 +1625,7 @@ Go's `flag` package: `-x` and `--x` are equivalent; flags go before positional a
 | `rearrange [flags] ROOT` | reorganize in place | ROOT |
 | `naming` | naming grammar, presets, placeholders | - |
 | `config [list\|get\|set\|unset\|path]` | user configuration | config file |
+| `stats [flags] FOLDER\|MOUNT...`, `stats -mounts` | what folders and volumes hold, duplicates | `-json` |
 | `doctor` | platform, zone, tools | - |
 | `tools [list\|install all\|ID...]` | pinned tool downloads (Windows) | state dir |
 | `gui [flags]` | the GUI | state dir |

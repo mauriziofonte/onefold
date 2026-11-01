@@ -29,6 +29,8 @@
         return s.assets !== undefined ? `${num(s.assets)} ${t('golden.assets').toLowerCase()}` : '';
       case 'plan':
         return s.golden !== undefined ? `${num(s.golden)} ${t('golden.goldenN')}` : '';
+      case 'stats':
+        return s.files !== undefined ? `${num(s.files)} ${t('stats.files')} · ${bytes(s.bytes)}` + (s.wasted ? ` · ${bytes(s.wasted)} ${t('stats.wasted').toLowerCase()}` : '') : '';
       case 'apply':
         return s.written !== undefined ? `${num(s.written)} ${t('golden.written').toLowerCase()}` : s.toWrite !== undefined ? `${num(s.toWrite)} ${t('golden.toWrite').toLowerCase()}` : '';
     }
@@ -54,7 +56,7 @@
         {#each jobs as j (j.id)}
           <tr class:bg-amber-50={j.status === 'interrupted' || j.status === 'stopped'}>
             <td class="text-xs whitespace-nowrap">{when(j.created)}</td>
-            <td>{t('kind.' + j.kind)} <span class="text-xs text-slate-400">· {t('stage.' + j.stage)}</span></td>
+            <td>{t('kind.' + j.kind)} {#if j.kind !== 'stats'}<span class="text-xs text-slate-400">· {t('stage.' + j.stage)}</span>{/if}</td>
             <td><span class={tone[j.status] || 'tag-slate'}>{t('status.' + j.status)}</span>{#if j.errors}<span class="ml-1 tag-rose">{num(j.errors)} ✕</span>{/if}</td>
             <td class="text-xs text-slate-600">{summary(j)}{#if j.status === 'failed'}<div class="text-rose-700">{j.error}</div>{/if}</td>
             <td class="text-right whitespace-nowrap">
