@@ -78,7 +78,7 @@ Pipeline: `catalog` (on each host, read-only) -> `plan` (anywhere) -> `apply` (d
 - Tests and experiments use synthetic or non-personal data only, in a scratch directory.
 - Nothing about a user is hardcoded: owner, comment, language, time zone, date order and month-name language come from `internal/config` (command-line flags override it, `-` clears a value); tests that run the binary set `ONEFOLD_STATE_DIR` to a scratch dir so a developer's own config never leaks in.
 - Never commit build outputs (`dist/`, `./onefold`) or personal data (manifests, plans, logs with archive paths).
-- License: AGPL-3.0-or-later (`LICENSE`); every source file starts with the project header (name, author, copyright, `SPDX-License-Identifier: AGPL-3.0-or-later`): new files get it too. Dependencies keep their own licenses (`make notices`).
+- License: AGPL-3.0-or-later (`LICENSE`), dual-licensed with a commercial license from the author (`LICENSING.md`, made possible by `CLA.md`); the name and logos are trademarks (`TRADEMARKS.md`, logos in `assets/brand`); every source file starts with the project header (name, author, copyright, `SPDX-License-Identifier: AGPL-3.0-or-later`): new files get it too. Dependencies keep their own licenses (`make notices`).
 - Comments say why, in full: no references to planning notes outside the repository (decision or contract ids, ADR numbers; `TestSourceHeaders` refuses them).
 - Code, comments, docs and commit messages in English. Commits: one line, `<feat|fix|chore|test|docs|ci|build>: <subject>`, max 72 chars.
 - Contributors: `CONTRIBUTING.md` (how), `CLA.md` (signed once per contributor through the CLA bot), `SECURITY.md` (private reports), `.github/pull_request_template.md` (the 28.3 checklist of `ARCHITECTURE.md`).

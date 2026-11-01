@@ -9,7 +9,7 @@ Your files are spread over a laptop, an old PC, a phone backup, two external dri
 
 ![The onefold GUI merging two folders: preview, then execute](assets/demo/gui-merge.gif)
 
-One static binary for Linux (amd64, arm64) and Windows (amd64), with a local GUI and a full command line. Current version: 0.0.1-alpha, an early pre-release ([CHANGELOG.md](CHANGELOG.md)).
+One static binary for Linux (amd64, arm64), macOS (Apple Silicon, Intel) and Windows (amd64), with a local GUI and a full command line. Current version: 0.0.1-alpha, an early pre-release ([CHANGELOG.md](CHANGELOG.md)).
 
 ## Contents
 
@@ -354,4 +354,9 @@ onefold is in alpha and looks for **developers** who want to work on it regularl
 
 ## License
 
-Copyright (c) 2026 Maurizio Fonte <fonte.maurizio@gmail.com>. Licensed under the [GNU Affero General Public License v3.0 or later](LICENSE) (`AGPL-3.0-or-later`): you may use, study, modify and share it, also commercially; whoever distributes a modified version, or lets users reach it over a network, must offer its source under the same license. Release binaries come with `THIRD_PARTY_NOTICES.txt`, the licenses of the components they include.
+Copyright (c) 2026 Maurizio Fonte <fonte.maurizio@gmail.com>. onefold is dual-licensed ([LICENSING.md](LICENSING.md)):
+
+- open source, for everyone: the [GNU Affero General Public License v3.0 or later](LICENSE) (`AGPL-3.0-or-later`). You may use, study, modify and share it, also commercially; whoever distributes a modified version, or lets users reach it over a network, must offer its source under the same license;
+- commercial: for organizations that cannot accept the AGPL terms, a separate license from the copyright holder.
+
+The name and the logos are trademarks and are not covered by either license ([TRADEMARKS.md](TRADEMARKS.md)): forks are welcome under another name. Release binaries come with `THIRD_PARTY_NOTICES.txt`, the licenses of the components they include.

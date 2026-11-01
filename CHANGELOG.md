@@ -6,6 +6,7 @@ The version being prepared is in the `VERSION` file; a release is the tag `v<VER
 
 ## [Unreleased]
 
+- Licensing: onefold stays AGPL-3.0-or-later for everyone and is also offered under a commercial license (`LICENSING.md`). The name and logos are covered by a trademark policy (`TRADEMARKS.md`).
 - macOS: `merge -verify-uncached` reads each copy back past the cache (`msync(MS_INVALIDATE)`, then `F_NOCACHE`) instead of falling back to the cached read.
 - macOS: `purge-sources -trash` (and the GUI option) moves the merged sources to the Trash, with Finder's Put Back, instead of deleting them. It uses the system Trash API without cgo, through the new dependency `github.com/ebitengine/purego`.
 - Linux: `purge-sources -trash` (and the GUI option) moves the merged sources to the Trash of the freedesktop.org specification, which desktop file managers and `trash-cli` restore from, on every distribution.

@@ -22,7 +22,7 @@ Never attach personal photos, documents or full file listings. Describe the file
 
 ### Contributor License Agreement
 
-Every contributor signs the [onefold Individual CLA](CLA.md) once, before the first pull request is merged. A bot comments on your first pull request with a link; signing takes one click with your GitHub account. The CLA lets the maintainer keep the project's licensing options open (onefold is AGPL-3.0-or-later today) while you keep the copyright of your work; every contribution stays available under an open-source license.
+Every contributor signs the [onefold Individual CLA](CLA.md) once, before the first pull request is merged. A bot comments on your first pull request with a link; signing takes one click with your GitHub account. The CLA lets the maintainer keep the project's licensing options open (onefold is AGPL-3.0-or-later today) while you keep the copyright of your work; every contribution stays available under an open-source license. This is what makes the dual licensing in [LICENSING.md](LICENSING.md) possible.
 
 ### Build and test
 
