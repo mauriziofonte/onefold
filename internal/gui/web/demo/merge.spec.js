@@ -7,11 +7,14 @@
 // Nothing personal: the sandbox is written here (DEMO_ROOT, must not exist).
 import { test, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, existsSync, createWriteStream, utimesSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, createWriteStream, utimesSync, realpathSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const bin = process.env.ONEFOLD_BIN;
-const root = process.env.DEMO_ROOT || '/tmp/onefold-demo';
+// the temp folder by its real name: no 8.3 short names or /var -> /private/var
+// links in the paths the GIF shows
+const root = process.env.DEMO_ROOT || join(realpathSync.native(tmpdir()), 'onefold-demo');
 const state = join(root, 'state');
 const port = 47191;
 let server;

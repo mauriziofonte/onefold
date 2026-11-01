@@ -134,7 +134,7 @@
     }, 300);
   });
 
-  const TONE = { dupDelete: 'tag-rose', canon: 'tag-indigo', byteCopy: 'tag-indigo', markers: 'tag-emerald', collision: 'tag-amber',
+  const TONE = { dupDelete: 'tag-rose', canon: 'tag-brand', byteCopy: 'tag-brand', markers: 'tag-emerald', collision: 'tag-amber',
     dateName: 'tag-amber', dateMtime: 'tag-amber' };
   const tagText = (g) => t('wtag.' + g.k, { a: g.k === 'excl' ? t('rule.' + g.a) : g.a });
 
@@ -186,7 +186,7 @@
 
   <div class="flex flex-wrap gap-1.5" data-testid="wizard-steps">
     {#each steps as s, i (s.k)}
-      <button class="phase {s.lock ? 'border-dashed border-slate-300 bg-slate-100 text-slate-400' : i < w.step ? 'border-emerald-200 text-emerald-700' : i === w.step ? 'border-indigo-200 bg-indigo-50 font-medium text-indigo-700' : 'border-slate-200 text-slate-500'} {!w.goal && i > 0 ? 'opacity-40' : ''}"
+      <button class="phase {s.lock ? 'border-dashed border-slate-300 bg-slate-100 text-slate-400' : i < w.step ? 'border-emerald-200 text-emerald-700' : i === w.step ? 'border-brand-200 bg-brand-50 font-medium text-brand-700' : 'border-slate-200 text-slate-500'} {!w.goal && i > 0 ? 'opacity-40' : ''}"
         onclick={() => go(i)} disabled={!w.goal && i > 0}>
         {#if s.lock}<Lock size={12} />{:else if i < w.step}<Check size={12} />{:else}{i + 1}{/if}
         {t('wizard.step.' + s.k)}
@@ -201,7 +201,7 @@
           <div class="card-h">{t('wizard.goal.q')}</div>
           <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
             {#each GOALS as g (g)}
-              <button class="flex flex-col items-start rounded-xl border-2 p-3 text-left {w.goal === g ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 hover:border-indigo-200'}" onclick={() => chooseGoal(g)} data-testid={'goal-' + g}>
+              <button class="flex flex-col items-start rounded-xl border-2 p-3 text-left {w.goal === g ? 'border-brand-600 bg-brand-50' : 'border-slate-200 hover:border-brand-200'}" onclick={() => chooseGoal(g)} data-testid={'goal-' + g}>
                 <div class="font-semibold text-slate-900">{t('wizard.goal.' + g)}</div>
                 <div class="mt-1 text-sm text-slate-600">{t('wizard.goal.' + g + '.d')}</div>
                 <div class="mt-2 border-t border-dashed border-slate-200 pt-2 text-xs text-slate-500"><b>{t('wizard.eff')}</b> {t('wizard.goal.' + g + '.e')}</div>
@@ -251,12 +251,12 @@
             <span class="text-xs text-slate-500">{scanning ? t('wizard.scanning') : t('wizard.scanHint')}</span>
           </div>
           {#if scanned}
-            <div class="banner border-indigo-200 bg-indigo-50 text-sm text-indigo-800" data-testid="wizard-scanned">
+            <div class="banner border-brand-200 bg-brand-50 text-sm text-brand-800" data-testid="wizard-scanned">
               <Info size={14} />{t(scan.truncated ? 'wizard.scannedPartial' : 'wizard.scanned', { secs: scan.secs.toFixed(1), n: num(scan.files), size: bytes(scan.bytes) })}
             </div>
             {#if w.goal === 'golden'}
               <div class="grid grid-cols-[12rem_1fr_6rem] items-center gap-2 text-sm">
-                <span>{t('wizard.golden.in')}</span><div class="h-2 rounded bg-slate-100"><div class="h-2 rounded bg-indigo-600" style="width:{Math.max(2, (considered.n / Math.max(1, scan.files)) * 100)}%"></div></div><span class="num">{num(considered.n)}</span>
+                <span>{t('wizard.golden.in')}</span><div class="h-2 rounded bg-slate-100"><div class="h-2 rounded bg-brand-600" style="width:{Math.max(2, (considered.n / Math.max(1, scan.files)) * 100)}%"></div></div><span class="num">{num(considered.n)}</span>
               </div>
               {#if goldenOut.gifbmp + goldenOut.gfx}
                 <div class="banner border-amber-200 bg-amber-50 text-xs text-amber-800" data-testid="wizard-golden-out"><CircleAlert size={14} />{t('wizard.golden.out', { gifbmp: num(goldenOut.gifbmp), gfx: num(goldenOut.gfx) })}</div>
@@ -265,7 +265,7 @@
               <div class="space-y-1">
                 {#each FAMILIES as f (f.key)}
                   {@const n = famCount(f.key)}
-                  <div class="grid grid-cols-[12rem_1fr_6rem] items-center gap-2 text-sm"><span>{t('fam.' + f.key)}</span><div class="h-2 rounded bg-slate-100"><div class="h-2 rounded bg-indigo-600" style="width:{Math.max(1, (n / Math.max(1, scan.files)) * 100)}%"></div></div><span class="num">{num(n)}</span></div>
+                  <div class="grid grid-cols-[12rem_1fr_6rem] items-center gap-2 text-sm"><span>{t('fam.' + f.key)}</span><div class="h-2 rounded bg-slate-100"><div class="h-2 rounded bg-brand-600" style="width:{Math.max(1, (n / Math.max(1, scan.files)) * 100)}%"></div></div><span class="num">{num(n)}</span></div>
                 {/each}
               </div>
             {/if}
@@ -309,7 +309,7 @@
                 <div class="mb-2 flex items-baseline gap-2"><b>{t('fam.' + f.key)}</b><span class="text-xs text-slate-500">{t('wizard.nFiles', { n: num(famCount(f.key)) })}</span></div>
                 <div class="flex flex-wrap gap-1.5">
                   {#each f.chips as p, i (p)}
-                    <button class="rounded-lg border px-2.5 py-1 text-sm {w.choice[f.key] === p ? 'border-indigo-600 bg-indigo-50 font-medium text-indigo-700' : 'border-slate-200 hover:border-indigo-200'}" onclick={() => (w.choice[f.key] = p)}>
+                    <button class="rounded-lg border px-2.5 py-1 text-sm {w.choice[f.key] === p ? 'border-brand-600 bg-brand-50 font-medium text-brand-700' : 'border-slate-200 hover:border-brand-200'}" onclick={() => (w.choice[f.key] = p)}>
                       {t('preset.' + p)}{#if i === 0}<span class="ml-1 text-[10px] text-emerald-600">{t('wizard.recommended')}</span>{/if}
                     </button>
                   {/each}
@@ -374,7 +374,7 @@
           {#if w.goal === 'rearrange' && w.dupes === 'delete'}
             <div class="banner border-rose-200 bg-rose-50 text-xs text-rose-800"><CircleAlert size={14} />{t('wizard.sum.delete')}</div>
           {:else}
-            <div class="banner border-indigo-200 bg-indigo-50 text-xs text-indigo-800"><Info size={14} />{t('wizard.sum.safe.' + w.goal)}</div>
+            <div class="banner border-brand-200 bg-brand-50 text-xs text-brand-800"><Info size={14} />{t('wizard.sum.safe.' + w.goal)}</div>
           {/if}
           <div>
             <span class="lbl">{t('wizard.sum.cli')}</span>

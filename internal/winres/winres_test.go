@@ -137,14 +137,20 @@ func TestSysoLayout(t *testing.T) {
 
 func TestLogo(t *testing.T) {
 	img := Logo(48)
-	if c := img.NRGBAAt(0, 0); c.A != 0 {
-		t.Fatalf("corner must be transparent: %v", c)
-	}
-	if c := img.NRGBAAt(24, 3); c != indigo {
-		t.Fatalf("background: %v", c)
-	}
-	if c := img.NRGBAAt(24, 10); c.R < 0xf0 || c.G < 0xf0 { // on the top layer's ridge (12,5) -> (24,10)
-		t.Fatalf("stroke: %v", c)
+	for _, c := range []struct {
+		x, y int
+		want color.NRGBA
+		what string
+	}{
+		{0, 0, color.NRGBA{}, "transparent corner"},
+		{46, 46, color.NRGBA{}, "transparent corner"},
+		{10, 30, backColor, "back square"},
+		{36, 12, frontColor, "front square"},
+		{24, 22, overColor, "overlap"},
+	} {
+		if got := img.NRGBAAt(c.x, c.y); got != c.want {
+			t.Errorf("%s at %d,%d: %v, want %v", c.what, c.x, c.y, got, c.want)
+		}
 	}
 }
 

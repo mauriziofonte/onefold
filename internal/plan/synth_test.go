@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -117,7 +118,25 @@ func TestMediaSynthRegression(t *testing.T) {
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("media plan of testdata/media-synth changed:\ngot:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	} // the catalog workers emit records in any order: the media winners must
+	// not depend on it
+	rev := slices.Clone(recs)
+	slices.Reverse(rev)
+	if a, b := winners(Plan(recs)), winners(Plan(rev)); !slices.Equal(a, b) {
+		t.Errorf("media winners depend on the record order:\n%s\nreversed:\n%s", strings.Join(a, "\n"), strings.Join(b, "\n"))
 	}
+}
+
+// winners lists the media winners of a plan, sorted.
+func winners(r *Result) []string {
+	var out []string
+	for _, a := range r.Golden {
+		if k := a.Winner.Meta.Kind; k == "photo" || k == "video" {
+			out = append(out, a.Winner.Path)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // Options.SelfContained writes the winner's sub-second, duration and

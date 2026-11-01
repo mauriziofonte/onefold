@@ -97,7 +97,7 @@ func runGUI(o guiOptions) {
 		}
 		return
 	}
-	srv, err := gui.New(gui.Options{Port: o.port, StateDir: dir, Version: version,
+	srv, err := gui.New(gui.Options{Port: o.port, StateDir: dir, Version: version, Build: buildLabel(),
 		OnConfig: func(c config.Config) { setDiag(c.DiagLog) }})
 	if err != nil {
 		fatal(1, err)
@@ -129,7 +129,7 @@ func runGUI(o guiOptions) {
 		dlog("gui: signal %v: pausing the active job and exiting", s)
 		srv.Shutdown() // pauses and persists the running job: resumable at next start
 	}()
-	fmt.Fprintf(os.Stderr, "onefold GUI: %s\n(state: %s; Ctrl+C pauses the running job and exits)\n", url, dir)
+	fmt.Fprintf(os.Stderr, "onefold %s GUI: %s\n(state: %s; Ctrl+C pauses the running job and exits)\n", version, url, dir)
 
 	if !o.noWindow && !o.noOpen {
 		if gui.OpenWindow(url, filepath.Join(dir, "webview2"), "onefold", srv.Opened()) {

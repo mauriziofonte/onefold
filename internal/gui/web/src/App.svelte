@@ -6,7 +6,8 @@
 -->
 
 <script>
-  import { Layers, GitMerge, FolderTree, Sparkles, History, Stethoscope, BookOpen, WifiOff, CircleAlert, X, Settings, Wand, Info, CircleCheck } from '@lucide/svelte';
+  import { GitMerge, FolderTree, Sparkles, History, Stethoscope, BookOpen, WifiOff, CircleAlert, X, Settings, Wand, Info, CircleCheck } from '@lucide/svelte';
+  import Logo from './components/Logo.svelte';
   import { onMount } from 'svelte';
   import { store, init, jobsSorted } from './lib/store.svelte.js';
   import { settings, save } from './lib/settings.svelte.js';
@@ -85,13 +86,13 @@
 
 <div class="flex h-full flex-col overflow-hidden">
   <header class="flex h-12 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4">
-    <div class="flex items-center gap-2 font-semibold text-slate-900">
-      <div class="grid h-7 w-7 place-items-center rounded-lg bg-indigo-600 text-white"><Layers size={16} /></div>
-      onefold <span class="text-xs font-normal text-slate-400">{store.info?.version || ''}</span>
+    <div class="flex items-center gap-2">
+      <Logo height={22} />
+      <button class="text-xs font-normal text-slate-400 hover:text-slate-600" title={store.info?.build || ''} onclick={() => (settings.view = 'doctor')} data-testid="app-version">{store.info?.version || ''}</button>
     </div>
     {#if store.info}
       <div class="ml-4 flex items-center gap-2 text-xs">
-        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{store.info.os === 'windows' ? 'Windows' : store.info.os === 'linux' ? 'Linux' : store.info.os} · {store.info.cpus} CPU</span>
+        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">{store.info.os === 'windows' ? 'Windows' : store.info.os === 'linux' ? 'Linux' : store.info.os === 'darwin' ? 'macOS' : store.info.os} · {store.info.cpus} CPU</span>
         <button class="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700 hover:bg-emerald-100" onclick={() => (settings.view = 'doctor')}>
           {tools ? t('header.tools', { n: tools, total: toolsTotal }) : t('header.toolsNone')}
         </button>
@@ -136,7 +137,7 @@
           </div>
         {/if}
         {#if settings.notice}
-          <div class="banner mx-auto mb-4 max-w-6xl border-indigo-200 bg-indigo-50 text-indigo-800" data-testid="notice">
+          <div class="banner mx-auto mb-4 max-w-6xl border-brand-200 bg-brand-50 text-brand-800" data-testid="notice">
             <Info size={16} class="shrink-0" /><span class="flex-1">{t(settings.notice)}</span>
             <button class="icon-btn" onclick={() => (settings.notice = '')}><X size={14} /></button>
           </div>

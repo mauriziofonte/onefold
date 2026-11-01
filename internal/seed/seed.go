@@ -68,8 +68,12 @@ func Rsync(script, list io.Writer, rels []string, staging, dest, listPath string
 			return err
 		}
 	}
+	// --info=progress2 needs rsync 3.1; the rsync macOS ships (2.6.9, or
+	// openrsync) only knows --progress, so the script picks what it has.
 	_, err := fmt.Fprintf(script, "#!/bin/sh\n# onefold seed: copy the plan's files from the staging tree; existing files are never replaced\nset -e\n"+
-		"rsync -a --ignore-existing --partial --info=progress2 --files-from=%s -- %s %s\n",
+		"progress=--progress\n"+
+		"if rsync --help 2>&1 | grep -q -- '--info=FLAGS'; then progress=--info=progress2; fi\n"+
+		"rsync -a --ignore-existing --partial \"$progress\" --files-from=%s -- %s %s\n",
 		shq(listPath), shq(strings.TrimSuffix(staging, "/")+"/"), shq(strings.TrimSuffix(dest, "/")+"/"))
 	return err
 }

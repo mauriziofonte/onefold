@@ -113,7 +113,7 @@
       <button class="link text-xs" onclick={reference}>{t('naming.reference')}</button>
       {#if showRef}
         <ul class="scroll-thin max-h-48 space-y-0.5 overflow-auto rounded-lg border border-slate-200 p-2 text-[11px]">
-          {#each placeholders as p (p[0])}<li><span class="font-mono text-indigo-700">{'{' + p[0] + '}'}</span> {p[1]}</li>{/each}
+          {#each placeholders as p (p[0])}<li><span class="font-mono text-brand-700">{'{' + p[0] + '}'}</span> {p[1]}</li>{/each}
         </ul>
       {/if}
     </div>

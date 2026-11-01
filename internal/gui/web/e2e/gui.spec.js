@@ -96,12 +96,19 @@ test.beforeAll(() => {
   chmodSync(join(root, 'IN3', 'broken', 'locked.pdf'), 0o000);
   writeFileSync(join(root, 'IN3', 'note.txt'), 'a note');
   // rearrange: a scratch copy with duplicates under copy names
-  execFileSync('cp', ['-r', '/usr/share/man/man1', join(root, 'TREE')]);
-  const some = readdirSync(join(root, 'TREE')).slice(0, 5);
+  // -L: on some systems most man pages are links to /etc/alternatives,
+  // which onefold (rightly) never treats as content; a dangling link only
+  // makes cp complain
+  const copyTree = (src, dst) => {
+    try { execFileSync('cp', ['-rL', src, dst], { stdio: 'ignore' }); } catch { /* dangling links */ }
+  };
+  const regular = (d) => readdirSync(d).filter((f) => lstatSync(join(d, f)).isFile());
+  copyTree('/usr/share/man/man1', join(root, 'TREE'));
+  const some = regular(join(root, 'TREE')).slice(0, 5);
   for (const f of some) execFileSync('cp', [join(root, 'TREE', f), join(root, 'TREE', f.replace(/\.gz$/, ' (1).gz'))]);
   // guided setup: another scratch tree with copies, untouched by the rearrange step
-  execFileSync('cp', ['-r', '/usr/share/man/man5', join(root, 'TREE2')]);
-  for (const f of readdirSync(join(root, 'TREE2')).slice(0, 3)) execFileSync('cp', [join(root, 'TREE2', f), join(root, 'TREE2', f.replace(/\.gz$/, ' (1).gz'))]);
+  copyTree('/usr/share/man/man5', join(root, 'TREE2'));
+  for (const f of regular(join(root, 'TREE2')).slice(0, 3)) execFileSync('cp', [join(root, 'TREE2', f), join(root, 'TREE2', f.replace(/\.gz$/, ' (1).gz'))]);
   // a Desktop to archive: content, OS droppings, shortcuts, temp and lock
   // files, unknown and missing extensions; merged, then purged
   for (const [f, body] of Object.entries({
@@ -167,7 +174,7 @@ test('GUI end to end', async ({ browser }) => {
     await page.getByTestId('confirm-reviewed').check();
     await page.getByTestId('confirm-go').click();
     await expect(page.getByTestId('jobbar-status')).toHaveText('running');
-    await expect(page.locator('[data-testid="jobbar"] .phase', { hasText: 'Copy + verify' })).toHaveClass(/indigo/, { timeout: 5 * 60 * 1000 });
+    await expect(page.locator('[data-testid="jobbar"] .phase', { hasText: 'Copy + verify' })).toHaveClass(/brand/, { timeout: 5 * 60 * 1000 });
     await page.getByTestId('job-pause').click();
     await expect(page.getByTestId('jobbar-status')).toHaveText('paused');
     await page.waitForTimeout(1500);
@@ -243,7 +250,7 @@ test('GUI end to end', async ({ browser }) => {
     await page.getByTestId('merge-execute').click();
     await page.getByTestId('confirm-reviewed').check();
     await page.getByTestId('confirm-go').click();
-    await expect(page.locator('[data-testid="jobbar"] .phase', { hasText: 'Copy + verify' })).toHaveClass(/indigo/, { timeout: 5 * 60 * 1000 });
+    await expect(page.locator('[data-testid="jobbar"] .phase', { hasText: 'Copy + verify' })).toHaveClass(/brand/, { timeout: 5 * 60 * 1000 });
     await page.waitForTimeout(400);
     server.kill('SIGKILL'); // the computer is switched off
     await page.waitForTimeout(1500);
@@ -404,7 +411,7 @@ test('GUI end to end', async ({ browser }) => {
     await expect(toCopy()).toHaveText('1');
     await page.getByTestId('tab-settings').click();
     await expect(page.getByTestId('filters-card')).toHaveAttribute('open', ''); // exclusions set: the card opens by itself
-    await page.getByTestId('exclusions').locator('.tag-indigo').getByTestId('exclusion-remove').click();
+    await page.getByTestId('exclusions').locator('.tag-brand').getByTestId('exclusion-remove').click();
     await page.getByTestId('tab-plan').click();
     await expect(toCopy()).toHaveText('3');
     await shot(page, '25-plan-reviewed');

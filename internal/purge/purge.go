@@ -32,6 +32,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mauriziofonte/onefold/internal/fsx"
 	"github.com/mauriziofonte/onefold/internal/kinds"
 	"github.com/mauriziofonte/onefold/internal/merge"
 	"github.com/mauriziofonte/onefold/internal/report"
@@ -45,8 +46,8 @@ type Options struct {
 	Output  string         // the merge output (keepers live there)
 	Rooms   []string       // the merge input rooms (sources live there)
 	Execute bool
-	// Trash moves the files to the Recycle Bin instead of deleting them
-	// (Windows only).
+	// Trash moves the files to the Recycle Bin (Windows) or the Trash
+	// (macOS, Linux) instead of deleting them.
 	Trash bool
 	// Expect, when >= 0, must equal the number of files an execute deletes
 	// (the typed confirmation); checked before anything is touched.
@@ -85,8 +86,11 @@ type Result struct {
 	Stopped      bool     `json:"stopped,omitempty"`
 }
 
-// ErrTrashUnsupported: the Recycle Bin option on an OS without one.
-var ErrTrashUnsupported = errors.New("the Recycle Bin option is available on Windows only")
+// ErrTrashUnsupported: the Trash option on an OS where onefold has none.
+var ErrTrashUnsupported = errors.New("the Recycle Bin / Trash option is available on Windows, macOS and Linux only")
+
+// TrashSupported reports whether this OS has the Trash option.
+const TrashSupported = trashSupported
 
 func fold(p string) string {
 	if runtime.GOOS == "windows" {
@@ -95,9 +99,39 @@ func fold(p string) string {
 	return p
 }
 
-// within reports whether p is dir or inside dir.
+// canonDir and canonFile give the spelling purge compares paths in
+// (fsx.Canonical): a report written with one spelling of a folder (its real
+// name) and options or items with another (a link, a Windows short name)
+// must still agree on what is inside the output and what is inside an input.
+// A file keeps its own name (a link to a file is not followed: it is the
+// link that is listed, and the link that would be deleted). Only comparisons
+// use them: deletions act on the path as listed.
+func canonDir(p string) string {
+	if c, ok := dirCanon.Load(p); ok {
+		return c.(string)
+	}
+	c, err := fsx.Canonical(p)
+	if err != nil {
+		c = filepath.Clean(p)
+	}
+	dirCanon.Store(p, c)
+	return c
+}
+
+// dirCanon caches canonDir: a purge compares every listed file with the
+// output and the rooms, and most files share their folders.
+var dirCanon sync.Map
+
+// sameDir reports whether a and b are the same folder, however spelled.
+func sameDir(a, b string) bool { return fold(canonDir(a)) == fold(canonDir(b)) }
+
+func canonFile(p string) string {
+	return filepath.Join(canonDir(filepath.Dir(p)), filepath.Base(p))
+}
+
+// within reports whether the file p is inside dir.
 func within(p, dir string) bool {
-	fp, fd := fold(filepath.Clean(p)), fold(filepath.Clean(dir))
+	fp, fd := fold(canonFile(p)), fold(canonDir(dir))
 	return fp == fd || strings.HasPrefix(fp, strings.TrimSuffix(fd, string(filepath.Separator))+string(filepath.Separator))
 }
 
@@ -133,23 +167,23 @@ func Plan(o Options) (*Result, error) {
 		switch {
 		case !filepath.IsAbs(it.Src) || !filepath.IsAbs(it.Keeper):
 			reason = "not an absolute path"
-		case seen[fold(filepath.Clean(it.Src))]:
+		case seen[fold(canonFile(it.Src))]:
 			reason = "listed twice"
 		case within(it.Src, res.Output):
 			reason = "inside the output"
 		case !within(it.Keeper, res.Output):
 			reason = "its copy is not inside the output"
-		case fold(filepath.Clean(it.Src)) == fold(filepath.Clean(it.Keeper)):
+		case fold(canonFile(it.Src)) == fold(canonFile(it.Keeper)):
 			reason = "same file as its copy"
 		default:
 			reason = "outside the input folders"
 			for _, r := range res.Rooms {
-				if within(it.Src, r) && fold(filepath.Clean(it.Src)) != fold(r) {
+				if within(it.Src, r) && !sameDir(it.Src, r) {
 					reason = ""
 				}
 			}
 		}
-		seen[fold(filepath.Clean(it.Src))] = true
+		seen[fold(canonFile(it.Src))] = true
 		if reason != "" {
 			res.Refused = append(res.Refused, Refusal{Src: it.Src, Reason: reason})
 			continue
@@ -317,7 +351,7 @@ func removeEmptyDirs(o Options, res *Result, deleted []string, j *journal) (dirs
 		if room == "" {
 			continue
 		}
-		for d := filepath.Dir(p); within(d, room) && fold(d) != fold(room); d = filepath.Dir(d) {
+		for d := filepath.Dir(p); within(d, room) && !sameDir(d, room); d = filepath.Dir(d) { // never the room itself
 			cand[d] = true
 		}
 	}
@@ -375,7 +409,7 @@ func removeEmptyDirs(o Options, res *Result, deleted []string, j *journal) (dirs
 	return dirs, junk
 }
 
-// removeDir removes an empty directory (to the Recycle Bin with trash: it
+// removeDir removes an empty directory (to the Recycle Bin / Trash with trash: it
 // stays restorable with its files).
 func removeDir(d string, trash bool) error {
 	if trash {

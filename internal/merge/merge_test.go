@@ -21,6 +21,8 @@ import (
 	"github.com/mauriziofonte/onefold/internal/catalog"
 	"github.com/mauriziofonte/onefold/internal/fsx"
 	"github.com/mauriziofonte/onefold/internal/sparsehash"
+	"github.com/mauriziofonte/onefold/internal/testfix"
+	"golang.org/x/text/unicode/norm"
 )
 
 var (
@@ -86,7 +88,7 @@ func targets(r *Result) map[string]string {
 
 // scenario: O is an <EXT>/<YEAR>/<name> tree and also the first input.
 func scenario(t *testing.T) (O, B, C string) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	O, B, C = filepath.Join(root, "FILES"), filepath.Join(root, "B"), filepath.Join(root, "C")
 	write(t, filepath.Join(O, "PDF/2010/fattura.pdf"), "%PDF fattura 2010", t2010)
 	write(t, filepath.Join(O, "TXT/2015/Readme.txt"), "readme in O", t2015)
@@ -212,7 +214,7 @@ func TestMergeOverlaps(t *testing.T) {
 
 // Two different 10 MB files with an identical sparse sample.
 func TestSparseCollisionNeverLosesData(t *testing.T) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	O, B := filepath.Join(root, "O"), filepath.Join(root, "B")
 	body := bytes.Repeat([]byte("0123456789abcdef"), 10<<20/16)
 	body[0] = 0 // binary: sparse (sampled) hash instead of full
@@ -239,7 +241,7 @@ func TestSparseCollisionNeverLosesData(t *testing.T) {
 }
 
 func TestBlockedParent(t *testing.T) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	O, B := filepath.Join(root, "O"), filepath.Join(root, "B")
 	write(t, filepath.Join(O, "ZIP"), "a FILE named like the target dir", t2015)
 	write(t, filepath.Join(B, "x.zip"), "PK\x03\x04 zip", t2020)
@@ -253,7 +255,7 @@ func TestBlockedParent(t *testing.T) {
 }
 
 func TestRenameNoReplace(t *testing.T) {
-	d := t.TempDir()
+	d := testfix.TempDir(t)
 	a, b := filepath.Join(d, "a"), filepath.Join(d, "b")
 	os.WriteFile(a, []byte("A"), 0o644)
 	os.WriteFile(b, []byte("B"), 0o644)
@@ -307,7 +309,7 @@ func mapsEqual(a, b map[string]string) bool {
 
 // Paths beyond Windows MAX_PATH (260) and a 200-byte file name.
 func TestLongPaths(t *testing.T) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	O, B := filepath.Join(root, "O"), filepath.Join(root, "B")
 	deep := B
 	for i := 0; i < 8; i++ {
@@ -334,7 +336,7 @@ func TestLongPaths(t *testing.T) {
 // blocked copy and its input duplicates are not in it. Excluded lists what the
 // filters left out.
 func TestSettledAndExcluded(t *testing.T) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	O, A := filepath.Join(root, "O"), filepath.Join(root, "A")
 	write(t, filepath.Join(O, "TXT", "2010", "old.txt"), "already there", t2010)
 	write(t, filepath.Join(A, "old copy.txt"), "already there", t2010)
@@ -379,7 +381,7 @@ func TestSettledAndExcluded(t *testing.T) {
 // exclusions, the plan equals a fresh preview with those exclusions, and
 // nothing is read from the inputs again.
 func TestReplanEqualsPreview(t *testing.T) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	O, A := filepath.Join(root, "O"), filepath.Join(root, "A")
 	write(t, filepath.Join(O, "TXT", "2010", "old.txt"), "already there", t2010)
 	write(t, filepath.Join(A, "old copy.txt"), "already there", t2010)
@@ -436,7 +438,7 @@ func TestVerifyUncached(t *testing.T) {
 	if r.Missing() != 0 || r.Copied != 6 || len(r.Failed) != 0 {
 		t.Fatalf("result: copied=%d missing=%d failed=%v cached=%d", r.Copied, r.Missing(), r.Failed, r.CachedVerify)
 	}
-	if (runtime.GOOS == "linux" || runtime.GOOS == "windows") && r.CachedVerify != 0 {
+	if (runtime.GOOS == "linux" || runtime.GOOS == "windows" || runtime.GOOS == "darwin") && r.CachedVerify != 0 {
 		t.Errorf("%d copies verified through the cache", r.CachedVerify)
 	}
 }
@@ -445,7 +447,7 @@ func TestVerifyUncached(t *testing.T) {
 // identified by their name (one per name in the output), and a second merge
 // copies nothing again.
 func TestKeepDotfiles(t *testing.T) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	A, B, O := filepath.Join(root, "A"), filepath.Join(root, "B"), filepath.Join(root, "O")
 	for p, body := range map[string]string{
 		"A/.env.sample": "KEY=1", "A/a.txt": "text a", "A/x/.nomedia": "", "A/pkg/__init__.py": "",
@@ -472,5 +474,64 @@ func TestKeepDotfiles(t *testing.T) {
 	os.MkdirAll(O2, 0o755)
 	if r := run(t, opts([]string{A, B}, O2, true)); r.Copied != 1 {
 		t.Fatalf("default merge copied %d, want 1 (a.txt)", r.Copied)
+	}
+}
+
+// One folder, two spellings: an output that does not exist yet, named
+// through a link to the input, is still recognised as inside the input, and
+// an exclusion typed through the link still applies.
+func TestSpellingsOfOneFolder(t *testing.T) {
+	root := testfix.TempDir(t)
+	in := filepath.Join(root, "in")
+	write(t, filepath.Join(in, "a.txt"), "alpha", t2010)
+	write(t, filepath.Join(in, "skip", "b.txt"), "beta", t2010)
+	link := filepath.Join(root, "link")
+	if err := os.Symlink(in, link); err != nil {
+		t.Skipf("symbolic links unavailable: %v", err)
+	}
+	o := opts([]string{in}, filepath.Join(link, "OUT"), false)
+	ex, err := catalog.CleanExcludePaths([]string{filepath.Join(link, "skip")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	o.Catalog.ExcludePaths = ex
+	r := run(t, o)
+	if want := filepath.Join(in, "OUT"); r.Output != want {
+		t.Fatalf("output %s, want the canonical %s", r.Output, want)
+	}
+	if len(r.Copies) != 1 || filepath.Base(r.Copies[0].SrcPath) != "a.txt" {
+		t.Fatalf("copies %+v (b.txt is excluded through the link)", r.Copies)
+	}
+	if len(r.Excluded) != 1 || r.Excluded[0].Rule != catalog.ReasonExcludePath {
+		t.Fatalf("excluded %+v", r.Excluded)
+	}
+}
+
+// Names that differ only in case or Unicode normalization are one name on
+// the usual Mac and Windows volumes: two such files from two inputs must
+// both reach the output under distinct names, on every system.
+func TestNamesOneVolumeConfuses(t *testing.T) {
+	root := testfix.TempDir(t)
+	B, C, O := filepath.Join(root, "B"), filepath.Join(root, "C"), filepath.Join(root, "O")
+	write(t, filepath.Join(B, "Café.txt"), "nfc", t2010)  // NFC
+	write(t, filepath.Join(C, "Café.txt"), "nfd", t2010) // NFD
+	write(t, filepath.Join(B, "Notes.txt"), "upper", t2010)
+	write(t, filepath.Join(C, "notes.txt"), "lower", t2010)
+	r := run(t, opts([]string{B, C}, O, true))
+	if r.Missing() != 0 || len(r.Copies) != 4 {
+		t.Fatalf("copies=%d missing=%d failed=%v", len(r.Copies), r.Missing(), r.Failed)
+	}
+	seen := map[string]string{}
+	for _, c := range r.Copies {
+		k := strings.ToLower(norm.NFC.String(c.Rel))
+		if prev, dup := seen[k]; dup {
+			t.Errorf("%s and %s are one name on a Mac or Windows volume", prev, c.Rel)
+		}
+		seen[k] = c.Rel
+		a, _ := os.ReadFile(c.SrcPath)
+		b, err := os.ReadFile(filepath.Join(O, filepath.FromSlash(c.Rel)))
+		if err != nil || !bytes.Equal(a, b) {
+			t.Errorf("%s: copy differs from %s (%v)", c.Rel, c.SrcPath, err)
+		}
 	}
 }

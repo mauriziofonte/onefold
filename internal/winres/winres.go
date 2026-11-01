@@ -30,7 +30,11 @@ var iconSizes = []int{16, 20, 24, 32, 40, 48, 64, 256}
 
 // Manifest is the application manifest: per-monitor (v2) DPI awareness, so
 // the WebView2 window renders sharp at any scaling, long path support, run
-// as the invoking user, Windows 10/11 behaviour.
+// as the invoking user, Windows 10/11 behaviour. consoleAllocationPolicy
+// "detached" (Windows 11 24H2 and later; older versions ignore it): started
+// from Explorer, onefold gets no console, so no terminal window flashes
+// before the GUI opens; started from a terminal it still shares that
+// terminal's console and the shell waits for it as before.
 const Manifest = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
   <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
@@ -43,6 +47,7 @@ const Manifest = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
       <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
       <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2, PerMonitor</dpiAwareness>
       <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+      <consoleAllocationPolicy xmlns="http://schemas.microsoft.com/SMI/2024/WindowsSettings">detached</consoleAllocationPolicy>
     </windowsSettings>
   </application>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">

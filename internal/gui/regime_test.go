@@ -11,12 +11,13 @@ import (
 	"testing"
 
 	"github.com/mauriziofonte/onefold/internal/catalog"
+	"github.com/mauriziofonte/onefold/internal/testfix"
 )
 
 // The server refuses settings that mix the golden archive with merge or
 // rearrange, whatever the form sent.
 func TestValidateRegimes(t *testing.T) {
-	d, _ := filepath.Abs(t.TempDir())
+	d, _ := filepath.Abs(testfix.TempDir(t))
 	m := filepath.Join(d, "m.jsonl")
 	refused := map[string]string{
 		"merge":     `{"inputs":["` + jsonPath(d) + `"],"output":"` + jsonPath(d) + `","filters":{"preset":"media"}}`,

@@ -1,10 +1,24 @@
-# onefold
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/onefold-logo-dark.svg">
+    <img alt="onefold" src="assets/brand/onefold-logo.svg" width="380">
+  </picture>
+</p>
+
+<p align="center"><b>One copy of every file you own, under a name you can predict.</b></p>
+
+<p align="center">
+  <a href="https://github.com/mauriziofonte/onefold/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/mauriziofonte/onefold/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/mauriziofonte/onefold/releases"><img alt="release" src="https://img.shields.io/github/v/release/mauriziofonte/onefold?include_prereleases&sort=semver"></a>
+  <a href="LICENSING.md"><img alt="license: AGPL-3.0-or-later or commercial" src="https://img.shields.io/badge/license-AGPL--3.0--or--later%20%7C%20commercial-blue"></a>
+  <a href="https://pkg.go.dev/github.com/mauriziofonte/onefold"><img alt="Go Reference" src="https://pkg.go.dev/badge/github.com/mauriziofonte/onefold.svg"></a>
+</p>
 
 Your files are spread over a laptop, an old PC, a phone backup, two external drives and a NAS. The same photo exists five times under five names; some copies were resized, some renamed by tools that added `(1)` or a date in front. onefold finds what is the same, keeps one copy of every distinct thing and puts it under a predictable name, without ever touching the originals unless you ask.
 
 ![The onefold GUI merging two folders: preview, then execute](assets/demo/gui-merge.gif)
 
-One static binary for Linux (amd64, arm64) and Windows (amd64), with a local GUI and a full command line. Current version: 0.0.1-alpha, an early pre-release ([CHANGELOG.md](CHANGELOG.md)).
+One static binary for Linux (amd64, arm64), macOS (Apple Silicon, Intel) and Windows (amd64), with a local GUI and a full command line. Current version: 0.0.1-alpha, an early pre-release ([CHANGELOG.md](CHANGELOG.md)).
 
 ## Contents
 
@@ -22,6 +36,7 @@ One static binary for Linux (amd64, arm64) and Windows (amd64), with a local GUI
 - [Windows notes](#windows-notes)
 - [Documentation](#documentation)
 - [Build from source](#build-from-source)
+- [Contributing](#contributing)
 - [License](#license)
 
 ## What it does
@@ -53,7 +68,8 @@ How it decides that two files are the same:
 Download the binary for your system from the [releases page](https://github.com/mauriziofonte/onefold/releases) and check it:
 
 ```bash
-sha256sum -c SHA256SUMS --ignore-missing
+sha256sum -c SHA256SUMS --ignore-missing         # Linux, Windows (Git Bash)
+shasum -a 256 -c SHA256SUMS --ignore-missing     # macOS
 ```
 
 | System | File |
@@ -61,8 +77,20 @@ sha256sum -c SHA256SUMS --ignore-missing
 | Windows 10/11 x64 | `onefold-windows-amd64.exe` |
 | Linux x64 (also WSL, most NAS) | `onefold-linux-amd64` |
 | Linux ARM64 (Raspberry Pi 4/5, ARM NAS) | `onefold-linux-arm64` |
+| macOS Apple Silicon (M1 and later) | `onefold-darwin-arm64` |
+| macOS Intel | `onefold-darwin-amd64` |
 
 Nothing to install: put the file anywhere (rename it to `onefold.exe` or `onefold` if you like). The optional helper tools are covered [below](#optional-tools).
+
+On macOS the binaries are not notarized (that needs a paid Apple Developer account), so the first start is blocked by Gatekeeper. Either remove the download mark once, from Terminal:
+
+```bash
+chmod +x onefold-darwin-arm64
+xattr -d com.apple.quarantine onefold-darwin-arm64
+./onefold-darwin-arm64 gui
+```
+
+or run it once, then allow it in System Settings > Privacy & Security ("Allow Anyway") and run it again. On macOS the GUI opens in your default browser (`onefold gui` from Terminal).
 
 ## Quick start
 
@@ -84,12 +112,18 @@ onefold.exe --input D:\FILES --input E:\old-disk --input D:\TMP --output D:\FILE
 
 On Windows a window opens (the console closes); without the WebView2 runtime, the default browser opens instead. From a terminal, on any system: `onefold gui`.
 
+The same merge recorded on the Windows and macOS machines of the CI (the window is the browser page; the paths are the runner's):
+
+| Windows | macOS |
+|---|---|
+| ![The onefold GUI on Windows merging two folders](assets/demo/gui-merge-windows.gif) | ![The onefold GUI on macOS merging two folders](assets/demo/gui-merge-macos.gif) |
+
 - **Guided setup**: the first page on a fresh install, and a button in every mode. It asks what you want to do (bring folders together, tidy up a folder, a photo and video archive from several computers, only find duplicates), scans the folders quickly (names and sizes only) and shows, after every answer, what would happen to a sample of your files, computed by the real engine. At the end it fills the right mode and starts its preview; it also shows the equivalent command (PowerShell) and saves the answers as a recipe.
 - **Every mode of the command line**: merge, rearrange, golden archive, journals and undo, configuration, tool downloads.
 - **Preview, then execute**: Execute runs exactly what the preview showed and asks you to type the number of files a rearrange or a source purge will delete.
 - **Naming per kind of file**: for photos and images, videos, documents, music, archives and everything else you pick a layout and what happens to the file name (normalized, clean, original, or with the name of a folder in front, like `[merge] posta.mbox`). The filters show every rule; the preview lists the files left out with the reason. "Export settings" saves them for `onefold merge -settings FILE`; "Copy command" gives the same run as a command line.
 - **Plan review**: after a preview the Plan tab lists every file (or groups them by folder, with counts and sizes), sorted and filtered by extension. Leave out a file, a folder or a pattern such as `*.data` from there: the plan updates at once, without scanning the disks again. Folders that look like driver or installer packages are pointed out, with a button to leave them all out.
-- **After a merge**, "Purge the sources" deletes from the input folders the files that are now in the output (with a preview, the typed count, and the Recycle Bin as an option on Windows).
+- **After a merge**, "Purge the sources" deletes from the input folders the files that are now in the output (with a preview, the typed count, and the Recycle Bin or Trash as an option).
 - **Long runs**: progress is always visible at the top, errors and warnings in the log panel at the bottom. Pause, resume or stop at any time. Runs are saved: one cut by a stop or by switching the computer off is listed under Runs and resumes where it was.
 - **English and Italian** (switch at the top right; the default follows the browser language). Folders and options are remembered.
 - **Config page**: the owner, comment and video language written into photo and video copies, the time zone, how dates in file names are read, and on Windows a switch for the diagnostic log.
@@ -97,6 +131,8 @@ On Windows a window opens (the console closes); without the WebView2 runtime, th
 ## Merge folders
 
 Fold several folders into one, keeping every distinct file exactly once. The output can be one of the inputs.
+
+![onefold merge in a terminal: preview, then execute](assets/demo/cli-merge.gif)
 
 ```bat
 :: preview
@@ -170,6 +206,8 @@ The archive works in steps that can run on different machines: each computer ind
 
 ### First run
 
+![catalog, plan and apply on a made-up photo folder](assets/demo/cli-golden.gif)
+
 ```bash
 # 1. index each machine locally (read-only); -host names the machine in the index
 onefold catalog -j 8 -host laptop -o laptop.jsonl /photos /videos
@@ -193,6 +231,8 @@ What ends up in the archive:
 - the archive scope: jpg, jpeg, heic, heif, avif, png, webp, tif, tiff, camera RAW (cr2, cr3, nef, arw, dng, raf, orf, rw2, ...) and video formats (mp4, mov, mkv, avi, 3gp, m4v, mpg, mpeg, wmv, webm, flv). GIF, BMP and graphics files are not photos and stay out.
 
 Stamping needs exiftool (photos) and ffmpeg (videos): install them before the first `apply` (on Windows: `onefold tools install all`). Without them `apply --execute` refuses to start, because a later run would not stamp copies that already exist; `-allow-unstamped` copies them unchanged anyway and reports how many.
+
+To keep the original bytes and use no extra disk space, add `-link`: each archive name becomes a hard link of its source file (same volume only, on NTFS, APFS, ext4, btrfs and similar file systems). Nothing is stamped, no tool is needed and the sources are not touched, but the archive and the sources then share their bytes: editing a file in either place changes both, so treat the archive as read-only (deleting a source later is safe: the archive name keeps the data).
 
 Useful plan options:
 
@@ -284,7 +324,7 @@ On Windows (x64), `onefold tools install all` (or the Doctor page of the GUI) do
 
 ## Windows notes
 
-- The first pass over files Windows has not read yet is slow: Microsoft Defender scans each file the first time it is opened (on 5,400 program files the first index took 21 s, a second one 0.25 s). If you trust the tool, you can exclude the onefold process from real-time scanning (administrator PowerShell, your decision): `Add-MpPreference -ExclusionProcess "C:\path\to\onefold.exe"`; `Remove-MpPreference -ExclusionProcess "C:\path\to\onefold.exe"` undoes it. onefold never changes this setting itself.
+- The first pass over files Windows has not read yet is slow: Microsoft Defender scans each file the first time it is opened (on 5,400 program files the first index took 21 s, a second one 0.25 s). Measured right after a reboot, so with nothing in the disk cache, the same index took 52 s with Defender scanning and 3 s with onefold excluded: almost all of the first-run cost is the scan, not the disk. If you trust the tool, you can exclude the onefold process from real-time scanning (administrator PowerShell, your decision): `Add-MpPreference -ExclusionProcess "C:\path\to\onefold.exe"`; `Remove-MpPreference -ExclusionProcess "C:\path\to\onefold.exe"` undoes it. onefold never changes this setting itself.
 - Long paths (over 260 characters) are supported.
 - If a double-click seems to do nothing, turn on the diagnostic log (`onefold config set diag-log on`) and read `onefold-gui.log` next to the exe.
 - Explorer shows the version of release builds in the file properties.
@@ -297,6 +337,8 @@ On Windows (x64), `onefold tools install all` (or the Doctor page of the GUI) do
 | [LLMS.md](LLMS.md) | contributors and coding agents: build, layout, invariants, conventions in short |
 | [TODOS.md](TODOS.md) | open work that needs a decision or a person |
 | [CHANGELOG.md](CHANGELOG.md) | what changed in each version |
+| [CONTRIBUTING.md](CONTRIBUTING.md), [CONTRIBUTORS.md](CONTRIBUTORS.md) | how to test or change onefold, who did |
+| [SECURITY.md](SECURITY.md) | how to report a vulnerability privately |
 | `onefold help`, `onefold naming`, `onefold doctor` | flags, naming patterns, your platform and tools |
 
 ## Build from source
@@ -313,8 +355,17 @@ make release    # all targets, LICENSE, third-party notices and SHA256SUMS
 
 The GUI frontend is prebuilt and embedded; Node is needed only to change it (`make web`, `make web-e2e`).
 
-Versions follow [Semantic Versioning](https://semver.org); the current one is in [`VERSION`](VERSION), the history in [CHANGELOG.md](CHANGELOG.md). `onefold version` prints the version of a binary: a build that is not an exact release says so (`v0.0.1-alpha+dev.<commit>`). Every release tag is built and tested on Linux and Windows by GitHub Actions and published with its checksums; versions with a suffix such as `-alpha` are marked as pre-releases.
+Versions follow [Semantic Versioning](https://semver.org); the current one is in [`VERSION`](VERSION), the history in [CHANGELOG.md](CHANGELOG.md). `onefold version` (also `--version`, `-V`) prints the version of a binary with its commit, build date, platform and Go version; a build that is not an exact release says so (`v0.0.1-alpha+dev.<commit>`). `onefold help` and `onefold doctor` start with it; in the GUI it is next to the logo and, with the build, the license and the source address, at the bottom of the Doctor page. Every release tag is built and tested on Linux and Windows by GitHub Actions and published with its checksums; versions with a suffix such as `-alpha` are marked as pre-releases.
+
+## Contributing
+
+onefold is in alpha and looks for **developers** who want to work on it regularly (Go, Svelte, macOS and Windows internals, binary file formats) and for **alpha testers** on every OS, especially macOS and large archives. Start with [CONTRIBUTORS.md](CONTRIBUTORS.md) (what is wanted) and [CONTRIBUTING.md](CONTRIBUTING.md) (how). Code contributions are made under a [Contributor License Agreement](CLA.md); everyone follows the [Code of Conduct](CODE_OF_CONDUCT.md). Security problems: [SECURITY.md](SECURITY.md).
 
 ## License
 
-Copyright (c) 2026 Maurizio Fonte <fonte.maurizio@gmail.com>. Licensed under the [GNU Affero General Public License v3.0 or later](LICENSE) (`AGPL-3.0-or-later`): you may use, study, modify and share it, also commercially; whoever distributes a modified version, or lets users reach it over a network, must offer its source under the same license. Release binaries come with `THIRD_PARTY_NOTICES.txt`, the licenses of the components they include.
+Copyright (c) 2026 Maurizio Fonte <fonte.maurizio@gmail.com>. onefold is dual-licensed ([LICENSING.md](LICENSING.md)):
+
+- open source, for everyone: the [GNU Affero General Public License v3.0 or later](LICENSE) (`AGPL-3.0-or-later`). You may use, study, modify and share it, also commercially; whoever distributes a modified version, or lets users reach it over a network, must offer its source under the same license;
+- commercial: for organizations that cannot accept the AGPL terms, a separate license from the copyright holder.
+
+The name and the logos are trademarks and are not covered by either license ([TRADEMARKS.md](TRADEMARKS.md)): forks are welcome under another name. Release binaries come with `THIRD_PARTY_NOTICES.txt`, the licenses of the components they include.

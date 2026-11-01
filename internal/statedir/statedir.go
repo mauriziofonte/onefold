@@ -13,7 +13,8 @@ import (
 	"runtime"
 )
 
-// Dir is $ONEFOLD_STATE_DIR, else %LOCALAPPDATA%\onefold on Windows, else
+// Dir is $ONEFOLD_STATE_DIR, else %LOCALAPPDATA%\onefold on Windows,
+// ~/Library/Application Support/onefold on macOS, else
 // $XDG_STATE_HOME/onefold, else ~/.local/state/onefold. Never a temp dir: a
 // run must survive a reboot.
 func Dir() (string, error) {
@@ -24,6 +25,13 @@ func Dir() (string, error) {
 		if d := os.Getenv("LOCALAPPDATA"); d != "" {
 			return filepath.Join(d, "onefold"), nil
 		}
+	}
+	if runtime.GOOS == "darwin" {
+		h, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		return filepath.Join(h, "Library", "Application Support", "onefold"), nil
 	}
 	if d := os.Getenv("XDG_STATE_HOME"); d != "" && filepath.IsAbs(d) {
 		return filepath.Join(d, "onefold"), nil

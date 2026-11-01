@@ -132,7 +132,7 @@ func validateParams(kind string, raw json.RawMessage) error {
 		if p.MergeJob == "" {
 			return errors.New("mergeJob: the executed merge whose sources are deleted")
 		}
-		if p.Trash && runtime.GOOS != "windows" {
+		if p.Trash && !purge.TrashSupported {
 			return purge.ErrTrashUnsupported
 		}
 		return nil

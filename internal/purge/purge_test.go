@@ -22,6 +22,7 @@ import (
 	"github.com/mauriziofonte/onefold/internal/catalog"
 	"github.com/mauriziofonte/onefold/internal/merge"
 	"github.com/mauriziofonte/onefold/internal/sparsehash"
+	"github.com/mauriziofonte/onefold/internal/testfix"
 )
 
 var t0 = time.Date(2015, 6, 6, 10, 0, 0, 0, time.Local)
@@ -86,7 +87,7 @@ func mergeDesktop(t *testing.T, root string) (A, O string, r *merge.Result) {
 }
 
 func TestPurge(t *testing.T) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	A, O, r := mergeDesktop(t, root)
 	write(t, filepath.Join(A, "later.txt"), "changed after the merge") // must survive: content differs now
 	outBefore := snap(t, O)
@@ -177,7 +178,7 @@ func TestPurge(t *testing.T) {
 // Items outside the input folders, inside the output, or whose keeper is not
 // in the output are refused, whatever the list says.
 func TestPurgeRefusals(t *testing.T) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	A, O, r := mergeDesktop(t, root)
 	elsewhere := filepath.Join(root, "Elsewhere", "x.txt")
 	write(t, elsewhere, "alpha spec")
@@ -204,7 +205,7 @@ func TestPurgeRefusals(t *testing.T) {
 // The output inside an input room (pruned from it by merge): neither the
 // output nor a directory holding it is ever removed.
 func TestPurgeOutputInsideInput(t *testing.T) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	A := filepath.Join(root, "A")
 	O := filepath.Join(A, "Archive", "OUT")
 	write(t, filepath.Join(A, "Archive", "a.txt"), "content a")
@@ -224,7 +225,7 @@ func TestPurgeOutputInsideInput(t *testing.T) {
 }
 
 func TestPurgeReport(t *testing.T) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	_, O, r := mergeDesktop(t, root)
 	p := filepath.Join(root, "report.json")
 	b, _ := jsonMarshal(r)
@@ -241,11 +242,12 @@ func TestPurgeReport(t *testing.T) {
 }
 
 func TestTrashOption(t *testing.T) {
-	if runtime.GOOS == "windows" {
+	if trashSupported {
 		if os.Getenv("ONEFOLD_TEST_TRASH") == "" {
-			t.Skip("writes into the Recycle Bin: set ONEFOLD_TEST_TRASH=1")
+			t.Skip("writes into the Recycle Bin or the Trash: set ONEFOLD_TEST_TRASH=1")
 		}
-		root := t.TempDir()
+		t.Setenv("XDG_DATA_HOME", testfix.TempDir(t)) // Linux: a Trash of its own
+		root := testfix.TempDir(t)
 		A, O, r := mergeDesktop(t, root)
 		res, err := Run(Options{Items: r.Settled, Output: O, Rooms: r.Rooms[1:], Execute: true, Expect: -1, Trash: true})
 		if err != nil {
@@ -256,7 +258,7 @@ func TestTrashOption(t *testing.T) {
 		}
 		return
 	}
-	if _, err := Plan(Options{Output: t.TempDir(), Trash: true}); !errors.Is(err, ErrTrashUnsupported) {
+	if _, err := Plan(Options{Output: testfix.TempDir(t), Trash: true}); !errors.Is(err, ErrTrashUnsupported) {
 		t.Fatalf("trash on %s: %v", runtime.GOOS, err)
 	}
 }
@@ -265,7 +267,7 @@ func jsonMarshal(v any) ([]byte, error) { return json.Marshal(v) }
 
 // No journal, no deletion: a journal that stops being writable stops the purge.
 func TestPurgeNeedsJournal(t *testing.T) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	_, O, r := mergeDesktop(t, root)
 	res, err := Plan(Options{Items: r.Settled, Output: O, Rooms: r.Rooms[1:]})
 	if err != nil {
@@ -304,19 +306,48 @@ func TestNoTrashReason(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		return
 	}
-	if err := checkTrash([]string{t.TempDir()}); err != nil {
+	if err := checkTrash([]string{testfix.TempDir(t)}); err != nil {
 		t.Fatalf("local temp dir: %v", err)
 	}
 	share := `\\server\share\Desktop`
-	if err := checkTrash([]string{t.TempDir(), share}); !errors.Is(err, ErrNoTrash) {
+	if err := checkTrash([]string{testfix.TempDir(t), share}); !errors.Is(err, ErrNoTrash) {
 		t.Fatalf("network share: %v", err)
 	}
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	_, O, r := mergeDesktop(t, root)
 	if _, err := Plan(Options{Items: r.Settled, Output: O, Rooms: []string{share}, Trash: true}); !errors.Is(err, ErrNoTrash) {
 		t.Fatalf("plan with a room on a share: %v", err)
 	}
 	if _, err := Plan(Options{Items: r.Settled, Output: O, Rooms: r.Rooms[1:], Trash: true}); err != nil {
 		t.Fatalf("plan on a local drive: %v", err)
+	}
+}
+
+// A purge whose output and room are named through a link (or a Windows short
+// name) agrees with the report's real paths: the same candidates, and the
+// room root itself is never removed, however it is spelled.
+func TestPurgeSpellings(t *testing.T) {
+	root := testfix.TempDir(t)
+	A, O, r := mergeDesktop(t, root)
+	link := filepath.Join(root, "link")
+	if err := os.Symlink(root, link); err != nil {
+		t.Skipf("symbolic links unavailable: %v", err)
+	}
+	viaLink := func(p string) string {
+		return filepath.Join(link, strings.TrimPrefix(p, root+string(filepath.Separator)))
+	}
+	o := Options{Items: r.Settled, Output: viaLink(O), Rooms: []string{viaLink(A)}, Expect: -1, Execute: true}
+	p, err := Run(o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(p.Candidates) != 5 || p.Deleted != 5 || len(p.Refused) != 0 {
+		t.Fatalf("candidates %d deleted %d refused %+v", len(p.Candidates), p.Deleted, p.Refused)
+	}
+	if fi, err := os.Stat(A); err != nil || !fi.IsDir() {
+		t.Fatalf("the room root was removed: %v", err)
+	}
+	if fi, err := os.Stat(O); err != nil || !fi.IsDir() {
+		t.Fatalf("the output was removed: %v", err)
 	}
 }

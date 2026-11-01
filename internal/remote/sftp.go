@@ -121,18 +121,20 @@ func Dial(cfg Config) (*Client, error) {
 		ka = 30 * time.Second
 	}
 	c.stopKA = make(chan struct{})
-	go c.keepAlive(ka)
+	go c.keepAlive(ka, c.stopKA)
 	return c, nil
 }
 
 // keepAlive pings the server so idle NAT/firewall state is never dropped
 // mid-transfer; a dead peer closes the connection (pending calls then fail).
-func (c *Client) keepAlive(every time.Duration) {
+// It gets its stop channel as an argument: Close clears c.stopKA, and reading
+// the field here would race with that write.
+func (c *Client) keepAlive(every time.Duration, stop <-chan struct{}) {
 	t := time.NewTicker(every)
 	defer t.Stop()
 	for {
 		select {
-		case <-c.stopKA:
+		case <-stop:
 			return
 		case <-t.C:
 			if _, _, err := c.ssh.SendRequest("keepalive@openssh.com", true, nil); err != nil {

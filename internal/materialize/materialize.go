@@ -153,6 +153,51 @@ func ApplyWith(a plan.Action, target string, batch *ExifBatch, s Silver) (Result
 	return Result{Dst: dst, Unsilvered: unsilvered}, nil
 }
 
+// LinkOriginal materializes a as a hard link: target/<canonRel> becomes a
+// second name of the source file, the original bytes, with no copy, no
+// silvering and the mtime left as it is (a hard link shares it with the
+// source: changing it would change the source). Source and target must be on
+// the same volume (fsx.ErrCrossVolume otherwise). The source is never
+// modified: only a name is added in the target. Idempotent like ApplyWith: an
+// existing destination is skipped, never replaced.
+func LinkOriginal(a plan.Action, target string) (Result, error) {
+	dst := filepath.Join(target, filepath.FromSlash(a.CanonRel))
+	if _, err := os.Lstat(dst); err == nil {
+		return Result{Dst: dst, Skipped: true}, nil
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return Result{Dst: dst}, err
+	}
+	if err := fsx.LinkNoReplace(a.SrcPath, dst); err != nil {
+		if errors.Is(err, fsx.ErrExists) {
+			return Result{Dst: dst, Skipped: true}, nil // appeared meanwhile: never replaced
+		}
+		return Result{Dst: dst}, err
+	}
+	return Result{Dst: dst}, nil
+}
+
+// CheckLink tells before a -link run whether the target can hold hard links
+// of the sources: it links the first action's source to a onefold temp name
+// in target and removes that temp name again. It catches the common mistakes
+// (target on another volume, a filesystem without hard links) before any
+// file is written. Sources on several volumes still fail one by one, each
+// with fsx.ErrCrossVolume.
+func CheckLink(acts []plan.Action, target string) error {
+	if len(acts) == 0 {
+		return nil
+	}
+	if err := os.MkdirAll(target, 0o755); err != nil {
+		return err
+	}
+	probe := fsx.TempFor(filepath.Join(target, "link-check"), false)
+	os.Remove(probe) // a probe left by a killed run: our own temp name
+	if err := fsx.LinkNoReplace(acts[0].SrcPath, probe); err != nil {
+		return err
+	}
+	return os.Remove(probe)
+}
+
 // parseCanon parses a plan's canonical "2006-01-02 15:04:05" wall-clock time in
 // the canonical zone (meta.Zone), whatever the host zone is.
 func parseCanon(s string) (time.Time, bool) {

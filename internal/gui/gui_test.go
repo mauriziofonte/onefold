@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/mauriziofonte/onefold/internal/naming"
+	"github.com/mauriziofonte/onefold/internal/testfix"
 	"github.com/mauriziofonte/onefold/internal/tooldl"
 )
 
@@ -62,7 +63,7 @@ func newTestServer(t *testing.T) (*Server, *http.Client) {
 	if !loopbackOK() {
 		t.Skip("this host blocks loopback connections for this process (environment, see TRAPS)")
 	}
-	s, err := New(Options{Port: -1, StateDir: t.TempDir(), Version: "test",
+	s, err := New(Options{Port: -1, StateDir: testfix.TempDir(t), Version: "test",
 		Static: fstest.MapFS{"index.html": {Data: []byte("<!doctype html><title>onefold</title>")}}})
 	if err != nil {
 		t.Fatal(err)
@@ -169,7 +170,7 @@ func writeFile(t *testing.T, p, body string) {
 
 // mergeTree: an output with one file, an input with new and duplicate files.
 func mergeTree(t *testing.T, n int) (out, in string) {
-	root := t.TempDir()
+	root := testfix.TempDir(t)
 	out, in = filepath.Join(root, "OUT"), filepath.Join(root, "IN")
 	writeFile(t, filepath.Join(out, "TXT", "2019", "have.txt"), "already there")
 	writeFile(t, filepath.Join(in, "a", "have-copy.txt"), "already there")
@@ -261,7 +262,7 @@ func TestMergeJobPreviewExecute(t *testing.T) {
 // The executed plan must be the confirmed one: a change after the preview
 // fails the execute with nothing written.
 func newTestManager(t *testing.T) *Manager {
-	return newManager(&store{dir: t.TempDir()}, newHub())
+	return newManager(&store{dir: testfix.TempDir(t)}, newHub())
 }
 
 func TestExecuteRefusedWhenFoldersChanged(t *testing.T) {
@@ -311,7 +312,7 @@ func TestPauseResume(t *testing.T) {
 
 // A run cut by a restart is listed as interrupted and Continue completes it.
 func TestInterruptedJobResumes(t *testing.T) {
-	dir := t.TempDir()
+	dir := testfix.TempDir(t)
 	out, in := mergeTree(t, 30)
 	st := &store{dir: dir}
 	m := newManager(st, newHub())
@@ -347,7 +348,7 @@ func TestInterruptedJobResumes(t *testing.T) {
 
 func TestRearrangeConfirmAndJournal(t *testing.T) {
 	s := struct{ mgr *Manager }{newTestManager(t)}
-	root := filepath.Join(t.TempDir(), "FILES")
+	root := filepath.Join(testfix.TempDir(t), "FILES")
 	writeFile(t, filepath.Join(root, "x", "a.txt"), "alpha")
 	writeFile(t, filepath.Join(root, "y", "a copy.txt"), "alpha")
 	writeFile(t, filepath.Join(root, "z", "b.txt"), "bravo")
@@ -418,7 +419,7 @@ func TestFolderBrowserAndNamingPreview(t *testing.T) {
 }
 
 func TestToolsAPI(t *testing.T) {
-	t.Setenv("ONEFOLD_STATE_DIR", t.TempDir())
+	t.Setenv("ONEFOLD_STATE_DIR", testfix.TempDir(t))
 	s, c := newTestServer(t)
 	var snap struct {
 		Packages []struct {

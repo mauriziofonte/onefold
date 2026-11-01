@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mauriziofonte/onefold/internal/fsx"
 )
 
 // ItemQuery selects a page of a result list: search text, extension of
@@ -70,6 +72,9 @@ func (m *Manager) query(id string, q ItemQuery) ([]Item, int, error) {
 		return nil, 0, err
 	}
 	q.Q, q.Ext = strings.ToLower(q.Q), strings.ToLower(strings.TrimPrefix(q.Ext, "."))
+	if q.Dir != "" {
+		q.Dir = canonicalPath(q.Dir) // the lists hold canonical paths
+	}
 	var sel []Item
 	for _, it := range all {
 		if q.keep(it) {
@@ -209,4 +214,20 @@ func summaryRooms(sum map[string]any) []string {
 		return out
 	}
 	return nil
+}
+
+// canonicalPath is fsx.Canonical, keeping p when it cannot be made absolute:
+// the result lists hold the canonical paths of the engines, a folder typed
+// or pasted through a link or a short name must still match them.
+func canonicalPath(p string) string {
+	if c, err := fsx.Canonical(p); err == nil {
+		return c
+	}
+	return p
+}
+
+// canonicalFile is canonicalPath for a file: its folder is resolved, its own
+// name is kept (a link to a file is not followed).
+func canonicalFile(p string) string {
+	return filepath.Join(canonicalPath(filepath.Dir(p)), filepath.Base(p))
 }

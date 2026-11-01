@@ -72,6 +72,11 @@ func resolve(name string) string {
 	if d := ManagedDir(); d != "" {
 		dirs = append(dirs, d)
 	}
+	if runtime.GOOS == "darwin" {
+		// Homebrew (Apple Silicon, then Intel): a program not started from a
+		// login shell (Finder, launchd) does not have it on PATH
+		dirs = append(dirs, "/opt/homebrew/bin", "/usr/local/bin")
+	}
 	cands := []string{name}
 	if runtime.GOOS == "windows" {
 		cands = []string{name + ".exe", name + ".bat", name + ".cmd"}

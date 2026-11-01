@@ -7,11 +7,25 @@
 
 @import "tailwindcss";
 
+/* the accent: a muted teal, readable on white (600 and up carry white text) */
+@theme {
+  --color-brand-50: #eff8f6;
+  --color-brand-100: #d7eeea;
+  --color-brand-200: #b0dcd5;
+  --color-brand-300: #7fc2b8;
+  --color-brand-400: #46a094;
+  --color-brand-500: #1f8479;
+  --color-brand-600: #0f766e;
+  --color-brand-700: #0c5f59;
+  --color-brand-800: #0b4d48;
+  --color-brand-900: #0a3f3b;
+}
+
 @utility nav-btn {
   @apply flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-slate-600 hover:bg-slate-100;
 }
 @utility nav-on {
-  @apply bg-indigo-50 font-medium text-indigo-700 hover:bg-indigo-50;
+  @apply bg-brand-50 font-medium text-brand-700 hover:bg-brand-50;
 }
 @utility card {
   @apply rounded-xl border border-slate-200 bg-white p-4 shadow-sm;
@@ -31,8 +45,8 @@
 @utility tag {
   @apply inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-sans whitespace-nowrap;
 }
-@utility tag-indigo {
-  @apply tag border-indigo-200 bg-indigo-50 text-indigo-700;
+@utility tag-brand {
+  @apply tag border-brand-200 bg-brand-50 text-brand-700;
 }
 @utility tag-amber {
   @apply tag border-amber-200 bg-amber-50 text-amber-700;
@@ -53,7 +67,7 @@
   @apply inline-flex items-center gap-1.5 rounded-lg px-3 py-2 font-medium shadow-sm disabled:cursor-not-allowed disabled:opacity-40;
 }
 @utility btn-primary {
-  @apply btn bg-indigo-600 text-white hover:bg-indigo-700;
+  @apply btn bg-brand-600 text-white hover:bg-brand-700;
 }
 @utility btn-danger {
   @apply btn bg-rose-600 text-white hover:bg-rose-700;
@@ -65,14 +79,14 @@
   @apply px-2 py-1 text-xs;
 }
 @utility input {
-  @apply w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 focus:outline-none;
+  @apply w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 focus:border-brand-400 focus:ring-2 focus:ring-brand-200 focus:outline-none;
 }
 @utility lbl {
   @apply text-xs font-medium text-slate-500;
 }
 @utility chk {
   @apply flex items-center gap-2 text-slate-700;
-  & input { @apply accent-indigo-600; }
+  & input { @apply accent-brand-600; }
 }
 @utility mini {
   @apply rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5;
@@ -110,13 +124,13 @@
   @apply -mb-px border-b-2 border-transparent px-3 py-2 text-slate-500 hover:text-slate-700;
 }
 @utility tab-on {
-  @apply border-indigo-600 font-medium text-indigo-700;
+  @apply border-brand-600 font-medium text-brand-700;
 }
 @utility tab-n {
   @apply ml-1 text-xs text-slate-400 tabular-nums;
 }
 @utility link {
-  @apply cursor-pointer text-indigo-600 underline;
+  @apply cursor-pointer text-brand-600 underline;
 }
 @utility pill {
   @apply rounded-full px-2 py-0.5 text-xs whitespace-nowrap;
@@ -131,7 +145,7 @@
   @apply grid h-6 w-6 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500;
 }
 @utility step-on {
-  @apply bg-indigo-600 text-white;
+  @apply bg-brand-600 text-white;
 }
 @utility phase {
   @apply flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs whitespace-nowrap;

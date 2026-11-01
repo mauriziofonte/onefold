@@ -29,6 +29,7 @@ import (
 
 	"github.com/charlievieth/fastwalk"
 
+	"github.com/mauriziofonte/onefold/internal/fsx"
 	"github.com/mauriziofonte/onefold/internal/kinds"
 	"github.com/mauriziofonte/onefold/internal/meta"
 	"github.com/mauriziofonte/onefold/internal/names"
@@ -218,14 +219,16 @@ func (noProgress) Advance(int64)             {}
 func (noProgress) Err()                      {}
 
 func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
+	// the exiftool readers the scan started do not outlive it
+	defer meta.CloseExifReaders()
 	prog := o.Progress
 	if prog == nil {
 		prog = noProgress{}
 	}
 	var skipDirs []string
 	for _, d := range o.SkipDirs {
-		if abs, err := filepath.Abs(d); err == nil {
-			skipDirs = append(skipDirs, filepath.Clean(abs))
+		if abs, err := fsx.Canonical(d); err == nil {
+			skipDirs = append(skipDirs, abs)
 		}
 	}
 

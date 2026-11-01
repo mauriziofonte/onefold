@@ -170,6 +170,9 @@ type Manager struct {
 	// apply job; "" = config.Path()
 	cfgPath string
 	version string
+	// tails counts finished jobs still writing their last log line (after
+	// they stopped being active); Wait waits for them
+	tails sync.WaitGroup
 
 	mu     sync.Mutex
 	jobs   map[string]*Job
@@ -212,6 +215,14 @@ func (j *Job) snapshot() *Job {
 	if j.Progress != nil {
 		p := *j.Progress
 		c.Progress = &p
+	}
+	// run() fills Summary in place under the lock; the copy is read (and
+	// marshalled) after the lock is released, so it must own its own map.
+	if j.Summary != nil {
+		c.Summary = make(map[string]any, len(j.Summary))
+		for k, v := range j.Summary {
+			c.Summary[k] = v
+		}
 	}
 	return &c
 }
@@ -385,6 +396,10 @@ func (m *Manager) PauseForExit() {
 	m.mu.Unlock()
 }
 
+// Wait waits until no finished job is still writing to the state dir. A
+// running or paused job is not waited for.
+func (m *Manager) Wait() { m.tails.Wait() }
+
 // begin marks j active and runs stage in the background.
 func (m *Manager) begin(j *Job, stage string, resume bool) error {
 	m.mu.Lock()
@@ -493,15 +508,20 @@ func (m *Manager) run(j *Job, stage string, resume bool, g *runctl.Gate) {
 		j.Progress.Done, j.Progress.Final, j.Progress.ETA = j.Progress.Total, true, 0
 	}
 	m.active, m.gate = nil, nil
+	m.tails.Add(1)
+	defer m.tails.Done()
 	m.st.saveJob(j)
+	// read under the lock: once it is released the job may start its next
+	// stage (Execute after a preview) and change them
+	status, msg := j.Status, j.Error
 	m.mu.Unlock()
-	switch j.Status {
+	switch status {
 	case stFailed:
-		m.log(j, LogEntry{Level: "error", Key: "log.jobFailed", Msg: j.Error})
+		m.log(j, LogEntry{Level: "error", Key: "log.jobFailed", Msg: msg})
 	case stStopped:
 		m.log(j, LogEntry{Level: "warn", Key: "log.jobStopped"})
 	default:
-		m.log(j, LogEntry{Level: "info", Key: "log.jobFinished", Args: map[string]any{"status": j.Status}})
+		m.log(j, LogEntry{Level: "info", Key: "log.jobFinished", Args: map[string]any{"status": status}})
 	}
 	m.broadcastJob(j)
 }

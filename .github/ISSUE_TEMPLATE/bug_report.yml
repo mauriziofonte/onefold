@@ -1,0 +1,60 @@
+# onefold
+# Author: Maurizio Fonte <fonte.maurizio@gmail.com>
+# Copyright (c) 2026 Maurizio Fonte
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+name: Bug report
+description: onefold did something wrong or unexpected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Never paste personal photos, documents or full file listings**: describe the files, and replace private folder names in excerpts.
+        A security problem (a way to lose or leak files, an attack on the GUI) goes through SECURITY.md, not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Exact command or GUI steps
+      description: The full command line (with flags), or the GUI screens and buttons in order.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: Output of `onefold version` and `onefold doctor`
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [Windows 11, Windows 10, macOS (Apple Silicon), macOS (Intel), Linux, Other]
+    validations:
+      required: true
+  - type: input
+    id: filesystems
+    attributes:
+      label: File systems and drives involved
+      placeholder: "e.g. NTFS internal disk, exFAT USB drive, SMB share on a NAS"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output, -list excerpt or log lines
+      description: Only the lines around the problem, with private paths replaced.
+      render: text
+  - type: checkboxes
+    id: data
+    attributes:
+      label: Data safety
+      options:
+        - label: A file was lost, overwritten or damaged (describe which and how you noticed above)

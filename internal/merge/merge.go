@@ -182,16 +182,10 @@ func (o *Options) collect(label string, rooms []string, co catalog.Options) ([]c
 	return catalog.Collect(rooms, co)
 }
 
-func cleanAbs(p string) (string, error) {
-	a, err := filepath.Abs(p)
-	if err != nil {
-		return "", err
-	}
-	if r, err := filepath.EvalSymlinks(a); err == nil {
-		a = r
-	}
-	return filepath.Clean(a), nil
-}
+// cleanAbs is fsx.Canonical: one spelling per folder, also for an output
+// that does not exist yet (resolved through its existing parent), so that a
+// link or a short name cannot hide that the output is inside an input.
+func cleanAbs(p string) (string, error) { return fsx.Canonical(p) }
 
 // fold normalizes a path for comparisons: case-insensitive on Windows.
 func fold(p string) string {
@@ -775,8 +769,9 @@ func verifyHash(p string, buf []byte, uncached bool) (string, error) {
 		return hashFile(p, buf) // filesystem without uncached reads (tmpfs, network): the cached proof
 	}
 	defer f.Close()
-	ab := alignedBufs.Get().([]byte)
-	defer alignedBufs.Put(ab)
+	abp := alignedBufs.Get().(*[]byte)
+	defer alignedBufs.Put(abp)
+	ab := *abp
 	h := xxh3.New()
 	for {
 		n, err := f.Read(ab)
@@ -792,7 +787,8 @@ func verifyHash(p string, buf []byte, uncached bool) (string, error) {
 }
 
 // alignedBufs: read buffers for uncached reads (aligned, 4 MiB).
-var alignedBufs = sync.Pool{New: func() any { return fsx.AlignedBuffer(4 << 20) }}
+// The pool holds pointers so that Put does not allocate a slice header.
+var alignedBufs = sync.Pool{New: func() any { b := fsx.AlignedBuffer(4 << 20); return &b }}
 
 // cachedVerify counts the verifications that fell back to the cache.
 var cachedVerify atomic.Int64

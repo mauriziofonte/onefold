@@ -69,7 +69,7 @@
       <ul class="scroll-thin min-h-40 flex-1 divide-y divide-slate-100 overflow-auto rounded-lg border border-slate-200">
         {#each entries as e (e.path)}
           <li>
-            <button class="row w-full hover:bg-indigo-50" ondblclick={() => close(e.path)} onclick={() => load(e.path)}>
+            <button class="row w-full hover:bg-brand-50" ondblclick={() => close(e.path)} onclick={() => load(e.path)}>
               <Folder size={16} class="text-amber-400" />{e.name}
             </button>
           </li>

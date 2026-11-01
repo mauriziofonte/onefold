@@ -148,7 +148,7 @@
       <div class="grid grid-cols-2 gap-3 md:grid-cols-5" data-testid="rearrange-result">
         <Stat label={t('rearrange.files')} value={num(s.files)} />
         <Stat label={t('rearrange.stay')} value={num(s.stay)} />
-        <Stat label={t('rearrange.moves')} value={num(s.moves)} tone="text-indigo-700" ring="ring-indigo-200" />
+        <Stat label={t('rearrange.moves')} value={num(s.moves)} tone="text-brand-700" ring="ring-brand-200" />
         <Stat testid="rearrange-deletes" label={t('rearrange.deletes')} value={num(s.deletes)} sub={t('rearrange.freed', { size: bytes(s.deleteBytes) })} tone={s.deletes ? 'text-rose-600' : ''} ring={s.deletes ? 'ring-rose-200' : ''} />
         <Stat label={t('merge.excluded')} value={num(s.excluded || 0)} sub={t('merge.excludedHint')} />
       </div>

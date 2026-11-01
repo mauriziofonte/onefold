@@ -259,7 +259,7 @@ func toolsSummary() string {
 
 // cmdDoctor prints platform, workers and external tool availability.
 func cmdDoctor() {
-	fmt.Printf("onefold %s  %s/%s  %s  NumCPU=%d\n", version, runtime.GOOS, runtime.GOARCH, runtime.Version(), runtime.NumCPU())
+	fmt.Printf("%s  NumCPU=%d\n", versionLine(), runtime.NumCPU())
 	c, err := config.Load()
 	if err != nil {
 		fmt.Printf("config: %v\n", err)

@@ -11,32 +11,29 @@ import (
 	"math"
 )
 
-// The logo is the GUI favicon (internal/gui/web/index.html) on a 24x24 view
-// box: an indigo rounded square with three white stroked "layers".
+// The logo is assets/brand/onefold-icon.svg on its 24x24 view box: two
+// overlapping rounded squares, a light one behind and a teal one in front,
+// with their overlap in a darker teal (many folders, one copy), on a
+// transparent background.
 var (
-	indigo = color.NRGBA{0x4f, 0x46, 0xe5, 0xff}
-	white  = color.NRGBA{0xff, 0xff, 0xff, 0xff}
+	backColor  = color.NRGBA{0x9f, 0xd3, 0xcc, 0xff}
+	frontColor = color.NRGBA{0x0f, 0x76, 0x6e, 0xff}
+	overColor  = color.NRGBA{0x0b, 0x52, 0x4c, 0xff}
 )
 
-const (
-	viewBox     = 24.0
-	cornerR     = 6.0
-	strokeWidth = 1.6
-)
+const viewBox = 24.0
 
 type pt struct{ x, y float64 }
 
-// polyline is one stroked path; closed ones join their last point to the first.
-type polyline struct {
-	pts    []pt
-	closed bool
-}
+// roundRect is an axis-aligned rectangle with rounded corners (r = 0: square).
+type roundRect struct{ x, y, w, h, r float64 }
 
-var layers = []polyline{
-	{[]pt{{6, 8}, {12, 5}, {18, 8}, {12, 11}}, true},
-	{[]pt{{6, 12}, {12, 15}, {18, 12}}, false},
-	{[]pt{{6, 16}, {12, 19}, {18, 16}}, false},
-}
+// The shapes, painted in this order.
+var (
+	backRect  = roundRect{2, 7, 13, 13, 3}
+	frontRect = roundRect{9, 2, 13, 13, 3}
+	overlap   = roundRect{9, 7, 6, 8, 0}
+)
 
 // Logo rasterizes the logo at size x size pixels, 8x8 samples per pixel.
 func Logo(size int) *image.NRGBA {
@@ -45,71 +42,53 @@ func Logo(size int) *image.NRGBA {
 	k := viewBox / float64(size)
 	for py := 0; py < size; py++ {
 		for px := 0; px < size; px++ {
-			var in, stroke int
+			var in int
+			var r, g, b int
 			for sy := 0; sy < ss; sy++ {
 				for sx := 0; sx < ss; sx++ {
-					p := pt{(float64(px) + float64((float64(sx)+0.5)/ss)) * k, (float64(py) + float64((float64(sy)+0.5)/ss)) * k}
-					if !inRoundedSquare(p) {
+					p := pt{float64((float64(px) + (float64(sx)+0.5)/ss) * k), float64((float64(py) + (float64(sy)+0.5)/ss) * k)}
+					c, ok := shade(p)
+					if !ok {
 						continue
 					}
 					in++
-					if onStroke(p) {
-						stroke++
-					}
+					r, g, b = r+int(c.R), g+int(c.G), b+int(c.B)
 				}
 			}
 			if in == 0 {
 				continue
 			}
-			mix := func(a, b uint8) uint8 {
-				return uint8((int(a)*(in-stroke) + int(b)*stroke + in/2) / in)
-			}
-			img.SetNRGBA(px, py, color.NRGBA{mix(indigo.R, white.R), mix(indigo.G, white.G), mix(indigo.B, white.B),
+			img.SetNRGBA(px, py, color.NRGBA{uint8((r + in/2) / in), uint8((g + in/2) / in), uint8((b + in/2) / in),
 				uint8((255*in + ss*ss/2) / (ss * ss))})
 		}
 	}
 	return img
 }
 
-func inRoundedSquare(p pt) bool {
-	cx := math.Max(cornerR, math.Min(viewBox-cornerR, p.x))
-	cy := math.Max(cornerR, math.Min(viewBox-cornerR, p.y))
-	// explicit conversions round each product: no fused multiply-add (arm64
-	// would fuse it), so the pixels, and the committed .syso, match on every
-	// architecture
-	return float64((p.x-cx)*(p.x-cx))+float64((p.y-cy)*(p.y-cy)) <= cornerR*cornerR
+// shade is the color painted at p (ok = false: transparent).
+func shade(p pt) (color.NRGBA, bool) {
+	switch {
+	case overlap.has(p):
+		return overColor, true
+	case frontRect.has(p):
+		return frontColor, true
+	case backRect.has(p):
+		return backColor, true
+	}
+	return color.NRGBA{}, false
 }
 
-// onStroke: within half the stroke width of a segment; round joins, butt caps
-// at the open ends (the SVG defaults with stroke-linejoin="round").
-func onStroke(p pt) bool {
-	for _, l := range layers {
-		n := len(l.pts)
-		segs := n - 1
-		if l.closed {
-			segs = n
-		}
-		for i := 0; i < segs; i++ {
-			a, b := l.pts[i], l.pts[(i+1)%n]
-			startCap := !l.closed && i == 0
-			endCap := !l.closed && i == segs-1
-			if segDist(p, a, b, startCap, endCap) <= strokeWidth/2 {
-				return true
-			}
-		}
+// has reports whether p is inside the rectangle. Explicit conversions round
+// each product: no fused multiply-add (arm64 would fuse it), so the pixels,
+// and the committed .syso, match on every architecture.
+func (q roundRect) has(p pt) bool {
+	if p.x < q.x || p.x > q.x+q.w || p.y < q.y || p.y > q.y+q.h {
+		return false
 	}
-	return false
-}
-
-// segDist is the distance from p to segment ab; a butt cap end does not
-// extend past its endpoint.
-func segDist(p, a, b pt, buttA, buttB bool) float64 {
-	dx, dy := b.x-a.x, b.y-a.y
-	t := (float64((p.x-a.x)*dx) + float64((p.y-a.y)*dy)) / (float64(dx*dx) + float64(dy*dy))
-	if (t < 0 && buttA) || (t > 1 && buttB) {
-		return math.Inf(1)
+	if q.r == 0 {
+		return true
 	}
-	t = math.Max(0, math.Min(1, t))
-	qx, qy := a.x+float64(t*dx)-p.x, a.y+float64(t*dy)-p.y
-	return math.Sqrt(float64(qx*qx) + float64(qy*qy))
+	cx := math.Max(q.x+q.r, math.Min(q.x+q.w-q.r, p.x))
+	cy := math.Max(q.y+q.r, math.Min(q.y+q.h-q.r, p.y))
+	return float64((p.x-cx)*(p.x-cx))+float64((p.y-cy)*(p.y-cy)) <= q.r*q.r
 }

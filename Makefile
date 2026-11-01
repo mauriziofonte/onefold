@@ -27,7 +27,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 # Static by default: CGO off so the binary runs on any host with zero deps.
 export CGO_ENABLED := 0
 
-.PHONY: version build test vet all linux windows linux-arm64 release notices winres workflows-check dist-clean web web-e2e web-demo
+.PHONY: version build test vet lint race cli-demo all linux windows linux-arm64 darwin release notices winres workflows-check dist-clean web web-e2e web-demo
 
 version: ## the version a build of this tree gets
 	@echo $(VERSION)
@@ -41,6 +41,15 @@ test:
 vet:
 	go vet ./...
 
+# What CI runs besides the tests: staticcheck (pinned) for every target OS, and
+# the race detector (needs cgo and a C compiler, unlike the product builds).
+STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.8.2
+lint:
+	for goos in linux windows darwin; do GOOS=$$goos go run $(STATICCHECK) ./... || exit 1; done
+
+race:
+	CGO_ENABLED=1 go test -race -count=1 ./...
+
 # GUI frontend (Svelte + Vite): rebuilds internal/gui/web/dist, which the Go
 # binary embeds and which is committed (go build/test need no Node).
 web:
@@ -52,6 +61,11 @@ web:
 web-demo:
 	scripts/gui-demo.sh
 
+# README demos of the CLI: assets/demo/cli-*.gif (vhs with ttyd, ffmpeg, exiftool;
+# in CI: the manual workflow .github/workflows/demo.yml)
+cli-demo:
+	scripts/tapes/render.sh
+
 web-e2e:
 	go build -o $${TMPDIR:-/tmp}/onefold-e2e ./cmd/onefold
 	cd internal/gui/web && ONEFOLD_BIN=$${TMPDIR:-/tmp}/onefold-e2e npm run e2e
@@ -60,9 +74,9 @@ all: linux windows ## the two targets we actually deploy
 
 # Release artifacts: every deploy target, the license, the third-party notices,
 # SHA-256 sums (.github/workflows/release.yml publishes them on a version tag).
-release: linux windows linux-arm64 notices
+release: linux windows linux-arm64 darwin notices
 	cp LICENSE $(DIST)/LICENSE
-	cd $(DIST) && sha256sum $(BIN)-linux-amd64 $(BIN)-windows-amd64.exe $(BIN)-linux-arm64 LICENSE THIRD_PARTY_NOTICES.txt > SHA256SUMS
+	cd $(DIST) && sha256sum $(BIN)-linux-amd64 $(BIN)-windows-amd64.exe $(BIN)-linux-arm64 $(BIN)-darwin-arm64 $(BIN)-darwin-amd64 LICENSE THIRD_PARTY_NOTICES.txt > SHA256SUMS
 
 # Licenses of everything linked or bundled into the binaries: Go standard
 # library, every module onefold imports on Linux and Windows, the GUI bundle.
@@ -71,7 +85,8 @@ notices:
 	{ echo "Third-party components of onefold $(VERSION). onefold itself: see LICENSE."; echo; \
 	  echo "=== Go standard library and runtime ($$(go env GOVERSION))"; cat "$$(go env GOROOT)/LICENSE"; echo; \
 	  { GOOS=linux go list -deps -f '{{with .Module}}{{if not .Main}}{{.Path}} {{.Version}} {{.Dir}}{{end}}{{end}}' $(PKG); \
-	    GOOS=windows go list -deps -f '{{with .Module}}{{if not .Main}}{{.Path}} {{.Version}} {{.Dir}}{{end}}{{end}}' $(PKG); } | sort -u | \
+	    GOOS=windows go list -deps -f '{{with .Module}}{{if not .Main}}{{.Path}} {{.Version}} {{.Dir}}{{end}}{{end}}' $(PKG); \
+	    GOOS=darwin go list -deps -f '{{with .Module}}{{if not .Main}}{{.Path}} {{.Version}} {{.Dir}}{{end}}{{end}}' $(PKG); } | sort -u | \
 	  while read -r mod ver dir; do echo "=== $$mod $$ver"; cat "$$dir"/LICENSE* "$$dir"/LICENCE* "$$dir"/COPYING* "$$dir"/UNLICENSE* 2>/dev/null; echo; done; \
 	  echo "=== GUI frontend (bundled JavaScript and CSS)"; cat internal/gui/web/dist/THIRD_PARTY_LICENSES.md; } > $(DIST)/THIRD_PARTY_NOTICES.txt
 
@@ -101,6 +116,10 @@ windows: ## native Windows (amd64) — indexes D:\ without 9P
 
 linux-arm64: ## (e.g. an ARM NAS) — trivial extra target
 	GOOS=linux   GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o $(DIST)/$(BIN)-linux-arm64      $(PKG)
+
+darwin: ## macOS, Apple Silicon and Intel (the linker signs arm64 ad hoc, as macOS requires)
+	GOOS=darwin  GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o $(DIST)/$(BIN)-darwin-arm64     $(PKG)
+	GOOS=darwin  GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(DIST)/$(BIN)-darwin-amd64     $(PKG)
 
 dist-clean:
 	go clean

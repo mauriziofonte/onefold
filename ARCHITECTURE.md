@@ -131,13 +131,13 @@ The only files onefold writes are:
 Two operations delete source files, both only when asked explicitly, both dry runs by default:
 
 - `rearrange -execute` renames files inside its root and deletes duplicates confirmed on their full content (keeper and duplicate re-read right before the deletion). Every run writes an fsync'ed journal first; moves can be undone.
-- `purge-sources -execute -expect N` deletes the input files of an executed merge whose copy in the output is read again in full and found equal right before, after the user typed the number of files the preview listed. It is journaled. With `-trash` on Windows the files go to the Recycle Bin.
+- `purge-sources -execute -expect N` deletes the input files of an executed merge whose copy in the output is read again in full and found equal right before, after the user typed the number of files the preview listed. It is journaled. With `-trash` the files go to the Recycle Bin (Windows) or the Trash (macOS, Linux).
 
 `reclaim` never deletes: it writes a script the user may run.
 
 ### 3.2 Writes are atomic, idempotent and never replace
 
-- Every file is built under a temporary name in its destination directory and published with a rename that refuses to replace an existing file (`fsx.RenameNoReplace`: `renameat2(RENAME_NOREPLACE)` on Linux, `MoveFileEx` without `MOVEFILE_REPLACE_EXISTING` on Windows). A destination that appeared meanwhile is never overwritten; the action counts as skipped.
+- Every file is built under a temporary name in its destination directory and published with a rename that refuses to replace an existing file (`fsx.RenameNoReplace`: `renameat2(RENAME_NOREPLACE)` on Linux, `renamex_np(RENAME_EXCL)` on macOS, `MoveFileEx` without `MOVEFILE_REPLACE_EXISTING` on Windows). A destination that appeared meanwhile is never overwritten; the action counts as skipped.
 - `apply` and `export-text` skip a destination that exists (silvering changes the size, so the test is existence, not size). Running them again finishes an interrupted run.
 - `merge` never moves, renames, overwrites or deletes an existing output file; it deletes only its own `*.onefold-tmp` leftovers.
 - `push` never overwrites a remote file: same size = skipped (resume), different size = conflict (listed, exit 1).
@@ -228,8 +228,8 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 │   ├── fixtures/           real-file corpus (documents, archives, media, sheets...)
 │   └── media-synth/        synthetic photos/videos pinning the media rules
 ├── VERSION, CHANGELOG.md   version being prepared; release notes
-├── scripts/                fixture generators, workflow check, GUI demo
-├── assets/demo/            README demo GIF
+├── scripts/                fixture generators, workflow check, demo GIFs
+├── assets/demo/            README demo GIFs
 ├── .github/                CI and release workflows
 ├── Makefile, go.mod, go.sum
 └── README.md, LLMS.md, ARCHITECTURE.md, TODOS.md, LICENSE
@@ -309,8 +309,8 @@ Leaves: `kinds`, `fsx`, `perf`, `report`, `runctl`, `statedir`, `testfix`, `winr
 
 ### 5.1 Toolchain
 
-- Go module `github.com/mauriziofonte/onefold`, `go 1.22` language directive. Builds use `CGO_ENABLED=0`: the binaries are static, no C toolchain is needed. CI and releases pin the Go toolchain version in the workflows.
-- Pinned dependencies are bumped on purpose only: several newer versions require a newer `go` directive (see `TODOS.md` for the open bump).
+- Go module `github.com/mauriziofonte/onefold`, `go 1.26.0` language directive (raised from 1.22 after 0.0.1-alpha to take the security fixes of `golang.org/x/crypto`, `golang.org/x/text` and `github.com/ulikunitz/xz`). Builds use `CGO_ENABLED=0`: the binaries are static, no C toolchain is needed. CI and releases pin the Go toolchain version in the workflows.
+- Dependencies are bumped on purpose only: Dependabot opens the pull requests (Go modules and action pins, weekly), a person merges them after CI. `govulncheck` (CI job `vulncheck`) fails the build on any advisory whose vulnerable code onefold reaches.
 - Node is needed only to rebuild the GUI frontend. The built frontend (`internal/gui/web/dist`) is committed and embedded with `go:embed`, so `go build` and `go test` never need Node. `TestWebDistInSync` fails when `dist` is older than the sources.
 
 Direct dependencies and what they are for:
@@ -327,6 +327,7 @@ Direct dependencies and what they are for:
 | `github.com/pkg/sftp`, `golang.org/x/crypto/ssh`, `github.com/skeema/knownhosts` | SFTP push |
 | `github.com/vbauerster/mpb/v8`, `github.com/rs/zerolog`, `golang.org/x/term` | progress bar, heartbeat logs, TTY detection |
 | `github.com/jchv/go-webview2` | the Windows GUI window |
+| `github.com/ebitengine/purego` | macOS only: calls the Foundation Trash API without cgo (`purge-sources -trash`) |
 | `golang.org/x/sys`, `golang.org/x/text` | OS calls; Unicode normalization |
 
 ### 5.2 Make targets
@@ -337,13 +338,16 @@ Direct dependencies and what they are for:
 | `make build` | `./onefold` for the host, with that version |
 | `make test` | `go test ./...` |
 | `make vet` | `go vet ./...` |
-| `make linux`, `make windows`, `make linux-arm64` | `dist/onefold-<os>-<arch>[.exe]` with the version of 5.4; `make windows` regenerates the exe resources with the build version (section 25.4) and restores the committed file afterwards |
-| `make release` | the three builds, `THIRD_PARTY_NOTICES.txt` (`make notices`), `SHA256SUMS`; `DIST=<dir>` to build elsewhere |
+| `make lint` | staticcheck (pinned) for `GOOS=linux`, `windows`, `darwin` |
+| `make race` | `go test -race` (cgo and a C compiler needed) |
+| `make linux`, `make windows`, `make linux-arm64`, `make darwin` | `dist/onefold-<os>-<arch>[.exe]` (`darwin`: arm64 and amd64; the Go linker signs arm64 ad hoc, which macOS requires) with the version of 5.4; `make windows` regenerates the exe resources with the build version (section 25.4) and restores the committed file afterwards |
+| `make release` | every build above (five binaries), `THIRD_PARTY_NOTICES.txt` (`make notices`), `SHA256SUMS`; `DIST=<dir>` to build elsewhere |
 | `make notices` | the Go standard library license, the license of every linked module, the licenses bundled in the GUI |
 | `make winres` | `go generate ./cmd/onefold`: rewrites `cmd/onefold/rsrc_windows_amd64.syso` (committed) |
 | `make web` | rebuilds `internal/gui/web/dist` (Node) |
 | `make web-e2e` | Playwright end-to-end test of the GUI against a freshly built binary |
 | `make web-demo` | records `assets/demo/gui-merge.gif` (section 22.11) |
+| `make cli-demo` | records `assets/demo/cli-merge.gif` and `cli-golden.gif` with vhs (section 22.11) |
 | `make workflows-check` | actionlint, zizmor and `act` runs of the workflows on a clean clone |
 | `make dist-clean` | removes build outputs |
 
@@ -351,9 +355,9 @@ Direct dependencies and what they are for:
 
 ### 5.3 Continuous integration and release
 
-- `.github/workflows/ci.yml` (push to `main`, pull requests, called by the release): matrix Ubuntu + Windows; Linux installs exiftool, ffmpeg, poppler, p7zip, antiword from apt; Windows installs the pinned tools with `go run ./cmd/onefold tools install all`, which also proves the download pins. Steps: gofmt (Linux), `go vet` for both GOOS, `go test -count=1 ./...`, then `TestE2E` again with `-v`: the job fails unless it PASSED (a skip is not a pass). A separate `vulncheck` job runs govulncheck (report-only for now, see `TODOS.md`).
+- `.github/workflows/ci.yml` (push to `main`, pull requests, called by the release, weekly on Mondays, by hand): matrix Ubuntu, Windows, macOS arm64 (`macos-15`) and macOS Intel (`macos-15-intel`), all four required; macOS installs exiftool, ffmpeg and poppler from Homebrew; Linux installs exiftool, ffmpeg, poppler, p7zip, antiword from apt; Windows installs the pinned tools with `go run ./cmd/onefold tools install all`, which also proves the download pins. Steps: gofmt (Linux), `go vet` for linux, windows and darwin, `go test -count=1 ./...`, then `TestE2E` again with `-v`: the job fails unless it PASSED (a skip is not a pass). On every OS the Recycle Bin / Trash tests run the same way (`ONEFOLD_TEST_TRASH=1`; a skip fails the job). Separate jobs: `race` (`go test -race` on Ubuntu with cgo, coverage of every package uploaded as the `coverage` artifact: `coverage.out`, a per-function `coverage.txt`, `coverage.html`), `lint` (staticcheck v0.8.2 for each target GOOS; suppressions are inline `//lint:ignore` with the reason), `vulncheck` (govulncheck, fails on any reachable advisory).
 - `.github/workflows/release.yml` (tag `v<VERSION>` on a commit of `main`, section 5.4): runs CI, then `make release`, checks that no tracked file changed, verifies checksums, versions (`go version -m`, `onefold version`) and notices, and publishes the GitHub release with the binaries, `LICENSE`, `THIRD_PARTY_NOTICES.txt` and `SHA256SUMS`.
-- Actions are pinned by commit; `.github/dependabot.yml` keeps the pins current. Workflows run only on github.com (`if: github.server_url == 'https://github.com'`), so mirrors on other forges stay quiet.
+- Actions are pinned by commit; `.github/dependabot.yml` keeps the pins and the Go modules current through weekly pull requests. Workflows run only on github.com (`if: github.server_url == 'https://github.com'`), so mirrors on other forges stay quiet.
 
 ### 5.4 Versions and releasing
 
@@ -365,7 +369,7 @@ onefold follows [Semantic Versioning](https://semver.org): `MAJOR.MINOR.PATCH`, 
 | `CHANGELOG.md` | one `## [<version>] - <date>` section per release, newest first; the release notes are taken from it |
 | tag `v<VERSION>` | marks the released commit on `main` |
 | `Makefile` | `VERSION` variable: a clean checkout of the tag `v<VERSION>` builds as `v<VERSION>`; any other tree as `v<VERSION>+dev.<commit>[.dirty]`, so a development binary never passes for the release; `make VERSION=...` overrides; `make version` prints it |
-| `-ldflags -X main.version=...` | the version inside the binary: `onefold version`, the default comment stamped into media copies (`Onefold v<version>`), the Windows file version (`major.minor.patch.0`, the full string in FileVersion/ProductVersion), the GUI header |
+| `-ldflags -X main.version=...` | the version inside the binary: `onefold version` (`--version`, `-V`; with the commit and commit date Go records from git, `runtime/debug.ReadBuildInfo`), the first line of `help`, `doctor` and the GUI's start message, the default comment stamped into media copies (`Onefold v<version>`), the Windows file version (`major.minor.patch.0`, the full string in FileVersion/ProductVersion), the GUI header and the About card of its Doctor page (`/api/info`: `version`, `build`, `go`) |
 | `TestVersionFile` (`cmd/onefold/version_test.go`) | `VERSION` is valid SemVer and `CHANGELOG.md` has its section |
 | `.github/workflows/release.yml` | runs on tags `vX.Y.Z` and `vX.Y.Z-*`; refuses a tag that is not `v` + `VERSION`, not on `main`, or without a CHANGELOG section; publishes as a pre-release when the version has a suffix |
 
@@ -578,7 +582,7 @@ GIF, BMP and graphics files are images, not photos: they never enter a golden ar
 | `SystemDirs` | `$Recycle.Bin`, `AppData`, `Program Files`, `Windows`, `Microsoft`, `htdocs`, `Steam`... | `system-dirs` |
 | `CloudDirs` | Dropbox, Google Drive, GDrive, OneDrive, iCloud Drive | `cloud-dirs` |
 | `DevDirs` | `vendor`, `node_modules`, `tmp`, `tests` | `dev-dirs` |
-| `JunkNames` | `__MACOSX`, `.DS_Store`, `.localized`, `Thumbs.db`, `desktop.ini` | `junk` |
+| `JunkNames` | `__MACOSX`, `.DS_Store`, `.localized`, `Thumbs.db`, `desktop.ini`, and what macOS leaves on drives: `.Spotlight-V100`, `.Trashes`, `.fseventsd`, `.DocumentRevisions-V100`, `.TemporaryItems`, `.apdisk`, `.VolumeIcon.icns`; `IsJunk` also matches AppleDouble `._name` files and Finder's `Icon\r` | `junk` |
 | `ArchiveJunkDirs` | `.git`, `.cache`, `vendor`, `node_modules`, `composer`, `tmp` | archive members ignored when dating an archive |
 
 Directory names match a whole path component, case-insensitively.
@@ -747,7 +751,7 @@ The device rules were built from a census of real archives; their order is part 
 | 7z | fallback listing of 7z and ISO | `l -slt -phello -y`, `TZ=UTC` (7-Zip for Windows ignores `TZ`: its local offset is undone) |
 | unrar | fallback listing of RAR | `lt -phello -c-`, `TZ=<canonical zone>` |
 
-exiftool calls go through a small pool of persistent readers (`exifpool.go`): up to 4 `exiftool -stay_open True -@ -` processes per run, started on demand with the canonical zone in their environment and replaced when the zone changes. One request writes the arguments and `-executeN`, the reply ends at `{readyN}`. A reader that fails or does not answer within 2 minutes is killed and that file goes through a one-shot exiftool. This avoids exiftool's Perl start-up for each file (measured on one small JPEG: Linux 65.7 ms -> 3.0 ms per file, Windows 181.5 ms -> 12.8 ms); `TestExifReadersParity` pins that readers and one-shot give identical results on the whole corpus.
+exiftool calls go through a small pool of persistent readers (`exifpool.go`): up to 4 `exiftool -stay_open True -@ -` processes per run, started on demand with the canonical zone in their environment and replaced when the zone changes. One request writes the arguments and `-executeN`, the reply ends at `{readyN}`. A reader that fails or does not answer within 2 minutes is killed and that file goes through a one-shot exiftool. exiftool `-stay_open` does not exit at the end of its input (it polls the closed pipe), so onefold stops its readers itself: at the end of every catalog walk, before `export-text` and a fatal error print their result, and after 3 s without a request (the GUI is long-lived); `TestExifReaderRetiresWhenIdle` pins the idle stop. Only a hard kill of onefold on Linux or macOS leaves them running (on Windows the job object ends them). This avoids exiftool's Perl start-up for each file (measured on one small JPEG: Linux 65.7 ms -> 3.0 ms per file, Windows 181.5 ms -> 12.8 ms); `TestExifReadersParity` pins that readers and one-shot give identical results on the whole corpus.
 
 ---
 
@@ -859,7 +863,7 @@ For each time cluster:
 
 1. Edits (category `snapseed`, `editing`, `photoshop`, `enlargement`) are pulled out: each distinct edit (by hash) becomes its own asset. Edits are never dropped in favour of the original.
 2. The rest is split by device: members with the same device as the best member (highest resolution, then largest size) or with no device are variants of one capture; members with another non-empty device are a separate capture, split again recursively.
-3. Each variant set elects its winner: highest resolution (width x height), then an HDR output (`_HDR` in the file name), then the largest file. Every other member is dropped with a reason: `exact-dupe` (same hash as the winner), `lower-res`, `smaller` (same resolution, smaller file), `variant` (same resolution, same or larger size, different bytes: for example the non-HDR frame next to the HDR one).
+3. Each variant set elects its winner: highest resolution (width x height), then an HDR output (`_HDR` in the file name), then the largest file; members equal on all three (byte-identical copies, mostly) are ordered by a clean name (`IsCopyName`), the oldest mtime (0 last), the shorter path and the lexical path, so the winner never depends on the order the catalog workers wrote the records in (`TestMediaSynthRegression` also plans the records reversed). Every other member is dropped with a reason: `exact-dupe` (same hash as the winner), `lower-res`, `smaller` (same resolution, smaller file), `variant` (same resolution, same or larger size, different bytes: for example the non-HDR frame next to the HDR one).
 
 With `VideoTolerance` > 0 the video clusters of one start time are re-cut first: sorted by duration, a member opens a new cluster when it is more than the tolerance longer than the first member of the current cluster. A re-encode whose duration crossed a rounding edge then joins its original.
 
@@ -1058,7 +1062,11 @@ There is no default owner. An empty value is not written.
 
 `materialize.MissingTools(actions, target)` names the tools (`exiftool`, `ffmpeg`) needed by the media actions still to be written (not RAW/MPEG-PS, not already in the target) that are not available. `apply --execute` refuses to start (exit 2) when the list is not empty, because those copies would stay unsilvered for good, unless `-allow-unstamped`. The GUI check shows the missing tools and enables Apply only when the user allowed unstamped copies.
 
-### 14.5 Text sidecars
+### 14.5 Byte-original golden (`-link`)
+
+`apply --execute -link --target D` publishes each action as a hard link instead of a copy (`materialize.LinkOriginal`, `RunOptions.Link`): `D/<canonRel>` becomes a second name of the source file through `fsx.LinkNoReplace` (`os.Link`, which refuses an existing name on every OS: atomic, never replacing, no temp file). No silvering, no tools needed (`MissingTools` is not consulted), and no `Chtimes`: the mtime belongs to the shared file, so changing it would change the source. Idempotent: an existing name is skipped. Before anything is written `materialize.CheckLink` links the first source to a onefold temp name in `D` and removes it; a target on another volume (`fsx.ErrCrossVolume`: `EXDEV`, Windows `ERROR_NOT_SAME_DEVICE`) or a filesystem without hard links stops the run with exit 2 and a hint. Sources spread over several volumes fail one by one with the same error. Sources stay untouched (only names are added in `D`); golden and source share bytes, so an edit to either shows in both. Tests: `TestLinkNoReplace`, `TestLinkNoReplaceCrossVolume` (`internal/fsx`), `TestLinkOriginal` (`internal/materialize`), `TestApplyLinkCLI` (`cmd/onefold`). The GUI does not offer it yet.
+
+### 14.6 Text sidecars
 
 `onefold export-text --target T PLAN` writes `T/<canonRel>.txt` for every document and text action: a header (file name, host:path, size, extension, golden path, date and its source, title, author, pages) and the extracted text, cleaned (valid UTF-8, LF newlines, no NUL, at most one blank line). Atomic, idempotent, mtime = plan time.
 
@@ -1076,7 +1084,7 @@ There is no default owner. An empty value is not written.
 
 Nothing extractable -> `[No text content could be extracted]`.
 
-### 14.6 Transfer to another machine
+### 14.7 Transfer to another machine
 
 - `onefold push --host H --user U [--key K] LOCAL REMOTE` (section 16.5) uploads a staged tree over SFTP, resumable.
 - `onefold seed -from STAGING -to DEST -o SCRIPT PLAN` (section 16.4) writes an rsync or robocopy script for a fast first copy.
@@ -1154,7 +1162,7 @@ The script is POSIX sh (`rm -- '...'`, `set -e`) or PowerShell (`Remove-Item -Li
 `onefold seed -from STAGING -to DEST -o SCRIPT [-format rsync|robocopy] [-list FILE] PLAN` writes the script that copies a materialized staging tree to its destination over a fast link; onefold runs neither tool:
 
 - only the plan's files present in STAGING are listed (missing ones counted);
-- rsync: a file list plus `rsync -a --ignore-existing --partial --info=progress2 --files-from=LIST -- STAGING/ DEST/`;
+- rsync: a file list plus `rsync -a --ignore-existing --partial --info=progress2 --files-from=LIST -- STAGING/ DEST/` (`--progress` instead when the local rsync is older than 3.1, as the one macOS ships);
 - robocopy: one command per folder with its file names (chunked under the command-line limit) and `/XC /XN /XO` (changed, newer and older files excluded: only missing files are copied), `if errorlevel 8 exit /b 1`;
 - both never replace a file at the destination.
 
@@ -1200,7 +1208,7 @@ The second run over the same folders reuses the cache and takes seconds.
 4. copy with a 4 MiB buffer while hashing the source bytes;
 5. compare with the cataloged full/content hash when known (a mismatch fails the copy: the source changed);
 6. fsync (`-no-fsync` skips);
-7. read the temp back and compare its hash (`-no-verify-copy` skips); with `-verify-uncached` the read bypasses the OS cache (Linux: cached pages of the fsync'ed file dropped with `fadvise(DONTNEED)`; Windows: `FILE_FLAG_NO_BUFFERING` with aligned buffers), proving the media rather than the write path; a filesystem that refuses an uncached read falls back to the cached read, counted and printed;
+7. read the temp back and compare its hash (`-no-verify-copy` skips); with `-verify-uncached` the read bypasses the OS cache (Linux: cached pages of the fsync'ed file dropped with `fadvise(DONTNEED)`; Windows: `FILE_FLAG_NO_BUFFERING` with aligned buffers; macOS: cached pages invalidated with `msync(MS_INVALIDATE)` on a read-only mapping, then `F_NOCACHE` on the descriptor), proving the media rather than the write path; a filesystem that refuses an uncached read falls back to the cached read, counted and printed;
 8. set the source mtime;
 9. `fsx.RenameNoReplace` to the final name.
 
@@ -1244,12 +1252,16 @@ Every settled item is a candidate unless refused: not an absolute path, listed t
 
 - `-execute` requires `-expect N`, the count of the dry run: a mismatch exits 2 before anything is touched (the folders changed since).
 - A journal `<output>/.onefold/purge-<ts>.jsonl` is opened first; every event is fsync'ed. If the journal stops being writable, every remaining candidate fails and no folder is removed: no deletion without its journal line.
-- Per candidate, in parallel workers: the source missing -> `gone` (a resumed run); not a regular file -> failed; source and copy are read in full and must be equal to each other and to the recorded content hash, else failed `content differs from its copy in the output: NOT deleted`; then the file is deleted, or moved to the Recycle Bin with `-trash` (Windows).
+- Per candidate, in parallel workers: the source missing -> `gone` (a resumed run); not a regular file -> failed; source and copy are read in full and must be equal to each other and to the recorded content hash, else failed `content differs from its copy in the output: NOT deleted`; then the file is deleted, or moved to the Recycle Bin (Windows) or the Trash (macOS, Linux) with `-trash`.
 - Then the folders left empty: ancestors of deleted files strictly below their input folder, never the output or a folder holding it, deepest first; a folder holding only OS droppings (`desktop.ini`, `Thumbs.db`...) counts as empty (the droppings go with it).
 
-### 18.3 Recycle Bin
+### 18.3 Recycle Bin and Trash
 
-`-trash` uses `SHFileOperationW` with `FOF_ALLOWUNDO`. It is refused off Windows, and refused on Windows when a source is on a volume without a Recycle Bin (a UNC share, or a drive whose type is not a local fixed disk: network, removable, optical, RAM disk), because Windows would delete those files for good.
+- Windows: `-trash` uses `SHFileOperationW` with `FOF_ALLOWUNDO`. It is refused when a source is on a volume without a Recycle Bin (a UNC share, or a drive whose type is not a local fixed disk: network, removable, optical, RAM disk), because Windows would delete those files for good.
+- macOS: `-trash` uses `-[NSFileManager trashItemAtURL:resultingItemURL:error:]`, the call Finder uses, so Finder's Put Back restores each file. The Objective-C runtime and Foundation are loaded with `purego` (no cgo) on the first trashed file only. macOS picks the Trash of each volume itself; where a volume has none the call returns an error, the file stays and is reported as failed.
+- Linux: the freedesktop.org Trash specification 1.0, in pure Go (plain files, the same on every distribution, libc and architecture, read and restored by GNOME, KDE, Xfce, Cinnamon, MATE, LXQt and `trash-cli`). A file on the home volume goes to `$XDG_DATA_HOME/Trash` (`~/.local/share/Trash`); a file on another volume to `$topdir/.Trash/$uid` when `$topdir/.Trash` is a sticky folder and not a link, else to `$topdir/.Trash-$uid` (created, mode 0700). The info file (`info/NAME.trashinfo`: escaped path, absolute for the home Trash and relative to `$topdir` otherwise, and the deletion time) is created with `O_EXCL` first to reserve the name, then the item is renamed into `files/` with `fsx.RenameNoReplace`. Never a copy: a volume where no Trash can be made (read-only, or a root-owned mount point such as `/` when home is elsewhere) fails per file and keeps it.
+
+The journal and the content check before each file are the same as for a deletion.
 
 ---
 
@@ -1350,7 +1362,7 @@ Rules: naming precedence `template` > `families` > `naming` (+`clean`) > `layout
 
 ## 22. The GUI
 
-`onefold gui` (or a double-click on the Windows exe) starts a local web server and opens the page: in a native WebView2 window on Windows, in the default browser elsewhere. Every mode of the CLI is available with a preview-first flow, live progress, pause/resume/stop, persistent runs and a guided setup.
+`onefold gui` (or a double-click on the Windows exe) starts a local web server and opens the page: in a native WebView2 window on Windows, in the default browser elsewhere (`open` on macOS, `xdg-open` on Linux; the URL is also printed). Every mode of the CLI is available with a preview-first flow, live progress, pause/resume/stop, persistent runs and a guided setup.
 
 ### 22.1 Launch
 
@@ -1364,7 +1376,7 @@ Rules: naming precedence `template` > `families` > `naming` (+`clean`) > `layout
 
 One instance per state dir: a second launch finds `gui.json` (pid + session URL), checks that the link answers and opens that instance.
 
-On Windows, `onefold.exe` with no arguments opens the GUI when it was started by a double-click (the process is alone on its console, or its parent is `explorer.exe`): the console is freed and the window opens. From a terminal it prints the usage. Without the WebView2 runtime the window cannot be created and the default browser gets the URL (`TestWindowFallsBackToBrowser`).
+On Windows, `onefold.exe` with no arguments opens the GUI when it was started by a double-click (the process is alone on its console, or its parent is `explorer.exe`): the console is freed and the window opens. The manifest asks for `consoleAllocationPolicy` `detached` (Windows 11 24H2 and later): Explorer then gives the exe no console at all, so no terminal window or Windows Terminal tab flashes before the GUI (the parent test decides); older Windows ignore it and show the console for a moment. From a terminal it prints the usage. Checked by hand on Windows 11 build 26300 with Windows Terminal and with the Windows Console Host as default terminal: double-click opens the GUI, a terminal gets the usage. Without the WebView2 runtime the window cannot be created and the default browser gets the URL (`TestWindowFallsBackToBrowser`).
 
 ### 22.2 Security
 
@@ -1375,7 +1387,7 @@ On Windows, `onefold.exe` with no arguments opens the GUI when it was started by
 
 ### 22.3 State dir
 
-`$ONEFOLD_STATE_DIR`, else `%LOCALAPPDATA%\onefold` (Windows), else `$XDG_STATE_HOME/onefold`, else `~/.local/state/onefold`; never a temporary folder, because a run must survive a reboot.
+`$ONEFOLD_STATE_DIR`, else `%LOCALAPPDATA%\onefold` (Windows), `~/Library/Application Support/onefold` (macOS), else `$XDG_STATE_HOME/onefold`, else `~/.local/state/onefold`; never a temporary folder, because a run must survive a reboot.
 
 | Path | Content |
 |---|---|
@@ -1413,7 +1425,7 @@ Exclusions after a preview: from the Plan tab a file, a folder, a pattern or "th
 | `/api/events` | GET | server-sent events: `hello`, `job` snapshots (at most every 250 ms), `log` entries, `tools` snapshots; ping every 20 s |
 | `/api/log` | GET | session log ring, or a job's persisted log |
 | `/api/fs` | GET | sub-folders of a path and the roots (drives, home, `/mnt/*`, `/media/*`) for the folder picker |
-| `/api/naming` | GET | presets, aliases, placeholders, catalog presets, families, generic presets, stem modes, skip rules, Recycle Bin availability |
+| `/api/naming` | GET | presets, aliases, placeholders, catalog presets, families, generic presets, stem modes, skip rules, Recycle Bin / Trash availability |
 | `/api/naming/preview` | POST | the composed naming of a form and up to 6 real files of the folders with their target |
 | `/api/cli` | POST | the settings as CLI arguments and a PowerShell line |
 | `/api/wizard/scan` | POST | quick scan of folders (names and sizes, bounded) for the guided setup |
@@ -1453,7 +1465,9 @@ The first page on a fresh install, and a button in every mode. It asks the goal 
 
 ### 22.11 README demo
 
-`make web-demo` (`scripts/gui-demo.sh`) runs `internal/gui/web/demo/merge.spec.js` with `playwright.demo.config.js`: the real binary merges two made-up folders (written by the spec, dated 2023) while screenshots are taken every ~200 ms; the system ffmpeg assembles them into `assets/demo/gui-merge.gif`.
+`make web-demo` (`scripts/gui-demo.sh`) runs `internal/gui/web/demo/merge.spec.js` with `playwright.demo.config.js`: the real binary merges two made-up folders (written by the spec, dated 2023) while screenshots are taken every ~200 ms; `scripts/gif-from-frames.sh` (ffmpeg) assembles them into `assets/demo/gui-merge.gif`. The same script runs on macOS and on Windows (Git Bash); `.github/workflows/demo.yml` records it on `windows-2025` and `macos-15` and assembles `gui-merge-windows.gif` and `gui-merge-macos.gif` on Linux.
+
+`make cli-demo` (`scripts/tapes/render.sh`) builds onefold, makes a made-up sandbox (`scripts/tapes/sandbox.sh`: fixed 2020-2023 dates, generated pictures and text, nothing personal) and records each `scripts/tapes/*.tape` with vhs into `assets/demo/cli-*.gif`. vhs needs ttyd and ffmpeg; `.github/workflows/demo.yml` renders them on GitHub instead (by hand, or on a push to a branch other than `main` that changes the tapes) and commits the GIFs to that branch, together with the GUI GIFs of Windows and macOS.
 
 ---
 
@@ -1484,9 +1498,11 @@ Units are bytes (apply, push, merge copies, verify) or items (catalog, rearrange
 
 ### 24.1 `fsx`
 
-- `RenameNoReplace(src, dst)`: Linux `renameat2(..., RENAME_NOREPLACE)`; Windows `MoveFileEx` without `MOVEFILE_REPLACE_EXISTING`, with `MOVEFILE_WRITE_THROUGH` and the `\\?\` prefix for long paths; where the platform call is unsupported (some filesystems, other OSes) a hard link then removal of the source, and as the last resort a stat-then-rename (not atomic: only where neither primitive exists). An existing destination returns `fsx.ErrExists`. Cross-volume renames fail (rearrange relies on it).
+- `RenameNoReplace(src, dst)`: Linux `renameat2(..., RENAME_NOREPLACE)`; macOS `renamex_np(..., RENAME_EXCL)` (APFS, HFS+); Windows `MoveFileEx` without `MOVEFILE_REPLACE_EXISTING`, with `MOVEFILE_WRITE_THROUGH` and the `\\?\` prefix for long paths; where the platform call is unsupported (some filesystems, other OSes) a hard link then removal of the source, and as the last resort a stat-then-rename (not atomic: only where neither primitive exists). An existing destination returns `fsx.ErrExists`. Cross-volume renames fail (rearrange relies on it). `TestRenameNoReplaceNative` proves the one-call primitive on each CI system.
 - Temp names: `TempSuffix = ".onefold-tmp"`, `TempFor(dst, keepExt)`, `IsTemp(name)` (section 6.6).
 - `OpenUncached(path)` and `AlignedBuffer(n)`: reads that bypass the OS cache (merge `-verify-uncached`).
+- `LinkNoReplace(src, dst)`: a hard link that refuses an existing name (`os.Link`), `ErrCrossVolume` across volumes (`apply -link`, section 14.5).
+- `Canonical(path)`: the one spelling every path comparison uses: absolute, clean, symbolic links and Windows 8.3 short names (`C:\Users\RUNNER~1`) resolved; on macOS each existing component is also spelled as its folder lists it (APFS and HFS+ find `/users/me/Cafe\u0301` through `/Users/Me/Café`, string comparisons do not; cached per process, `TestCanonicalStoredSpelling`); a path that does not exist yet is resolved through its longest existing ancestor. merge (output, inputs), catalog exclusions and skip folders, purge (output, rooms, listed files: folders resolved, a file's own name kept) and the GUI list filters go through it, so a folder reached through a link or a short name still counts as inside the output or an input. Tests compare against `testfix.TempDir` (a temp dir already canonical: macOS reaches `/var` through `/private/var`).
 
 Anything that must not clobber uses `RenameNoReplace`, never `os.Rename`.
 
@@ -1494,7 +1510,7 @@ Anything that must not clobber uses `RenameNoReplace`, never `os.Rename`.
 
 The registry of optional programs: `exiftool ffprobe ffmpeg pdfinfo pdftotext antiword 7z unrar`.
 
-- Lookup, cached per process: `PATH`, the exe's folder, `<exe folder>/tools`, then `<state dir>/tools` (downloads). On Windows the candidates are `.exe`, `.bat`, `.cmd` (and `exiftool(-k).exe`). `tools.Reset` clears the cache after an install.
+- Lookup, cached per process: `PATH`, the exe's folder, `<exe folder>/tools`, `<state dir>/tools` (downloads), then on macOS the Homebrew folders `/opt/homebrew/bin` and `/usr/local/bin` (a program started from Finder has no Homebrew on `PATH`; `TestHomebrewWithoutPath`). On Windows the candidates are `.exe`, `.bat`, `.cmd` (and `exiftool(-k).exe`). `tools.Reset` clears the cache after an install.
 - `ONEFOLD_NO_EXTERNAL=1` makes every tool missing (parity tests).
 - `Command` returns nil when the tool is missing; on Windows the child gets no console window.
 - `StartTree(cmd)` starts a tool so that a kill also ends every process it started (on Windows a job object with kill-on-close: the pinned exiftool is a launcher running Perl, and killing only the launcher left Perl holding the pipes).
@@ -1519,7 +1535,7 @@ Install: download into `<state dir>/tools/.download/<id>-<version>.onefold-tmp` 
 
 ### 24.4 `statedir`
 
-`statedir.Dir()`: `ONEFOLD_STATE_DIR`, else `%LOCALAPPDATA%\onefold`, else `$XDG_STATE_HOME/onefold`, else `~/.local/state/onefold`. Shared by the GUI, the downloaded tools and the user config. `onefold gui -state DIR` moves only the GUI state.
+`statedir.Dir()`: `ONEFOLD_STATE_DIR`, else `%LOCALAPPDATA%\onefold` (Windows), `~/Library/Application Support/onefold` (macOS), else `$XDG_STATE_HOME/onefold`, else `~/.local/state/onefold`. Shared by the GUI, the downloaded tools and the user config. `onefold gui -state DIR` moves only the GUI state.
 
 ### 24.5 `runctl`
 
@@ -1551,7 +1567,7 @@ The GUI window is WebView2 (`jchv/go-webview2`), with the exe icon, sized for th
 
 `cmd/onefold/rsrc_windows_amd64.syso` (committed, generated by `internal/winres` with `go generate ./cmd/onefold`) is a COFF object the Go linker picks up for windows/amd64 builds. It holds:
 
-- the application icon (the GUI logo, rasterized in Go at 16 to 256 px, so no image tool is needed);
+- the application icon (`assets/brand/onefold-icon.svg`, its rounded rectangles rasterized in Go at 16 to 256 px, so no image tool is needed; a change to the SVG needs the same change in `internal/winres/logo.go`);
 - the application manifest: per-monitor DPI awareness (v2), long-path awareness, `asInvoker`, Windows 10/11 compatibility;
 - in release builds only, `VS_VERSIONINFO`: `make windows` copies the committed file aside, runs `gen_winres.go -version $(VERSION)`, builds, and restores the committed file (also when the build fails). The fixed file version is the tag's `major.minor.patch.0` (0.0.0.0 for a build that is not a tag); the strings (FileVersion, ProductVersion) carry the full version; Explorer and Task Manager show them.
 
@@ -1559,11 +1575,11 @@ The GUI window is WebView2 (`jchv/go-webview2`), with the exe icon, sized for th
 
 ### 25.5 Antivirus
 
-Microsoft Defender scans each file the first time it is opened. On a first catalog of thousands of files this dominates: measured on 5,384 program files (2.0 GB), the first run took 21.5 s with 114 s of cumulative `open` time (average 21 ms, max 12.7 s), a second run 0.25 s. onefold opens each small file once (whole-read path, preloaded bytes for every extractor). Excluding the onefold process from real-time scanning is the user's decision, documented in the README; onefold never changes it.
+Microsoft Defender scans each file the first time it is opened. On a first catalog of thousands of files this dominates: measured on 5,384 program files (2.0 GB), the first run took 21.5 s with 114 s of cumulative `open` time (average 21 ms, max 12.7 s), a second run 0.25 s. To separate the scan from the cold OS cache, `scripts/defender-measure.ps1` repeated it right after a reboot (Windows 11 build 26300, 16 CPUs, `-j 8`): with real-time protection 52 s wall, `open` 397 s cumulative (average 74 ms, max 9.8 s); with a process exclusion for onefold.exe 2.8 s wall, `open` 6.9 s cumulative (average 1.3 ms). About 95% of the first-run time is the on-access scan; the cold cache costs a few seconds. onefold opens each small file once (whole-read path, preloaded bytes for every extractor). Excluding the onefold process from real-time scanning is the user's decision, documented in the README; onefold never changes it.
 
 ### 25.6 Recycle Bin, drives, WSL
 
-- `purge-sources -trash` only on local fixed drives (section 18.3).
+- `purge-sources -trash` only on local fixed drives (section 18.3); on macOS and Linux any volume with a Trash.
 - Writing targets on WSL's Windows mounts (`/mnt/<drive>`) is unreliable for large files and for ffmpeg's mp4 muxer (it seeks back): materialize to a native filesystem and transfer, or run the Windows exe.
 - The loopback between WSL and Windows differs per machine: some Windows processes started from WSL cannot reach 127.0.0.1 listeners, so some GUI HTTP tests skip there.
 
@@ -1640,6 +1656,7 @@ Go's `flag` package: `-x` and `--x` are equivalent; flags go before positional a
 | | `-j N` | CPUs | photo and generic workers (videos serial) |
 | | `-signature TEXT`, `-lang CODE` | config | silver tags; `-` = none |
 | | `-allow-unstamped` | off | start without exiftool/ffmpeg |
+| | `-link` | off | hard links of the sources instead of copies (section 14.5) |
 | | `--heartbeat D` | 10s | log-mode interval |
 | export-text | `--target T`, `--only-host`, `-j` | | sidecars |
 
@@ -1653,7 +1670,7 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 |---|---|
 | 0 | success |
 | 1 | runtime failure: a file failed (merge `missing after run` > 0, rearrange or purge failures, export-text errors, push failure or conflicts, apply failed actions, backup conflicts or an unclean audit) |
-| 2 | usage errors, invalid flags or config, regime refusals, a purge confirmation mismatch, `apply --execute` without the tools |
+| 2 | usage errors, invalid flags or config, regime refusals, a purge confirmation mismatch, `apply --execute` without the tools, `apply -link` refused by the target |
 
 ### 26.6 Environment variables
 
@@ -1667,7 +1684,7 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 | `LOCALAPPDATA`, `XDG_STATE_HOME` | state dir defaults |
 | `ONEFOLD_BIN` | tests: the binary to test (cross-compiled Windows exe) |
 | `ONEFOLD_TEST_COPY_DELAY` | tests: a delay before each merge copy |
-| `ONEFOLD_TEST_TRASH=1` | tests: allow the Windows Recycle Bin test |
+| `ONEFOLD_TEST_TRASH=1` | tests: allow the Recycle Bin (Windows) and Trash (macOS; Linux uses a Trash in a temporary `XDG_DATA_HOME`) tests; CI sets it, and fails if they skip |
 | `E2E_ROOT`, `DEMO_ROOT` | GUI tests and demo: scratch folders |
 
 ---
@@ -1731,8 +1748,8 @@ Run the suite with `TZ=America/New_York go test ./...` and `TZ=UTC go test ./...
 - Comments say why, in full; they do not reference planning notes outside the repository.
 - No extension literals or extension switches outside `internal/kinds` (`TestChokePoint`).
 - Every external command through `internal/tools`; every no-clobber publish through `fsx.RenameNoReplace`; every time string parsed in `meta.Zone()`.
-- gofmt, `go vet` for Linux and Windows (`GOOS=windows go vet ./...`); CI checks both, the test suite does not.
-- Code, comments, docs and commit messages in English; commits are one line, `<feat|fix|chore|test|docs>: <subject>`, at most 72 characters.
+- gofmt, `go vet` for Linux, Windows and macOS (`GOOS=windows go vet ./...`, `GOOS=darwin go vet ./...`) and staticcheck (`make lint`); CI checks them all, the test suite does not.
+- Code, comments, docs and commit messages in English; commits are one line, `<feat|fix|chore|test|docs|ci|build>: <subject>`, at most 72 characters.
 
 ### 28.2 Recipes
 
@@ -1752,7 +1769,7 @@ Run the suite with `TZ=America/New_York go test ./...` and `TZ=UTC go test ./...
 
 ### 28.3 Before saying done
 
-`make test`; `gofmt -l .` empty; `go vet` for both OSes; the Windows test binaries of the touched packages when paths, renames, time or console output changed; `make web-e2e` when the GUI, the run control, the report sink or the engine hooks changed; the time-zone runs when times changed; the docs (`README.md`, `LLMS.md`, this file) updated when commands, files or guarantees changed.
+`make test`; `gofmt -l .` empty; `go vet` for linux, windows and darwin; `make lint`; the Windows test binaries of the touched packages when paths, renames, time or console output changed; `make web-e2e` when the GUI, the run control, the report sink or the engine hooks changed; the time-zone runs when times changed; the docs (`README.md`, `LLMS.md`, this file) updated when commands, files or guarantees changed.
 
 ---
 
@@ -1767,5 +1784,4 @@ Run the suite with `TZ=America/New_York go test ./...` and `TZ=UTC go test ./...
 - `similar` cannot decode HEIC, RAW, WebP or TIFF (no pure-Go decoder); `-docs` needs `pdftotext` for PDFs.
 - Two `apply` runs on the same target at the same time (CLI and GUI together) could interfere through deterministic temp names; one run per target.
 - The rearrange journal stores absolute paths: a moved or remounted tree cannot be resumed or undone in place.
-- The Windows double-click detection with Windows Terminal as the default terminal is written for that case but not yet checked by hand (`TODOS.md`).
-- macOS builds are not produced; the code compiles, but the state dir and the browser opener are not adapted to macOS.
+- macOS binaries are not notarized (it needs a paid Apple Developer account): the first start needs the Gatekeeper steps of the README. The GUI runs in the browser (no native window).

@@ -31,21 +31,29 @@ import (
 // -fast2).
 const exifReadTimeout = 2 * time.Minute
 
+// exifIdle retires a reader nobody used for that long. A reader must be
+// stopped by onefold: at the end of its input exiftool -stay_open does not
+// exit, it polls the closed pipe forever, so a reader left behind outlives
+// the program.
+const exifIdle = 3 * time.Second
+
 type exifProc struct {
 	cmd   *exec.Cmd
 	tree  *tools.Tree
 	stdin io.WriteCloser
 	out   *bufio.Scanner
 	n     int
+	last  time.Time // when it went back to the pool
 }
 
 type exifPool struct {
-	mu    sync.Mutex
-	zone  string // TZ the readers run with: a new zone starts new readers
-	free  chan *exifProc
-	slots chan struct{} // one per reader that may run
-	off   bool          // exiftool missing: one-shot path (which reports it)
-	gen   int           // bumped by every reset: readers of an older one retire
+	mu      sync.Mutex
+	zone    string // TZ the readers run with: a new zone starts new readers
+	free    chan *exifProc
+	slots   chan struct{} // one per reader that may run
+	off     bool          // exiftool missing: one-shot path (which reports it)
+	gen     int           // bumped by every reset: readers of an older one retire
+	reaping bool          // the idle reaper is running
 }
 
 var readers = &exifPool{}
@@ -129,7 +137,49 @@ func (p *exifPool) put(pr *exifProc, gen int, failed bool) {
 		}
 		return
 	}
+	pr.last = time.Now()
 	p.free <- pr // capacity = slots: never blocks
+	if !p.reaping {
+		p.reaping = true
+		go p.reap()
+	}
+}
+
+// reap retires the readers idle for exifIdle; it ends when no reader runs.
+func (p *exifPool) reap() {
+	for {
+		time.Sleep(exifIdle / 3)
+		var stale []*exifProc
+		p.mu.Lock()
+		if p.free == nil {
+			p.reaping = false
+			p.mu.Unlock()
+			return
+		}
+		for range len(p.free) {
+			select {
+			case pr := <-p.free:
+				if time.Since(pr.last) >= exifIdle {
+					stale = append(stale, pr)
+					p.slots <- struct{}{}
+				} else {
+					p.free <- pr
+				}
+			default:
+			}
+		}
+		done := len(p.slots) == cap(p.slots)
+		if done {
+			p.reaping = false
+		}
+		p.mu.Unlock()
+		for _, pr := range stale {
+			pr.close()
+		}
+		if done {
+			return
+		}
+	}
 }
 
 var errNoExif = errors.New("exiftool not available")
@@ -225,8 +275,9 @@ func exifOutput(args []string) (out []byte, ok bool) {
 	return out, err == nil
 }
 
-// CloseExifReaders stops the running readers (they also exit when the
-// program ends: their stdin closes).
+// CloseExifReaders stops the running readers: the idle ones now, the busy
+// ones when they finish their file. Call it when a scan ends; the readers do
+// not exit by themselves when the program does (see exifIdle).
 func CloseExifReaders() {
 	readers.mu.Lock()
 	defer readers.mu.Unlock()

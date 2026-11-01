@@ -35,7 +35,7 @@
     <li class="row">
       <span class="badge">{i + 1}</span>
       <span class="mono flex-1">{p}</span>
-      {#if tag && tag(p)}<span class="tag-indigo">{tag(p)}</span>{/if}
+      {#if tag && tag(p)}<span class="tag-brand">{tag(p)}</span>{/if}
       <button class="icon-btn" disabled={i === 0} onclick={() => move(i, -1)} title={t('common.up')}><ChevronUp size={14} /></button>
       <button class="icon-btn" disabled={i === items.length - 1} onclick={() => move(i, 1)} title={t('common.down')}><ChevronDown size={14} /></button>
       <button class="icon-btn" onclick={() => (items = items.filter((x) => x !== p))} title={t('common.remove')}><X size={14} /></button>

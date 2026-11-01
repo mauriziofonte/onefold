@@ -82,7 +82,7 @@ func heifExifNative(p string, m *Meta) error {
 	n, _ := f.ReadAt(hb, 0)
 	hb = hb[:n]
 	meta := isoChild(hb, "meta")
-	if meta == nil || len(meta) < 4 {
+	if len(meta) < 4 {
 		return errUnsupported
 	}
 	meta = meta[4:] // FullBox version and flags

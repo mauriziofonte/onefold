@@ -162,7 +162,7 @@ func (m *Manager) Exclude(id string, q ExcludeReq) (*Job, error) {
 	}
 	paths := q.Paths
 	if q.ContentOf != "" {
-		paths = append(paths, contentMembers(prev.Lists, abs(q.ContentOf), abs)...)
+		paths = append(paths, contentMembers(prev.Lists, canonicalFile(abs(q.ContentOf)), abs)...)
 	}
 	paths = uniqStrings(paths, filepath.Clean)
 	for _, p := range paths {

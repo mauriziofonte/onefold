@@ -45,7 +45,7 @@
   {:else}
     <div class="flex flex-wrap items-center gap-3">
       {#if job.status === 'running'}
-        <span class="h-2 w-2 animate-pulse rounded-full bg-indigo-500"></span>
+        <span class="h-2 w-2 animate-pulse rounded-full bg-brand-500"></span>
       {:else if job.status === 'paused'}
         <Pause size={16} class="text-amber-500" />
       {:else if job.status === 'done' || job.status === 'previewed'}
@@ -56,12 +56,12 @@
       <button class="font-semibold text-slate-800 hover:underline" onclick={() => onopen?.(job)} data-testid="jobbar-title">
         {t('kind.' + job.kind)} · {t('stage.' + job.stage)}
       </button>
-      <span class="pill {job.status === 'failed' ? 'bg-rose-100 text-rose-700' : job.status === 'paused' || job.status === 'stopped' || job.status === 'interrupted' ? 'bg-amber-100 text-amber-800' : job.status === 'running' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700'}" data-testid="jobbar-status">{t('status.' + job.status)}</span>
+      <span class="pill {job.status === 'failed' ? 'bg-rose-100 text-rose-700' : job.status === 'paused' || job.status === 'stopped' || job.status === 'interrupted' ? 'bg-amber-100 text-amber-800' : job.status === 'running' ? 'bg-brand-50 text-brand-700' : 'bg-emerald-50 text-emerald-700'}" data-testid="jobbar-status">{t('status.' + job.status)}</span>
       <div class="flex flex-wrap items-center gap-1">
         {#each job.phases as ph, i (ph)}
           {@const st = phaseState(i)}
           {#if i > 0}<span class="text-slate-300">›</span>{/if}
-          <span class="phase {st === 'done' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : st === 'cur' ? 'border-indigo-300 bg-indigo-50 font-medium text-indigo-700' : 'border-slate-200 text-slate-400'}">
+          <span class="phase {st === 'done' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : st === 'cur' ? 'border-brand-300 bg-brand-50 font-medium text-brand-700' : 'border-slate-200 text-slate-400'}">
             {#if st === 'done'}<Check size={12} />{:else if st === 'cur' && job.status === 'running'}<LoaderCircle size={12} class="animate-spin" />{:else}<Circle size={12} />{/if}
             {t('phase.' + ph)}
           </span>
@@ -97,9 +97,9 @@
     </div>
     <div class="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
       {#if live && pct === null}
-        <div class="indeterminate h-full w-1/3 rounded-full {job.status === 'paused' ? 'bg-amber-400' : 'bg-indigo-500'}"></div>
+        <div class="indeterminate h-full w-1/3 rounded-full {job.status === 'paused' ? 'bg-amber-400' : 'bg-brand-500'}"></div>
       {:else}
-        <div class="h-full transition-all {job.status === 'paused' ? 'bg-amber-400' : live ? 'stripes bg-indigo-600' : job.status === 'failed' ? 'bg-rose-500' : job.errors || job.status !== 'done' && job.status !== 'previewed' ? 'bg-amber-500' : 'bg-emerald-500'}" style="width:{live ? pct : 100}%" data-testid="jobbar-bar"></div>
+        <div class="h-full transition-all {job.status === 'paused' ? 'bg-amber-400' : live ? 'stripes bg-brand-600' : job.status === 'failed' ? 'bg-rose-500' : job.errors || job.status !== 'done' && job.status !== 'previewed' ? 'bg-amber-500' : 'bg-emerald-500'}" style="width:{live ? pct : 100}%" data-testid="jobbar-bar"></div>
       {/if}
     </div>
   {/if}

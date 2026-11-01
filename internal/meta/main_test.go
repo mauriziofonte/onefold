@@ -18,5 +18,7 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	SetZone(l)
-	os.Exit(m.Run())
+	code := m.Run()
+	CloseExifReaders()
+	os.Exit(code)
 }

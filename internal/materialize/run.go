@@ -31,6 +31,9 @@ type RunOptions struct {
 	Gate     *runctl.Gate // pause/stop between actions (GUI); nil = never
 	Progress Progress     // optional
 	Silver   Silver       // tags embedded into media copies (zero = defaults)
+	// Link publishes hard links of the sources instead of copies (LinkOriginal):
+	// byte-original, no silvering, same volume only.
+	Link bool
 }
 
 // RunStats is the outcome of ApplyAll.
@@ -68,7 +71,7 @@ func ApplyAll(acts []plan.Action, target string, o RunOptions) RunStats {
 	var st RunStats
 	var mu sync.Mutex
 	var written, skipped, pending, unsilvered atomic.Int64
-	if o.Progress != nil {
+	if o.Progress != nil && !o.Link {
 		// one notice per missing tool instead of one warning per file
 		if hasMedia(photos) && !tools.Has("exiftool") {
 			o.Progress.Event("photos are copied without canonical metadata: " + NoExiftool)
@@ -116,7 +119,13 @@ func ApplyAll(acts []plan.Action, target string, o RunOptions) RunStats {
 			return
 		}
 		t0 := time.Now()
-		res, err := ApplyWith(a, target, batch, o.Silver)
+		var res Result
+		var err error
+		if o.Link {
+			res, err = LinkOriginal(a, target)
+		} else {
+			res, err = ApplyWith(a, target, batch, o.Silver)
+		}
 		record(a, res, err, t0)
 	}
 	var wg sync.WaitGroup
@@ -129,7 +138,10 @@ func ApplyAll(acts []plan.Action, target string, o RunOptions) RunStats {
 			pw.Add(1)
 			go func() {
 				defer pw.Done()
-				batch, _ := NewExifBatch() // nil when exiftool is missing: per-file fallback
+				var batch *ExifBatch
+				if !o.Link {
+					batch, _ = NewExifBatch() // nil when exiftool is missing: per-file fallback
+				}
 				if batch != nil {
 					defer batch.Close()
 				}

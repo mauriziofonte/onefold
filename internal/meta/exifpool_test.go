@@ -91,3 +91,28 @@ func TestExifReaderAnswers(t *testing.T) {
 		t.Fatal("the reader is gone after a missing file")
 	}
 }
+
+// A reader nobody uses stops by itself: exiftool -stay_open never exits on
+// its own, so a forgotten reader would outlive onefold.
+func TestExifReaderRetiresWhenIdle(t *testing.T) {
+	if !tools.Has("exiftool") {
+		t.Skip("exiftool not installed")
+	}
+	defer CloseExifReaders()
+	if m := exifJSON(filepath.Join("testdata", "photo", "createdate.jpg"), "-CreateDate"); m == nil {
+		t.Fatal("no answer")
+	}
+	deadline := time.Now().Add(exifIdle + 5*time.Second)
+	for {
+		readers.mu.Lock()
+		reaping, idle := readers.reaping, len(readers.free)
+		readers.mu.Unlock()
+		if !reaping && idle == 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("after %v: %d idle readers still running", exifIdle+5*time.Second, idle)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}

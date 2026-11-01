@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mauriziofonte/onefold/internal/runctl"
+	"github.com/mauriziofonte/onefold/internal/testfix"
 )
 
 // A preview with a StateCache writes nothing into the output (not even
@@ -20,7 +21,7 @@ import (
 func TestStateCachePreviewWritesNothing(t *testing.T) {
 	O, B, C := scenario(t)
 	before := snap(t, O)
-	state := filepath.Join(t.TempDir(), "job", "cache.jsonl")
+	state := filepath.Join(testfix.TempDir(t), "job", "cache.jsonl")
 	o := opts([]string{O, B, C}, O, false)
 	o.StateCache = state
 	run(t, o)

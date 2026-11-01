@@ -44,7 +44,8 @@ type Options struct {
 	Port     int    // 0 = DefaultPort (falls back to a random port when busy); -1 = random
 	StateDir string // "" = StateDir()
 	Version  string
-	Static   fs.FS // frontend files ("" = embedded dist)
+	Build    string // commit and date of the binary ("" = unknown)
+	Static   fs.FS  // frontend files ("" = embedded dist)
 	// ConfigPath is the user config file ("" = config.Path()); OnConfig is
 	// called after the Config view saved it (e.g. to switch the diagnostic log).
 	ConfigPath string
@@ -173,6 +174,7 @@ func (s *Server) Serve() error {
 func (s *Server) Shutdown() {
 	s.once.Do(func() {
 		s.mgr.PauseForExit()
+		s.mgr.Wait()
 		close(s.stopped)
 		s.hub.close()
 		s.srv.Close()
@@ -322,7 +324,7 @@ func (s *Server) handleInfo(w http.ResponseWriter, r *http.Request) {
 	tl := tools.Report()
 	host, _ := os.Hostname()
 	writeJSONResp(w, 200, map[string]any{
-		"version": s.opts.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "cpus": runtime.NumCPU(),
+		"version": s.opts.Version, "build": s.opts.Build, "go": runtime.Version(), "os": runtime.GOOS, "arch": runtime.GOARCH, "cpus": runtime.NumCPU(),
 		"lang": PreferredLang(r.Header.Get("Accept-Language")), "stateDir": s.opts.StateDir,
 		"tools": tl, "toolsDisabled": tools.Disabled(), "active": s.mgr.Active(), "sep": string(filepath.Separator), "hostname": host,
 	})
