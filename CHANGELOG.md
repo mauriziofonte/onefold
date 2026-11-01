@@ -4,7 +4,7 @@ All notable changes to onefold are listed here, newest first. Versions follow [S
 
 The version being prepared is in the `VERSION` file; a release is the tag `v<VERSION>` (see section 5.4 of `ARCHITECTURE.md`).
 
-## [Unreleased]
+## [0.0.2-alpha] - 2026-11-01
 
 - The version is shown where people look for it: `onefold --version` and `-V` (with the commit and its date), the first line of `onefold help` and of the GUI's start message, and in the GUI an About card on the Doctor page (version, build, platform, license, source address), reached from the version next to the logo.
 - Statistics (`onefold stats`, and the Statistics view in the GUI): what fills whole volumes or chosen folders, by file family, category, extension, year, size and folder, the largest files, and how much space duplicates waste, with the groups of copies and the pairs of folders sharing the most files (one click opens Merge on them). Duplicates are found on sampled content by default, or confirmed on the whole content with `-dups full`. Read-only; `-json` writes everything.
@@ -19,7 +19,7 @@ The version being prepared is in the `VERSION` file; a release is the tag `v<VER
 - macOS: release binaries for Apple Silicon and Intel (`onefold-darwin-arm64`, `onefold-darwin-amd64`); `onefold gui` opens the browser (`open`); the state lives in `~/Library/Application Support/onefold`; tools installed with Homebrew are found even when onefold is not started from a shell.
 - Windows 11 24H2 and later: a double-click on onefold.exe no longer flashes a console window or a Windows Terminal tab before the GUI opens.
 - Measured: right after a reboot, the first catalog of 5,384 files took 52 s with Microsoft Defender scanning and 3 s with onefold excluded (README, Windows notes).
-- Fixed: among byte-identical photos or videos with no sub-second time, the copy kept could change from one run to the next (it followed the order the catalog workers finished in); it is now the one with a clean name, then the oldest, then the shortest path.
+- Fixed: among byte-identical photos or videos with no sub-second time, the copy kept could change from one run to the next (it followed the order the catalog workers finished in); it is now the one in the folder given first, then the one with a clean name, then the oldest, then the shortest path.
 - Fixed: the exiftool readers of a catalog run were never stopped and kept running, polling, after onefold exited (Linux and macOS; on Windows they ended with it).
 - Fixed: the `seed` rsync script failed with the rsync macOS ships (no `--info=progress2`); it now falls back to `--progress`.
 - Fixed: two data races in the GUI: a running job updating its summary while live updates were sent to the browser, and the end of a preview logging its status while Execute had already started the next stage.
