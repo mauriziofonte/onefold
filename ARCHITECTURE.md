@@ -9,8 +9,9 @@ Companion documents:
 | `README.md` | users: what onefold does, how to run it |
 | `LLMS.md` | coding agents: build commands, layout, invariants, conventions in short form |
 | `ARCHITECTURE.md` (this file) | everyone who changes the code: how every part works and why |
+| `CONTRIBUTING.md`, `SECURITY.md`, `LICENSING.md`, `TRADEMARKS.md` | contributors: how to send a change, how to report a vulnerability, the licenses, the name and logo |
 | `CHANGELOG.md`, `VERSION` | released versions; the version being prepared (section 5.4) |
-| `onefold help`, `onefold naming`, `onefold doctor` | the binary's own reference: flags, naming grammar, platform and tools |
+| `onefold help`, `onefold naming`, `onefold doctor`, `onefold version` | the binary's own reference: flags, naming grammar, platform and tools, version and build |
 
 ## Contents
 
@@ -48,7 +49,7 @@ Companion documents:
 
 ## 1. What onefold is
 
-onefold is a single static Go binary (Linux amd64 and arm64, Windows amd64) for people whose files are spread over several computers and disks: the same photo on a laptop, a phone backup, two external drives and a NAS, under different names, sometimes resized, sometimes renamed by tools that added `(1)` or a date prefix. It finds what is the same, keeps one copy of every distinct thing, and puts that copy under a predictable name.
+onefold is a single static Go binary (Linux amd64 and arm64, macOS arm64 and amd64, Windows amd64) for people whose files are spread over several computers and disks: the same photo on a laptop, a phone backup, two external drives and a NAS, under different names, sometimes resized, sometimes renamed by tools that added `(1)` or a date prefix. It finds what is the same, keeps one copy of every distinct thing, and puts that copy under a predictable name.
 
 It has three families of work, each with its own naming rules (section 13.8, "naming regimes"):
 
@@ -58,13 +59,13 @@ It has three families of work, each with its own naming rules (section 13.8, "na
 | Folder merge | `merge`, then optionally `purge-sources` | one output folder holding every distinct content of N input folders exactly once, named by a template | `merge`: no. `purge-sources`: deletes merged inputs on request |
 | In-place reorganization | `rearrange` | the same folder, files renamed/moved to a template, confirmed duplicates deleted | yes, by design, journaled and undoable (moves) |
 
-Around them: review tools (`similar`, `reclaim`), a cold-storage copy with an audit (`backup`), transfer helpers (`push` over SFTP, `seed` scripts for rsync/robocopy), text sidecars of documents (`export-text`), a local GUI (`gui`) that runs every mode with previews, pause, resume and a guided setup, and a per-user configuration (`config`).
+Around them: review tools (`similar`, `reclaim`), statistics of folders and volumes with their duplicates (`stats`), a cold-storage copy with an audit (`backup`), transfer helpers (`push` over SFTP, `seed` scripts for rsync/robocopy), text sidecars of documents (`export-text`), a local GUI (`gui`) that runs every mode with previews, pause, resume and a guided setup, and a per-user configuration (`config`).
 
 Design principles, in priority order:
 
 1. No data loss. Nothing is deleted or overwritten unless the user asked for that exact operation, and even then only after re-reading the bytes that justify it.
 2. Robustness. Every write is atomic and idempotent; an interrupted run is finished by running it again.
-3. Parity. Linux and Windows-native behave the same; every external tool is optional and has a pure-Go fallback.
+3. Parity. Linux, macOS and Windows behave the same; every external tool is optional and has a pure-Go fallback.
 4. Speed. Sparse hashing, one read per small file, parallel workers, caches; never at the expense of 1-3.
 
 The program works on metadata it extracts itself, so the computers do not need to see each other: each host catalogs its own disks into a manifest (a JSONL file), the manifests are planned together anywhere, and each host materializes its share of the plan.
@@ -123,10 +124,11 @@ The only files onefold writes are:
 | `export-text --target T` | `.txt` sidecars under T only |
 | `push` | the remote destination only |
 | `merge -execute` | new files in the output only, plus `<output>/.onefold/` |
-| `golden-index -o`, `match -o/-report`, `similar -o`, `reclaim -o/-script`, `seed -o/-list` | the named files |
+| `golden-index -o`, `match -o/-report`, `similar -o`, `reclaim -o/-script`, `seed -o/-list`, `stats -json` | the named files |
 | `backup -execute SRC DST` | new files in DST, plus `DST/.onefold/` |
 | GUI | its state dir; and what the mode it runs writes |
 | `config set` | `<state dir>/config.json` |
+| `tools install` | `<state dir>/tools/` (Windows) |
 
 Two operations delete source files, both only when asked explicitly, both dry runs by default:
 
@@ -209,7 +211,8 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 │   ├── remote/             pure-Go SFTP push
 │   ├── merge/              merge engine
 │   ├── rearrange/          in-place rearrange with journal, resume, undo
-│   ├── purge/              verified deletion of merged sources
+│   ├── purge/              verified deletion of merged sources, Recycle Bin and Trash
+│   ├── stats/              what folders and volumes hold, duplicates (read-only)
 │   ├── settings/           merge/rearrange settings schema (CLI, files, GUI)
 │   ├── config/             per-user configuration
 │   ├── runctl/             pause/stop gate
@@ -229,10 +232,13 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 │   └── media-synth/        synthetic photos/videos pinning the media rules
 ├── VERSION, CHANGELOG.md   version being prepared; release notes
 ├── scripts/                fixture generators, workflow check, demo GIFs
+├── assets/brand/           logo, icon, wordmark, social preview
 ├── assets/demo/            README demo GIFs
 ├── .github/                CI and release workflows
 ├── Makefile, go.mod, go.sum
-└── README.md, LLMS.md, ARCHITECTURE.md, LICENSE
+├── README.md, LLMS.md, ARCHITECTURE.md, AGENTS.md
+├── CONTRIBUTING.md, CONTRIBUTORS.md, CLA.md, CODE_OF_CONDUCT.md, SECURITY.md
+└── LICENSE, LICENSING.md, TRADEMARKS.md
 ```
 
 ### 4.1 Packages
@@ -291,7 +297,11 @@ Leaves: `kinds`, `fsx`, `perf`, `report`, `runctl`, `statedir`, `testfix`, `winr
 | `merge` | catalog, fsx, names, naming, perf, plan, report, runctl |
 | `rearrange` | catalog, fsx, merge, names, naming, perf, plan, report, runctl, sparsehash |
 | `settings` | catalog, merge, naming, rearrange |
-| `purge` | kinds, merge, report, runctl, sparsehash |
+| `purge` | fsx, kinds, merge, report, runctl, sparsehash |
+| `stats` | kinds, runctl, sparsehash |
+| `scan` | kinds, sparsehash |
+| `planreport` | catalog, kinds, plan, report |
+| `remote` | fsx |
 | `materialize` | fsx, kinds, meta, plan, runctl, tools |
 | `textexport` | fsx, kinds, meta, plan, tools |
 | `similar` | kinds, plan, runctl, textexport |
@@ -511,6 +521,7 @@ Timestamps in these names are `yyyyMMdd-HHmmss.nnnnnnnnn`.
 | `similar -o FILE` | JSON: hashed, skipped, flat, failed, pairs, docGroups |
 | `reclaim -o FILE`, `-script FILE` | JSON: safe, review, skipped; the sh or PowerShell script |
 | `seed -o FILE`, `-list FILE` | the sh or cmd script; the rsync file list |
+| `stats -json FILE` | JSON of `stats.Result` (`version` 1): totals, breakdowns, folder tree, duplicates, folder pairs, problems (section 16.6) |
 | settings JSON (`-settings`, GUI export) | section 20 |
 | `<state dir>/config.json` | section 21 |
 | `<state dir>/jobs/<id>/...` | section 22 |
@@ -631,7 +642,7 @@ Every time string onefold stores (`meta.time` in manifests, `time` in plans) is 
 
 1. user config `timezone` (an IANA name);
 2. the `TZ` environment variable (a zoneinfo path is reduced to its name);
-3. the host zone: Linux `/etc/localtime` link or `/etc/timezone`; Windows the registry `TimeZoneKeyName`, mapped to IANA through ICU (`icu.dll` `ucal_getTimeZoneIDForWindowsID`) for the user's region, else the CLDR default mapping.
+3. the host zone: Linux and macOS the `/etc/localtime` link (on macOS it points into `/var/db/timezone/zoneinfo`), else `/etc/timezone`; Windows the registry `TimeZoneKeyName`, mapped to IANA through ICU (`icu.dll` `ucal_getTimeZoneIDForWindowsID`) for the user's region, else the CLDR default mapping.
 
 There is no silent fallback: an unknown zone is `ErrNoZone` and the commands that need times stop. `time/tzdata` is embedded, because Windows has no zoneinfo database.
 
@@ -1181,9 +1192,10 @@ The script is POSIX sh (`rm -- '...'`, `set -e`) or PowerShell (`Remove-Item -Li
 `onefold stats [flags] FOLDER|MOUNT...` and `onefold stats -mounts` measure; they never write into the measured folders. `internal/stats` is shared by the CLI and the GUI's Statistics view (a `stats` job, section 22).
 
 - Roots: made absolute and clean; a missing one is refused; a root inside another given root is dropped (it would be counted twice).
-- Pass 1 (scan): `fastwalk` over every root, regular files only (symbolic links counted, never followed). Each file is added to every breakdown: family (`kinds.Family`, from the category of `types.tsv`), category, extension (unknown extensions apart, `""` = none), year of last change (before 1980 or more than two days ahead: year 0, shown as unknown), size band, the largest files overall and per family, and the folder tree. Empty files and OS droppings (`kinds.IsJunk`) are counted apart as well. A file with more than one hard link is counted once per volume and inode (Linux, macOS). With `OneVolume` (the CLI default and the GUI's unless "Enter volumes mounted inside") a folder on another device than its root is not entered and listed in `otherVolumes`; Windows walks never enter mounted folders (reparse points). Space on disk (`allocated`, from `st_blocks`) exists on Linux and macOS only.
+- Pass 1 (scan): `fastwalk` over every root, regular files only (symbolic links counted, never followed). Each file is added to every breakdown: family (`kinds.Family`, from the category of `types.tsv`), category, extension (unknown extensions apart, `""` = none), year of last change in the computer's local time, as file managers show it (before 1980 or more than two days ahead: year 0, shown as unknown), size band, the largest files overall and per family, and the folder tree. Empty files and OS droppings (`kinds.IsJunk`) are counted apart as well. A file with more than one hard link is counted once per volume and inode (Linux, macOS). With `OneVolume` (`-one-volume`, the CLI default and the GUI's unless "Enter volumes mounted inside") a folder on another device than its root is not entered and listed in `otherVolumes`; Windows walks never enter mounted folders (reparse points). Space on disk (`allocated`, from `st_blocks`) exists on Linux and macOS only.
 - Pass 2 (duplicates; `-dups off|fast|full`, default `fast`): the files whose size occurs at least twice (and is at least `-dup-min`) are walked again and hashed in parallel: `fast` takes the sparse digest (`sparsehash.HashFile`, section 8.1), `full` then reads every file of a sparse group in full (`sparsehash.FullFile`) and only full-equal files stay grouped (`verified`). Wasted bytes = (copies - 1) x size per group. Folder pairs: for every group of at most 64 copies, every pair of the folders holding them gains the group's file and bytes; pairs of two different folders sharing more than one file come first. Sizes are counted again in pass 2, so a size left unique by a file gone since pass 1 is skipped; a file that cannot be read gets no hash and is counted in `dups.errors`.
 - Limits of the result: the folder tree keeps `-depth` levels (default 6) and the 40 heaviest subfolders of each folder (the rest summed in `more*`, `deeper` marks a cut); 100 largest files and duplicate groups (50 paths each), 25 largest files per family, 300 extensions, 150 unknown extensions, 100 folder pairs, 200 problems.
+- Workers: `-j` (default: CPUs) for both passes; CLI progress as in section 23.1 (`-heartbeat`, reporter labels `stats scan` and `stats duplicates`).
 - Live: `OnSnapshot` receives a partial result every second during the scan (the GUI shows the charts filling in); pause and stop go through `runctl` (a stopped run returns what it read, `stopped: true`).
 - `Mounts()`: the volumes with size and free space. Linux reads `/proc/self/mountinfo` (pseudo file systems such as `proc`, `sysfs`, `tmpfs`, `overlay` left out; network file systems marked remote), macOS `getfsstat`, Windows the logical drives with their type and label.
 - `-json FILE` (`-` = standard output) writes the whole `Result` (`version` 1); without it the CLI prints tables of `-top` rows.
@@ -1405,7 +1417,7 @@ On Windows, `onefold.exe` with no arguments opens the GUI when it was started by
 | Path | Content |
 |---|---|
 | `jobs/<id>/job.json` | the job (atomic, fsync) |
-| `jobs/<id>/result.json` | the confirmed-plan fingerprint and the result lists |
+| `jobs/<id>/result.json` | the confirmed-plan fingerprint and the result lists; for a stats job the `stats.Result` |
 | `jobs/<id>/log.jsonl` | the job log |
 | `jobs/<id>/cache.jsonl` | merge/rearrange state cache (previews write nothing into the trees) |
 | `golden/` | manifests and plans of the golden archive view |
@@ -1433,7 +1445,7 @@ Exclusions after a preview: from the Plan tab a file, a folder, a pattern or "th
 
 | Route | Method | Purpose |
 |---|---|---|
-| `/api/info` | GET | version, OS, CPUs, language, state dir, tools, active job, path separator, host name |
+| `/api/info` | GET | version, build (commit and date), Go version, OS, CPUs, language, state dir, tools, active job, path separator, host name |
 | `/api/config` | GET, POST | user config, effective signature, zone and its source; POST validates, saves, applies |
 | `/api/events` | GET | server-sent events: `hello`, `job` snapshots (at most every 250 ms), `log` entries, `tools` snapshots; ping every 20 s |
 | `/api/log` | GET | session log ring, or a job's persisted log |
@@ -1458,7 +1470,7 @@ Errors are JSON `{error}` with 400 (bad input), 404 (unknown job), 409 (busy or 
 
 ### 22.6 Engine events
 
-While the server runs, `report.SetSink` routes every engine reporter to the active job: start/progress/done events become the job's progress and phase (reporter labels map to phases: `catalog output` -> scan output, `catalog inputs` -> scan inputs, `verify`, `merge`/`materialize` -> copy, `rearrange` -> apply, `purge` -> delete...), warnings and errors become log entries with their path. Log entries carry a translation key and arguments, or raw engine text.
+While the server runs, `report.SetSink` routes every engine reporter to the active job: start/progress/done events become the job's progress and phase (reporter labels map to phases: `catalog output` -> scan output, `catalog inputs` -> scan inputs, `verify`, `merge`/`materialize` -> copy, `rearrange` -> apply, `purge` -> delete, `stats scan` -> scan, `stats duplicates` -> dups...), warnings and errors become log entries with their path. Log entries carry a translation key and arguments, or raw engine text.
 
 ### 22.7 Guided setup
 
@@ -1476,7 +1488,7 @@ The first page on a fresh install, and a button in every mode. It asks the goal 
 
 ### 22.10 End-to-end test
 
-`make web-e2e` builds the binary and drives it with Playwright in a real browser: a merge with pause and resume, language switch and persisted settings, a rearrange with typed confirmation, journal undo, a power loss (SIGKILL mid-copy) and resume from Runs, the config page, the golden archive (index, plan, check, apply), the guided setup, the plan review with exclusions and instant re-plan, a Desktop merge with the folder prefix, settings export and copy command, and a source purge with the typed count. Scratch data lives in `E2E_ROOT` (default `/tmp/onefold-gui-e2e`, must not exist; it holds a mode-000 file, so remove it with `chmod -R u+rwX` first). Screenshots go to `internal/gui/web/e2e/screens/`.
+`make web-e2e` builds the binary and drives it with Playwright in a real browser: a merge with pause and resume, language switch and persisted settings, a rearrange with typed confirmation, journal undo, a power loss (SIGKILL mid-copy) and resume from Runs, the config page, the golden archive (index, plan, check, apply), the guided setup, the plan review with exclusions and instant re-plan, a Desktop merge with the folder prefix, settings export and copy command, and a source purge with the typed count, the Doctor page, and the Statistics view (duplicates confirmed on full content, folder pairs, a pair filling the Merge form). Scratch data lives in `E2E_ROOT` (default `/tmp/onefold-gui-e2e`, must not exist; it holds a mode-000 file, so remove it with `chmod -R u+rwX` first). Screenshots go to `internal/gui/web/e2e/screens/`.
 
 ### 22.11 README demo
 
@@ -1494,10 +1506,10 @@ stdout carries results (summaries, TSV lists); stderr carries progress and statu
 
 | Mode | When | Output |
 |---|---|---|
-| bar | stderr is a terminal with a width (Linux TTY; the Windows console natively) | counters, `+` while the total still grows, percentage, smoothed speed, ETA |
+| bar | stderr is a terminal with a width (Linux and macOS terminals; the Windows console natively) | counters, `+` while the total still grows, percentage, smoothed speed, ETA |
 | log | a pipe, a file, a background run, a 0-column pty | a heartbeat line every `-heartbeat` (default 10 s): done, total (`+` = still growing), percentage and ETA once the total is final, throughput |
 
-Units are bytes (apply, push, merge copies, verify) or items (catalog, rearrange). `report.Printf` prints status lines above an active bar without tearing it. `Finish` prints one summary line on stdout. In the GUI a sink replaces the terminal output (section 22.6). Library code shows progress only when the caller passes a log writer, so tests stay quiet.
+Units are bytes (apply, push, merge copies, verify) or items (catalog, rearrange, stats). `report.Printf` prints status lines above an active bar without tearing it. `Finish` prints one summary line on stdout. In the GUI a sink replaces the terminal output (section 22.6). Library code shows progress only when the caller passes a log writer, so tests stay quiet.
 
 ### 23.2 Plan report (`internal/planreport`)
 
@@ -1533,7 +1545,7 @@ The registry of optional programs: `exiftool ffprobe ffmpeg pdfinfo pdftotext an
 
 Every external command in product code goes through `tools`; a direct `exec.Command` elsewhere would break window hiding, `doctor` and `ONEFOLD_NO_EXTERNAL`.
 
-`onefold doctor` prints the version, OS/arch, Go version, CPUs, the canonical zone and its source, whether external tools are disabled, each tool's path or `missing (pure-Go fallback)`, and what is pure Go versus what needs a tool.
+`onefold doctor` prints the version line of `onefold version` (version, commit and date, OS/arch, Go version), CPUs, the canonical zone and its source, whether external tools are disabled, each tool's path or `missing (pure-Go fallback)`, and what is pure Go versus what needs a tool.
 
 ### 24.3 `tooldl`: pinned downloads (Windows)
 
@@ -1560,7 +1572,7 @@ Install: download into `<state dir>/tools/.download/<id>-<version>.onefold-tmp` 
 
 ## 25. Windows specifics
 
-Windows-native is the primary target; Linux parity is mandatory.
+Linux, macOS and Windows are equal targets: a command behaves the same on each, and CI runs the whole suite on all of them (section 5.3). This section collects what is particular to Windows; macOS specifics sit with the parts they concern (renames and path spelling 24.1, Homebrew lookup 24.2, state dir 24.4, Trash 18.3, Gatekeeper section 29).
 
 ### 25.1 Parity rules
 
@@ -1628,7 +1640,7 @@ Go's `flag` package: `-x` and `--x` are equivalent; flags go before positional a
 | `doctor` | platform, zone, tools | - |
 | `tools [list\|install all\|ID...]` | pinned tool downloads (Windows) | state dir |
 | `gui [flags]` | the GUI | state dir |
-| `hash FILE`, `index DIR`, `version`, `help` | debugging and info | - |
+| `hash FILE`, `index DIR`, `version` (`--version`, `-V`), `help` | debugging and info | - |
 
 ### 26.2 catalog flags
 
@@ -1685,7 +1697,7 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 | Code | Meaning |
 |---|---|
 | 0 | success |
-| 1 | runtime failure: a file failed (merge `missing after run` > 0, rearrange or purge failures, export-text errors, push failure or conflicts, apply failed actions, backup conflicts or an unclean audit) |
+| 1 | runtime failure: a file failed (merge `missing after run` > 0, rearrange or purge failures, export-text errors, push failure or conflicts, apply failed actions, backup conflicts or an unclean audit, a stats run that fails or cannot write its JSON) |
 | 2 | usage errors, invalid flags or config, regime refusals, a purge confirmation mismatch, `apply --execute` without the tools, `apply -link` refused by the target |
 
 ### 26.6 Environment variables
@@ -1713,7 +1725,7 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 
 | Package | Tests |
 |---|---|
-| `kinds` | registry loading, presets, sniff, frozen media kinds and canonical aliases, `TestChokePoint` (no extension knowledge outside `kinds`) |
+| `kinds` | registry loading, presets, sniff, frozen media kinds and canonical aliases, every category in exactly one stats family, `TestChokePoint` (no extension knowledge outside `kinds`) |
 | `meta` | per-format extraction, the real-file corpus (`TestCorpus`), parity with and without tools, photo formats with sub-seconds, the JPEG date fallback, RAR5 listing (native == unrar), EBML/FLV parity with ffprobe, exiftool readers == one-shot, zone resolution |
 | `sparsehash` | determinism, small files, size sensitivity, whole-read == seek |
 | `catalog` | default scope, rules and reasons, exclusions, sizes and limits, hosts, reuse, sources untouched, whole-read equivalence, regime scopes |
@@ -1723,13 +1735,15 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 | `materialize` | generic copies, stale temps, missing tools, photo stamping on every photo format, batch refusals, video silvering (UTC creation time, tags, streams, AVI, refused files), byte-copied media |
 | `merge` | dry run writes nothing, execute, overlaps, sparse collisions never lose data, blocked parents, no-replace rename, layouts, long paths, settled and excluded lists, re-plan == preview, pause/stop hooks, `-verify-uncached`, `-keep-dotfiles` |
 | `rearrange` | end to end, interrupted runs, duplicate re-verification, presets, stop then recover, refusals |
-| `purge` | purge, refusals, output inside an input, report reading, journal required, Recycle Bin volume rules |
+| `purge` | purge, refusals, output inside an input, report reading, journal required, Recycle Bin volume rules, path spellings, the Trash on macOS and Linux (`TestTrashItem`) |
+| `stats` | breakdowns and duplicates on a synthetic tree (`TestRun`), `off`/`fast`/`full` (`TestDupModes`), nested roots and hard links counted once, tree depth, the volume list, Linux `mountinfo` parsing |
+| `fsx`, `tools`, `statedir` | no-replace rename (the one-call primitive on each CI system), no-replace links, temp names, uncached reads, `Canonical` and the stored spelling on macOS; Homebrew lookup without `PATH`, on Windows a killed tool takes its children; the state dir of each OS |
 | `similar`, `reclaim`, `backup`, `seed` | review lists, scripts (the sh script is executed; on Windows the robocopy script is executed), audits |
 | `textexport` | extractors, sidecars, Office 97-2003 files saved by Microsoft Office, SST continuation, Word fields |
 | `gui` | section 22.9; on Windows the WebView2 fallback |
 | `remote` | SFTP push against an in-process SSH/SFTP server, including size conflicts |
 | `winres` | `.syso` in sync, layout, logo pixels, version info |
-| `cmd/onefold` | CLI end-to-end (`TestE2E` on a synthetic two-host corpus, `TestCorpusFlow`, merge, rearrange, desktop archive with purge, settings round trip, the golden delta flow with similar, reclaim, backup and seed), `TestSourceHeaders` |
+| `cmd/onefold` | CLI end-to-end (`TestE2E` on a synthetic two-host corpus, `TestCorpusFlow`, merge, rearrange, desktop archive with purge, settings round trip, the golden delta flow with similar, reclaim, backup and seed, `apply -link`), `TestSourceHeaders`, `TestVersionFile` |
 
 ### 27.2 Fixtures
 
@@ -1791,7 +1805,7 @@ Run the suite with `TZ=America/New_York go test ./...` and `TZ=UTC go test ./...
 
 ## 29. Known limits
 
-- The manifest record order is not deterministic (parallel workers); the planner's "room order" for generic winners is the order rooms first appear, which within one manifest can in rare cases differ from the command-line order.
+- The manifest record order is not deterministic (parallel workers); the planner's "room order" (generic winners, and media copies equal in resolution, HDR and size) is the order rooms first appear, which within one manifest can in rare cases differ from the command-line order.
 - `-limit` keeps the first N files in walk order, which is not deterministic.
 - Photos without a sub-second are identified by their bytes: a resized copy of such a photo is kept as its own asset.
 - Upgrades found by `match` are reported only; replacing a golden file is not supported (the tree only grows).
@@ -1801,3 +1815,4 @@ Run the suite with `TZ=America/New_York go test ./...` and `TZ=UTC go test ./...
 - Two `apply` runs on the same target at the same time (CLI and GUI together) could interfere through deterministic temp names; one run per target.
 - The rearrange journal stores absolute paths: a moved or remounted tree cannot be resumed or undone in place.
 - macOS binaries are not notarized (it needs a paid Apple Developer account): the first start needs the Gatekeeper steps of the README. The GUI runs in the browser (no native window).
+- `stats` on Windows: a directory listing carries no link count, so each path of a hard-linked file counts as a file (and the paths as duplicates of each other), and there is no space-on-disk figure; years follow the computer's local time, not the canonical zone (no stored times are involved).
