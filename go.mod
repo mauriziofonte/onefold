@@ -10,7 +10,7 @@ require (
 	github.com/ebitengine/purego v0.11.2
 	github.com/evanoberholster/imagemeta v0.3.1
 	github.com/jchv/go-webview2 v0.0.0-20260205173254-56598839c808
-	github.com/pkg/sftp v1.13.7
+	github.com/pkg/sftp v1.13.12
 	github.com/richardlehane/mscfb v1.0.9
 	github.com/richardlehane/msoleps v1.0.3
 	github.com/rs/zerolog v1.29.0
