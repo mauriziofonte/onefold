@@ -174,6 +174,7 @@ func (s *Server) Serve() error {
 func (s *Server) Shutdown() {
 	s.once.Do(func() {
 		s.mgr.PauseForExit()
+		s.mgr.Wait()
 		close(s.stopped)
 		s.hub.close()
 		s.srv.Close()
