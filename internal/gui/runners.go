@@ -26,6 +26,7 @@ import (
 	"github.com/mauriziofonte/onefold/internal/report"
 	"github.com/mauriziofonte/onefold/internal/runctl"
 	"github.com/mauriziofonte/onefold/internal/settings"
+	"github.com/mauriziofonte/onefold/internal/stats"
 )
 
 // MergeParams and RearrangeParams are the shared settings schema: the
@@ -176,6 +177,20 @@ func validateParams(kind string, raw json.RawMessage) error {
 			return err
 		}
 		return absAll("plan/target", p.Plan, p.Target)
+	case "stats":
+		var p StatsParams
+		if err := json.Unmarshal(raw, &p); err != nil {
+			return err
+		}
+		if len(p.Roots) == 0 {
+			return errors.New("roots: add at least one folder or volume")
+		}
+		switch p.Dups {
+		case "", stats.DupsOff, stats.DupsFast, stats.DupsFull:
+		default:
+			return fmt.Errorf("dups %q: off, fast or full", p.Dups)
+		}
+		return absAll("roots", p.Roots...)
 	}
 	return fmt.Errorf("unknown kind %q", kind)
 }

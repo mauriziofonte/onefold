@@ -308,6 +308,7 @@ func (s *Server) routes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/tools", s.handleTools)
 	mux.HandleFunc("/api/tools/", s.handleTools)
 	mux.HandleFunc("/api/jobs/", s.handleJob)
+	mux.HandleFunc("/api/mounts", s.handleMounts)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			http.NotFound(w, r)
@@ -430,6 +431,8 @@ func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			writeJSONResp(w, 200, map[string]any{"nodes": nodes, "more": more})
+		case "stats":
+			s.handleStatsResult(w, id)
 		case "exts":
 			exts, err := s.mgr.exts(id, r.URL.Query().Get("list"))
 			if err != nil {

@@ -38,7 +38,7 @@ const (
 // execute, resumable after a stop or a power loss.
 type Job struct {
 	ID       string          `json:"id"`
-	Kind     string          `json:"kind"` // merge rearrange recover index plan apply purge
+	Kind     string          `json:"kind"` // merge rearrange recover index plan apply purge stats
 	Status   string          `json:"status"`
 	Stage    string          `json:"stage"` // preview | execute
 	Phases   []string        `json:"phases"`
@@ -133,6 +133,8 @@ func phasesFor(kind, stage string) []string {
 		return []string{"plan"}
 	case "purge/execute":
 		return []string{"plan", "delete"}
+	case "stats/execute":
+		return []string{"scan", "dups"}
 	}
 	return []string{"recover"}
 }
@@ -158,6 +160,10 @@ func labelPhase(kind, label string) string {
 		return "check"
 	case "purge":
 		return "delete"
+	case "stats scan":
+		return "scan"
+	case "stats duplicates":
+		return "dups"
 	}
 	return ""
 }
@@ -475,6 +481,8 @@ func (m *Manager) run(j *Job, stage string, resume bool, g *runctl.Gate) {
 			sum, pending, err = m.runApply(j, g, stage == "execute")
 		case "purge":
 			sum, pending, err = m.runPurge(j, g, stage == "execute", resume)
+		case "stats":
+			sum, err = m.runStats(j, g)
 		default:
 			err = fmt.Errorf("unknown kind %q", j.Kind)
 		}
