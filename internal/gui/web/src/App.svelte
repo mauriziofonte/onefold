@@ -88,7 +88,7 @@
   <header class="flex h-12 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4">
     <div class="flex items-center gap-2">
       <Logo height={22} />
-      <span class="text-xs font-normal text-slate-400">{store.info?.version || ''}</span>
+      <button class="text-xs font-normal text-slate-400 hover:text-slate-600" title={store.info?.build || ''} onclick={() => (settings.view = 'doctor')} data-testid="app-version">{store.info?.version || ''}</button>
     </div>
     {#if store.info}
       <div class="ml-4 flex items-center gap-2 text-xs">

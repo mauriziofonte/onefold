@@ -110,8 +110,8 @@ func main() {
 		cmdPush(os.Args[2:])
 	case "export-text":
 		cmdExportText(os.Args[2:])
-	case "version", "--version":
-		fmt.Printf("onefold %s (%s/%s, %s)\n", version, runtime.GOOS, runtime.GOARCH, runtime.Version())
+	case "version", "--version", "-version", "-V":
+		fmt.Println(versionLine())
 	case "-h", "--help", "help":
 		usage()
 	default:
@@ -149,8 +149,8 @@ func hasFlag(args []string, name string) bool {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `onefold - dedup + canonical golden tree for photos, videos and generic files
-
+	fmt.Fprintf(os.Stderr, "onefold %s - dedup + canonical golden tree for photos, videos and generic files\n", version)
+	fmt.Fprint(os.Stderr, `
 usage:
   onefold merge -input A [-input B ...] -output O [-execute]   fold inputs into O (O may be an input); dry-run by default
   onefold -input A -input B -output A [-execute]              same (merge shorthand)

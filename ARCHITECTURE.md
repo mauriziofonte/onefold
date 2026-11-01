@@ -369,7 +369,7 @@ onefold follows [Semantic Versioning](https://semver.org): `MAJOR.MINOR.PATCH`, 
 | `CHANGELOG.md` | one `## [<version>] - <date>` section per release, newest first; the release notes are taken from it |
 | tag `v<VERSION>` | marks the released commit on `main` |
 | `Makefile` | `VERSION` variable: a clean checkout of the tag `v<VERSION>` builds as `v<VERSION>`; any other tree as `v<VERSION>+dev.<commit>[.dirty]`, so a development binary never passes for the release; `make VERSION=...` overrides; `make version` prints it |
-| `-ldflags -X main.version=...` | the version inside the binary: `onefold version`, the default comment stamped into media copies (`Onefold v<version>`), the Windows file version (`major.minor.patch.0`, the full string in FileVersion/ProductVersion), the GUI header |
+| `-ldflags -X main.version=...` | the version inside the binary: `onefold version` (`--version`, `-V`; with the commit and commit date Go records from git, `runtime/debug.ReadBuildInfo`), the first line of `help`, `doctor` and the GUI's start message, the default comment stamped into media copies (`Onefold v<version>`), the Windows file version (`major.minor.patch.0`, the full string in FileVersion/ProductVersion), the GUI header and the About card of its Doctor page (`/api/info`: `version`, `build`, `go`) |
 | `TestVersionFile` (`cmd/onefold/version_test.go`) | `VERSION` is valid SemVer and `CHANGELOG.md` has its section |
 | `.github/workflows/release.yml` | runs on tags `vX.Y.Z` and `vX.Y.Z-*`; refuses a tag that is not `v` + `VERSION`, not on `main`, or without a CHANGELOG section; publishes as a pre-release when the version has a suffix |
 

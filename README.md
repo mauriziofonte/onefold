@@ -355,7 +355,7 @@ make release    # all targets, LICENSE, third-party notices and SHA256SUMS
 
 The GUI frontend is prebuilt and embedded; Node is needed only to change it (`make web`, `make web-e2e`).
 
-Versions follow [Semantic Versioning](https://semver.org); the current one is in [`VERSION`](VERSION), the history in [CHANGELOG.md](CHANGELOG.md). `onefold version` prints the version of a binary: a build that is not an exact release says so (`v0.0.1-alpha+dev.<commit>`). Every release tag is built and tested on Linux and Windows by GitHub Actions and published with its checksums; versions with a suffix such as `-alpha` are marked as pre-releases.
+Versions follow [Semantic Versioning](https://semver.org); the current one is in [`VERSION`](VERSION), the history in [CHANGELOG.md](CHANGELOG.md). `onefold version` (also `--version`, `-V`) prints the version of a binary with its commit, build date, platform and Go version; a build that is not an exact release says so (`v0.0.1-alpha+dev.<commit>`). `onefold help` and `onefold doctor` start with it; in the GUI it is next to the logo and, with the build, the license and the source address, at the bottom of the Doctor page. Every release tag is built and tested on Linux and Windows by GitHub Actions and published with its checksums; versions with a suffix such as `-alpha` are marked as pre-releases.
 
 ## Contributing
 

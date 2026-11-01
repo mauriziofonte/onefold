@@ -6,6 +6,7 @@ The version being prepared is in the `VERSION` file; a release is the tag `v<VER
 
 ## [Unreleased]
 
+- The version is shown where people look for it: `onefold --version` and `-V` (with the commit and its date), the first line of `onefold help` and of the GUI's start message, and in the GUI an About card on the Doctor page (version, build, platform, license, source address), reached from the version next to the logo.
 - New logo: an icon (two overlapping squares, their overlap darker: many folders, one copy) and the "onefold" wordmark in DM Sans, in `assets/brand` (SVG, a 512 px PNG and a social preview image), used for the Windows exe icon, the GUI favicon and header, and the README. The GUI accent is a muted teal (`brand` colors in `app.css`) instead of indigo.
 - Licensing: onefold stays AGPL-3.0-or-later for everyone and is also offered under a commercial license (`LICENSING.md`). The name and logos are covered by a trademark policy (`TRADEMARKS.md`).
 - macOS: `merge -verify-uncached` reads each copy back past the cache (`msync(MS_INVALIDATE)`, then `F_NOCACHE`) instead of falling back to the cached read.

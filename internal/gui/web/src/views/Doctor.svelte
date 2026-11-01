@@ -10,6 +10,7 @@
   import { store, installTools, cancelTools, flash } from '../lib/store.svelte.js';
   import { t } from '../lib/i18n.svelte.js';
   import { bytes } from '../lib/format.js';
+  import Logo from '../components/Logo.svelte';
 
   const order = ['exiftool', 'ffmpeg', 'ffprobe', 'pdfinfo', 'pdftotext', 'antiword', '7z', 'unrar'];
 
@@ -114,8 +115,18 @@
     </table>
   </div>
   <p class="text-slate-500">{t('doctor.native')}</p>
-  <div class="card space-y-1 text-xs">
-    <div><span class="text-slate-500">{t('doctor.version')}:</span> <span class="font-mono">{store.info?.version} · {store.info?.os}/{store.info?.arch} · {store.info?.cpus} CPU</span></div>
-    <div><span class="text-slate-500">{t('doctor.state')}:</span> <span class="font-mono">{store.info?.stateDir}</span></div>
+  <div class="card flex flex-wrap items-start gap-6" data-testid="about">
+    <div class="space-y-1">
+      <Logo height={26} />
+      <div class="text-xs text-slate-500">{t('doctor.tagline')}</div>
+    </div>
+    <dl class="grid flex-1 grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+      <dt class="text-slate-500">{t('doctor.version')}</dt><dd class="font-mono" data-testid="about-version">{store.info?.version}</dd>
+      {#if store.info?.build}<dt class="text-slate-500">{t('doctor.build')}</dt><dd class="font-mono">{store.info.build}</dd>{/if}
+      <dt class="text-slate-500">{t('doctor.platform')}</dt><dd class="font-mono">{store.info?.os}/{store.info?.arch} · {store.info?.cpus} CPU · {store.info?.go}</dd>
+      <dt class="text-slate-500">{t('doctor.state')}</dt><dd class="font-mono break-all">{store.info?.stateDir}</dd>
+      <dt class="text-slate-500">{t('doctor.license')}</dt><dd>{t('doctor.licenseText')}</dd>
+      <dt class="text-slate-500">{t('doctor.source')}</dt><dd class="font-mono select-all">https://github.com/mauriziofonte/onefold</dd>
+    </dl>
   </div>
 </section>
