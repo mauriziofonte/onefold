@@ -66,14 +66,17 @@ test('merge two folders', async ({ browser }) => {
   // Playwright video, which would need a browser-side ffmpeg download
   const frames = join(process.env.DEMO_OUT || 'demo-results', 'frames');
   mkdirSync(frames, { recursive: true });
+  // the recorder starts once the page is there: a screenshot racing the first
+  // navigation never returned on Linux (headless shell), and the empty frames
+  // before it are not worth showing; a stuck screenshot gives up after 10 s
+  await page.goto(await sessionURL());
   let recording = true;
   const recorder = (async () => {
     for (let n = 0; recording; n++) {
-      await page.screenshot({ path: join(frames, `f${String(n).padStart(5, '0')}.png`) }).catch(() => {});
+      await page.screenshot({ path: join(frames, `f${String(n).padStart(5, '0')}.png`), timeout: 10000 }).catch(() => {});
       await new Promise((r) => setTimeout(r, 150));
     }
   })();
-  await page.goto(await sessionURL());
   await pause(1200);
   await page.getByTestId('nav-merge').click();
   await pause(800);
