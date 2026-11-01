@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // GUI end-to-end: the real binary serves the embedded frontend; the browser
-// drives merge, rearrange, journals, golden archive, pause/resume, language,
+// drives merge, rearrange, journals, golden archive, statistics, pause/resume, language,
 // persisted settings and the resume of a run killed mid-copy (power loss).
 // Data: read-only system trees as sources, scratch copies under E2E_ROOT.
 import { test, expect } from '@playwright/test';
@@ -316,6 +316,31 @@ test('GUI end to end', async ({ browser }) => {
   await test.step('doctor', async () => {
     await page.getByTestId('nav-doctor').click();
     await shot(page, '18-doctor');
+  });
+
+  await test.step('statistics: duplicates confirmed, folder pairs, Merge filled from a pair', async () => {
+    for (const d of ['a', 'b']) mkdirSync(join(root, 'STATS', d), { recursive: true });
+    for (let i = 0; i < 4; i++) {
+      const body = `stats e2e body ${i} `.repeat(200 + i);
+      writeFileSync(join(root, 'STATS', 'a', `note${i}.txt`), body);
+      writeFileSync(join(root, 'STATS', 'b', `copy${i}.txt`), body);
+    }
+    writeFileSync(join(root, 'STATS', 'a', 'only.md'), 'only here');
+    await page.getByTestId('nav-stats').click();
+    await page.getByTestId('stats-roots-input').fill(join(root, 'STATS'));
+    await page.getByTestId('stats-roots-input').press('Enter');
+    await page.getByTestId('dups-full').click();
+    await page.getByTestId('stats-run').click();
+    await expect(page.getByTestId('jobbar-status')).toHaveText('done', { timeout: 60 * 1000 });
+    await expect(page.getByTestId('stats-wasted')).toContainText('4 extra copies');
+    await expect(page.getByTestId('stats-dups')).toContainText('Verified');
+    await expect(page.getByTestId('treemap')).toBeVisible();
+    await shot(page, '18b-stats');
+    await expect(page.getByTestId('pairs')).toContainText('STATS/a');
+    await page.getByTestId('pairs').getByRole('button', { name: 'Merge' }).first().click();
+    await expect(page.getByTestId('merge-inputs')).toContainText(join(root, 'STATS', 'a'));
+    await expect(page.getByTestId('merge-inputs')).toContainText(join(root, 'STATS', 'b'));
+    expect(count(join(root, 'STATS'))).toBe(9); // read-only
   });
 
   await test.step('guided setup: golden scope locked, real preview on the sample', async () => {
