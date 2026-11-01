@@ -174,7 +174,7 @@ test('GUI end to end', async ({ browser }) => {
     await page.getByTestId('confirm-reviewed').check();
     await page.getByTestId('confirm-go').click();
     await expect(page.getByTestId('jobbar-status')).toHaveText('running');
-    await expect(page.locator('[data-testid="jobbar"] .phase', { hasText: 'Copy + verify' })).toHaveClass(/indigo/, { timeout: 5 * 60 * 1000 });
+    await expect(page.locator('[data-testid="jobbar"] .phase', { hasText: 'Copy + verify' })).toHaveClass(/brand/, { timeout: 5 * 60 * 1000 });
     await page.getByTestId('job-pause').click();
     await expect(page.getByTestId('jobbar-status')).toHaveText('paused');
     await page.waitForTimeout(1500);
@@ -250,7 +250,7 @@ test('GUI end to end', async ({ browser }) => {
     await page.getByTestId('merge-execute').click();
     await page.getByTestId('confirm-reviewed').check();
     await page.getByTestId('confirm-go').click();
-    await expect(page.locator('[data-testid="jobbar"] .phase', { hasText: 'Copy + verify' })).toHaveClass(/indigo/, { timeout: 5 * 60 * 1000 });
+    await expect(page.locator('[data-testid="jobbar"] .phase', { hasText: 'Copy + verify' })).toHaveClass(/brand/, { timeout: 5 * 60 * 1000 });
     await page.waitForTimeout(400);
     server.kill('SIGKILL'); // the computer is switched off
     await page.waitForTimeout(1500);
@@ -411,7 +411,7 @@ test('GUI end to end', async ({ browser }) => {
     await expect(toCopy()).toHaveText('1');
     await page.getByTestId('tab-settings').click();
     await expect(page.getByTestId('filters-card')).toHaveAttribute('open', ''); // exclusions set: the card opens by itself
-    await page.getByTestId('exclusions').locator('.tag-indigo').getByTestId('exclusion-remove').click();
+    await page.getByTestId('exclusions').locator('.tag-brand').getByTestId('exclusion-remove').click();
     await page.getByTestId('tab-plan').click();
     await expect(toCopy()).toHaveText('3');
     await shot(page, '25-plan-reviewed');
