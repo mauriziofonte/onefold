@@ -13,7 +13,7 @@ require (
 	github.com/pkg/sftp v1.13.7
 	github.com/richardlehane/mscfb v1.0.9
 	github.com/richardlehane/msoleps v1.0.3
-	github.com/rs/zerolog v1.29.0
+	github.com/rs/zerolog v1.35.1
 	github.com/skeema/knownhosts v1.3.0
 	github.com/vbauerster/mpb/v8 v8.9.3
 	github.com/zeebo/xxh3 v1.1.0
@@ -37,8 +37,8 @@ require (
 	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/kr/fs v0.1.0 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.17 // indirect
+	github.com/mattn/go-colorable v0.1.14 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/philhofer/fwd v1.1.3-0.20240916144458-20a13a1f6b7c // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
