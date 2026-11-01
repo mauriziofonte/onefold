@@ -118,10 +118,18 @@ func TestMediaSynthRegression(t *testing.T) {
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("media plan of testdata/media-synth changed:\ngot:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
-	} // the catalog workers emit records in any order: the media winners must
-	// not depend on it
+	}
+	// the catalog workers emit the records of a room in any order: the media
+	// winners must not depend on it (the order of the rooms is the input's)
+	rank := map[string]int{}
+	for _, r := range recs {
+		if _, ok := rank[r.Room]; !ok {
+			rank[r.Room] = len(rank)
+		}
+	}
 	rev := slices.Clone(recs)
 	slices.Reverse(rev)
+	sort.SliceStable(rev, func(i, j int) bool { return rank[rev[i].Room] < rank[rev[j].Room] })
 	if a, b := winners(Plan(recs)), winners(Plan(rev)); !slices.Equal(a, b) {
 		t.Errorf("media winners depend on the record order:\n%s\nreversed:\n%s", strings.Join(a, "\n"), strings.Join(b, "\n"))
 	}

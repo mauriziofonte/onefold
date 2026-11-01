@@ -20,8 +20,11 @@ import (
 )
 
 // baselineSortedPlanMD5 is the md5 of the sorted plan JSONL produced by the
-// pre-generic-files binary on the census manifests below, in this order.
-const baselineSortedPlanMD5 = "782f78c205a4399a05caadea489ac2fc"
+// pre-generic-files binary on the census manifests below, in this order,
+// re-pinned once when equal media copies of one room stopped depending on the
+// record order (the earlier room, then a clean name, the oldest, the shortest
+// path): same assets and names, another source file for some of them.
+const baselineSortedPlanMD5 = "7627e98692610158b210b91d4a5909e8"
 
 // Historical manifests (no new fields) must plan byte-identically.
 func TestMediaPlanRegression(t *testing.T) {

@@ -459,7 +459,8 @@ func PlanWith(recs []catalog.Record, o Options) *Result {
 	makeMedia := func(members []catalog.Record) {
 		// Winner: resolution, then HDR (Policy C), then byte size (larger wins -
 		// e.g. a phone original over a jpegoptim'd room copy); equal on all
-		// three (byte-identical copies, mostly): as for generic files.
+		// three (byte-identical copies, mostly): the earlier room, then as for
+		// generic files.
 		sort.SliceStable(members, func(i, j int) bool {
 			if ri, rj := res(members[i]), res(members[j]); ri != rj {
 				return ri > rj
@@ -469,6 +470,9 @@ func PlanWith(recs []catalog.Record, o Options) *Result {
 			}
 			if members[i].Size != members[j].Size {
 				return members[i].Size > members[j].Size
+			}
+			if ra, rb := roomRank[members[i].Room], roomRank[members[j].Room]; ra != rb {
+				return ra < rb
 			}
 			return copyLess(members[i], members[j])
 		})
