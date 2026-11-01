@@ -15,7 +15,7 @@ require (
 	github.com/richardlehane/msoleps v1.0.3
 	github.com/rs/zerolog v1.29.0
 	github.com/skeema/knownhosts v1.3.0
-	github.com/vbauerster/mpb/v8 v8.9.3
+	github.com/vbauerster/mpb/v8 v8.16.3
 	github.com/zeebo/xxh3 v1.1.0
 	golang.org/x/crypto v0.58.0
 	golang.org/x/sys v0.49.0
@@ -29,6 +29,7 @@ require (
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/bodgit/plumbing v1.3.0 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
+	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/google/uuid v1.1.2 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -39,12 +40,12 @@ require (
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
-	github.com/mattn/go-runewidth v0.0.16 // indirect
+	github.com/mattn/go-runewidth v0.0.31 // indirect
 	github.com/philhofer/fwd v1.1.3-0.20240916144458-20a13a1f6b7c // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/tinylib/msgp v1.2.5 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
+	github.com/vbauerster/cupwriter v0.0.5 // indirect
 	go4.org v0.0.0-20200411211856-f5505b9728dd // indirect
 )
