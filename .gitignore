@@ -1,0 +1,10 @@
+.claude
+/CLAUDE.md
+node_modules/
+internal/gui/web/test-results/
+internal/gui/web/playwright-report/
+/onefold
+/dist/
+# private regression fixture (manifests of a real archive): a local link, never committed
+/census-final
+internal/gui/web/demo-results/

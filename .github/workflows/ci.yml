@@ -1,0 +1,193 @@
+# onefold
+# Author: Maurizio Fonte <fonte.maurizio@gmail.com>
+# Copyright (c) 2026 Maurizio Fonte
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Tests on Linux, Windows and macOS (Apple Silicon and Intel), equal targets
+# that must behave the same, the race detector with a coverage report,
+# staticcheck for every target OS and govulncheck. Also called by the release workflow before
+# anything is built, and run every week so that a new advisory or a changed
+# runner image shows up without a push. Actions are pinned by commit.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+  schedule:
+    - cron: "17 4 * * 1" # Mondays 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow_ref }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    # this repository can live on other forges reading .github/workflows:
+    # run only on GitHub (and under act, which reports a github.com server)
+    if: github.server_url == 'https://github.com'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      CGO_ENABLED: "0"
+      # throwaway runners: the Recycle Bin / Trash tests may write there
+      ONEFOLD_TEST_TRASH: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3" # toolchain pin (workstations too); go.mod holds the language directive
+          cache: false
+
+      - name: external tools (Linux)
+        if: runner.os == 'Linux'
+        # the end-to-end test needs exiftool, ffmpeg and ffprobe: without them it skips, and a skip is not a pass
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends libimage-exiftool-perl ffmpeg poppler-utils p7zip-full antiword
+
+      - name: external tools (macOS, Homebrew)
+        if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+        run: brew install exiftool ffmpeg poppler
+
+      - name: external tools (Windows, pinned downloads of onefold itself)
+        if: runner.os == 'Windows'
+        env:
+          ONEFOLD_STATE_DIR: ${{ runner.temp }}\onefold-state
+        run: |
+          go run ./cmd/onefold tools install all
+          printf '%s\\tools\n' "$ONEFOLD_STATE_DIR" >> "$GITHUB_PATH"
+
+      - name: PowerShell scripts parse
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach ($f in Get-ChildItem scripts -Filter *.ps1) {
+            $errs = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$errs) | Out-Null
+            if ($errs) { $errs | Format-List; exit 1 }
+          }
+
+      - name: format
+        if: runner.os == 'Linux'
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then echo "not gofmt-ed:"; echo "$unformatted"; exit 1; fi
+
+      - name: vet (every target, whatever the runner)
+        run: |
+          GOOS=linux go vet ./...
+          GOOS=windows go vet ./...
+          GOOS=darwin go vet ./...
+
+      - name: test
+        run: go test -count=1 ./...
+
+      - name: Recycle Bin / Trash tests ran (not skipped)
+        run: |
+          go test -count=1 -run 'TestTrash' -v ./internal/purge | tee trash.log
+          if grep -q -- '--- SKIP' trash.log; then echo "a Trash test was skipped"; exit 1; fi
+          grep -q -- '--- PASS: TestTrashOption' trash.log
+
+      - name: end-to-end ran (not skipped)
+        run: |
+          go test -count=1 -run 'TestE2E$' -v ./cmd/onefold | tee e2e.log
+          grep -q -- '--- PASS[:] TestE2E' e2e.log
+
+  race:
+    name: race detector and coverage
+    if: github.server_url == 'https://github.com'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CGO_ENABLED: "1" # the race detector needs cgo; product builds stay CGO_ENABLED=0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3"
+          cache: false
+
+      - name: go test -race with coverage
+        run: |
+          go test -race -count=1 -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out > coverage.txt
+          tail -n 1 coverage.txt
+          go tool cover -html=coverage.out -o coverage.html
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage
+          path: |
+            coverage.out
+            coverage.txt
+            coverage.html
+          if-no-files-found: error
+          retention-days: 14
+
+  lint:
+    name: staticcheck
+    if: github.server_url == 'https://github.com'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3"
+          cache: false
+
+      - name: staticcheck (pinned version, every target OS)
+        run: |
+          GOBIN="$RUNNER_TEMP/bin" go install honnef.co/go/tools/cmd/staticcheck@v0.8.2
+          for goos in linux windows darwin; do
+            echo "== $goos"
+            GOOS=$goos "$RUNNER_TEMP/bin/staticcheck" ./...
+          done
+
+  vulncheck:
+    name: govulncheck
+    if: github.server_url == 'https://github.com'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3"
+          cache: false
+
+      - name: govulncheck (pinned version, module checksum verified by sum.golang.org)
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...

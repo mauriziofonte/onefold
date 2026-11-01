@@ -1,0 +1,19 @@
+# Line endings: LF in the repository and in checkouts for text sources, so
+# Windows checkouts build and test exactly like Linux and macOS.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Real-file test corpus and generated media: never touched by line-ending conversion.
+testdata/** -text -diff
+assets/** binary
+*.syso binary
+*.png binary
+*.gif binary
+*.jpg binary
+*.ico binary
+
+# The built GUI bundle is committed so Go builds need no Node: generated, not reviewed.
+internal/gui/web/dist/** linguist-generated=true -diff
+internal/gui/web/package-lock.json linguist-generated=true

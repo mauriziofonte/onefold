@@ -1,0 +1,168 @@
+/*
+ * onefold
+ * Author: Maurizio Fonte <fonte.maurizio@gmail.com>
+ * Copyright (c) 2026 Maurizio Fonte
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+@import "tailwindcss";
+
+/* the accent: a muted teal, readable on white (600 and up carry white text) */
+@theme {
+  --color-brand-50: #eff8f6;
+  --color-brand-100: #d7eeea;
+  --color-brand-200: #b0dcd5;
+  --color-brand-300: #7fc2b8;
+  --color-brand-400: #46a094;
+  --color-brand-500: #1f8479;
+  --color-brand-600: #0f766e;
+  --color-brand-700: #0c5f59;
+  --color-brand-800: #0b4d48;
+  --color-brand-900: #0a3f3b;
+}
+
+@utility nav-btn {
+  @apply flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-slate-600 hover:bg-slate-100;
+}
+@utility nav-on {
+  @apply bg-brand-50 font-medium text-brand-700 hover:bg-brand-50;
+}
+@utility card {
+  @apply rounded-xl border border-slate-200 bg-white p-4 shadow-sm;
+}
+@utility card-h {
+  @apply mb-3 flex items-center gap-2 font-semibold text-slate-800;
+}
+@utility hint {
+  @apply text-xs font-normal text-slate-400;
+}
+@utility row {
+  @apply flex items-center gap-2 px-1 py-2;
+}
+@utility badge {
+  @apply grid h-5 w-5 shrink-0 place-items-center rounded-full bg-slate-100 text-xs text-slate-600;
+}
+@utility tag {
+  @apply inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-sans whitespace-nowrap;
+}
+@utility tag-brand {
+  @apply tag border-brand-200 bg-brand-50 text-brand-700;
+}
+@utility tag-amber {
+  @apply tag border-amber-200 bg-amber-50 text-amber-700;
+}
+@utility tag-emerald {
+  @apply tag border-emerald-200 bg-emerald-50 text-emerald-700;
+}
+@utility tag-rose {
+  @apply tag border-rose-200 bg-rose-50 text-rose-700;
+}
+@utility tag-slate {
+  @apply tag border-slate-200 bg-slate-100 text-slate-600;
+}
+@utility icon-btn {
+  @apply rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-30;
+}
+@utility btn {
+  @apply inline-flex items-center gap-1.5 rounded-lg px-3 py-2 font-medium shadow-sm disabled:cursor-not-allowed disabled:opacity-40;
+}
+@utility btn-primary {
+  @apply btn bg-brand-600 text-white hover:bg-brand-700;
+}
+@utility btn-danger {
+  @apply btn bg-rose-600 text-white hover:bg-rose-700;
+}
+@utility btn-ghost {
+  @apply btn border border-slate-300 bg-white font-normal text-slate-700 hover:bg-slate-50;
+}
+@utility btn-sm {
+  @apply px-2 py-1 text-xs;
+}
+@utility input {
+  @apply w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 focus:border-brand-400 focus:ring-2 focus:ring-brand-200 focus:outline-none;
+}
+@utility lbl {
+  @apply text-xs font-medium text-slate-500;
+}
+@utility chk {
+  @apply flex items-center gap-2 text-slate-700;
+  & input { @apply accent-brand-600; }
+}
+@utility mini {
+  @apply rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5;
+}
+@utility mini-v {
+  @apply font-semibold text-slate-800 tabular-nums;
+}
+@utility mini-l {
+  @apply text-[11px] text-slate-500;
+}
+@utility stat {
+  @apply rounded-xl border border-slate-200 bg-white p-3 shadow-sm;
+}
+@utility stat-l {
+  @apply text-xs text-slate-500;
+}
+@utility stat-v {
+  @apply mt-0.5 text-xl font-semibold text-slate-900 tabular-nums;
+}
+@utility stat-s {
+  @apply text-xs text-slate-400;
+}
+@utility tbl {
+  @apply w-full text-left;
+  & th { @apply border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500; }
+  & td { @apply border-b border-slate-100 px-3 py-1.5 align-top; }
+}
+@utility mono {
+  @apply font-mono text-xs break-all;
+}
+@utility num {
+  @apply text-right text-xs tabular-nums whitespace-nowrap;
+}
+@utility tab {
+  @apply -mb-px border-b-2 border-transparent px-3 py-2 text-slate-500 hover:text-slate-700;
+}
+@utility tab-on {
+  @apply border-brand-600 font-medium text-brand-700;
+}
+@utility tab-n {
+  @apply ml-1 text-xs text-slate-400 tabular-nums;
+}
+@utility link {
+  @apply cursor-pointer text-brand-600 underline;
+}
+@utility pill {
+  @apply rounded-full px-2 py-0.5 text-xs whitespace-nowrap;
+}
+@utility flt {
+  @apply rounded-md px-2 py-1 text-xs text-slate-500 hover:bg-slate-100;
+}
+@utility flt-on {
+  @apply bg-slate-800 text-white hover:bg-slate-700;
+}
+@utility step {
+  @apply grid h-6 w-6 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500;
+}
+@utility step-on {
+  @apply bg-brand-600 text-white;
+}
+@utility phase {
+  @apply flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs whitespace-nowrap;
+}
+@utility crumb {
+  @apply cursor-pointer rounded px-1.5 py-0.5 hover:bg-slate-100;
+}
+@utility banner {
+  @apply flex items-center gap-2 rounded-lg border px-3 py-2;
+}
+.stripes {
+  background-image: linear-gradient(45deg, rgba(255,255,255,.25) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.25) 50%, rgba(255,255,255,.25) 75%, transparent 75%, transparent);
+  background-size: 16px 16px;
+  animation: stripes 1s linear infinite;
+}
+@keyframes stripes { from { background-position: 0 0; } to { background-position: 16px 0; } }
+.indeterminate { animation: indet 1.4s ease-in-out infinite; }
+@keyframes indet { 0% { margin-left: -30%; } 100% { margin-left: 100%; } }
+.scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
