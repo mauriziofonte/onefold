@@ -5,10 +5,10 @@
 
 # Release: pushing a version tag v<VERSION> (SemVer: vMAJOR.MINOR.PATCH, or a
 # pre-release such as v0.0.1-alpha) on a commit of main runs the CI tests
-# (Linux and Windows), builds every binary with `make release`, checks the
-# artifacts and publishes them as the GitHub release of that tag (marked as a
-# pre-release when the version has a suffix), with the notes of its
-# CHANGELOG.md section.
+# (Linux, Windows, macOS arm64 and Intel), builds every binary with
+# `make release`, checks the artifacts and publishes them as the GitHub
+# release of that tag (marked as a pre-release when the version has a
+# suffix), with the notes of its CHANGELOG.md section.
 # Actions are pinned by commit; publishing uses the gh CLI of the runner.
 name: release
 

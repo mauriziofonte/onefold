@@ -5,9 +5,10 @@
 
 # onefold — cross-platform build.
 # The indexer/planner/applier are a single static binary that runs where the
-# files live: Linux (WSL, a NAS) AND Windows-native (to index a Windows drive
-# without the WSL 9P bridge). Functional parity across OSes is a hard requirement, so we depend
-# on NO external tools for transport (no rsync/ssh binary).
+# files live: Linux (WSL, a NAS), macOS (Apple Silicon and Intel) and
+# Windows-native (to index a Windows drive without the WSL 9P bridge).
+# Functional parity across OSes is a hard requirement, so we depend on NO
+# external tools for transport (no rsync/ssh binary).
 
 BIN     := onefold
 PKG     := ./cmd/onefold
@@ -79,7 +80,8 @@ release: linux windows linux-arm64 darwin notices
 	cd $(DIST) && sha256sum $(BIN)-linux-amd64 $(BIN)-windows-amd64.exe $(BIN)-linux-arm64 $(BIN)-darwin-arm64 $(BIN)-darwin-amd64 LICENSE THIRD_PARTY_NOTICES.txt > SHA256SUMS
 
 # Licenses of everything linked or bundled into the binaries: Go standard
-# library, every module onefold imports on Linux and Windows, the GUI bundle.
+# library, every module onefold imports on Linux, Windows and macOS, the GUI
+# bundle.
 notices:
 	mkdir -p $(DIST)
 	{ echo "Third-party components of onefold $(VERSION). onefold itself: see LICENSE."; echo; \

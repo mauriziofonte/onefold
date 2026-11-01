@@ -3,9 +3,9 @@
 # Copyright (c) 2026 Maurizio Fonte
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-# Tests on Linux, Windows-native (the primary target) and macOS (Apple Silicon
-# and Intel), the race detector with a coverage report, staticcheck for every
-# target OS and govulncheck. Also called by the release workflow before
+# Tests on Linux, Windows and macOS (Apple Silicon and Intel), equal targets
+# that must behave the same, the race detector with a coverage report,
+# staticcheck for every target OS and govulncheck. Also called by the release workflow before
 # anything is built, and run every week so that a new advisory or a changed
 # runner image shows up without a push. Actions are pinned by commit.
 name: ci
