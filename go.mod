@@ -3,7 +3,7 @@ module github.com/mauriziofonte/onefold
 go 1.26.0
 
 require (
-	github.com/abema/go-mp4 v1.7.1
+	github.com/abema/go-mp4 v1.7.4
 	github.com/bodgit/sevenzip v1.5.2
 	github.com/charlievieth/fastwalk v1.0.14
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
