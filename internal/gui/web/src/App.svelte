@@ -6,7 +6,8 @@
 -->
 
 <script>
-  import { Layers, GitMerge, FolderTree, Sparkles, History, Stethoscope, BookOpen, WifiOff, CircleAlert, X, Settings, Wand, Info, CircleCheck } from '@lucide/svelte';
+  import { GitMerge, FolderTree, Sparkles, History, Stethoscope, BookOpen, WifiOff, CircleAlert, X, Settings, Wand, Info, CircleCheck } from '@lucide/svelte';
+  import Logo from './components/Logo.svelte';
   import { onMount } from 'svelte';
   import { store, init, jobsSorted } from './lib/store.svelte.js';
   import { settings, save } from './lib/settings.svelte.js';
@@ -85,9 +86,9 @@
 
 <div class="flex h-full flex-col overflow-hidden">
   <header class="flex h-12 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-4">
-    <div class="flex items-center gap-2 font-semibold text-slate-900">
-      <div class="grid h-7 w-7 place-items-center rounded-lg bg-indigo-600 text-white"><Layers size={16} /></div>
-      onefold <span class="text-xs font-normal text-slate-400">{store.info?.version || ''}</span>
+    <div class="flex items-center gap-2">
+      <Logo height={22} />
+      <span class="text-xs font-normal text-slate-400">{store.info?.version || ''}</span>
     </div>
     {#if store.info}
       <div class="ml-4 flex items-center gap-2 text-xs">

@@ -1,9 +1,18 @@
-# onefold
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/onefold-logo-dark.svg">
+    <img alt="onefold" src="assets/brand/onefold-logo.svg" width="380">
+  </picture>
+</p>
 
-[![ci](https://github.com/mauriziofonte/onefold/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mauriziofonte/onefold/actions/workflows/ci.yml)
-[![release](https://img.shields.io/github/v/release/mauriziofonte/onefold?include_prereleases&sort=semver)](https://github.com/mauriziofonte/onefold/releases)
-[![license: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue)](LICENSE)
-[![Go Reference](https://pkg.go.dev/badge/github.com/mauriziofonte/onefold.svg)](https://pkg.go.dev/github.com/mauriziofonte/onefold)
+<p align="center"><b>One copy of every file you own, under a name you can predict.</b></p>
+
+<p align="center">
+  <a href="https://github.com/mauriziofonte/onefold/actions/workflows/ci.yml"><img alt="ci" src="https://github.com/mauriziofonte/onefold/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/mauriziofonte/onefold/releases"><img alt="release" src="https://img.shields.io/github/v/release/mauriziofonte/onefold?include_prereleases&sort=semver"></a>
+  <a href="LICENSING.md"><img alt="license: AGPL-3.0-or-later or commercial" src="https://img.shields.io/badge/license-AGPL--3.0--or--later%20%7C%20commercial-blue"></a>
+  <a href="https://pkg.go.dev/github.com/mauriziofonte/onefold"><img alt="Go Reference" src="https://pkg.go.dev/badge/github.com/mauriziofonte/onefold.svg"></a>
+</p>
 
 Your files are spread over a laptop, an old PC, a phone backup, two external drives and a NAS. The same photo exists five times under five names; some copies were resized, some renamed by tools that added `(1)` or a date in front. onefold finds what is the same, keeps one copy of every distinct thing and puts it under a predictable name, without ever touching the originals unless you ask.
 

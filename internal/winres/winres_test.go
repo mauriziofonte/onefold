@@ -140,11 +140,18 @@ func TestLogo(t *testing.T) {
 	if c := img.NRGBAAt(0, 0); c.A != 0 {
 		t.Fatalf("corner must be transparent: %v", c)
 	}
-	if c := img.NRGBAAt(24, 3); c != indigo {
+	if c := img.NRGBAAt(24, 2); c.A != 0xff || c.B < 0xe0 || c.R > 0x70 { // top of the gradient
 		t.Fatalf("background: %v", c)
 	}
-	if c := img.NRGBAAt(24, 10); c.R < 0xf0 || c.G < 0xf0 { // on the top layer's ridge (12,5) -> (24,10)
-		t.Fatalf("stroke: %v", c)
+	if c := img.NRGBAAt(28, 30); c != white { // the stem of the "1"
+		t.Fatalf("stem: %v", c)
+	}
+	if c := img.NRGBAAt(22, 16); c != flapColor { // the folded flap
+		t.Fatalf("flap: %v", c)
+	}
+	top, bottom := img.NRGBAAt(4, 12), img.NRGBAAt(4, 36)
+	if top.R <= bottom.R || top.G <= bottom.G { // lighter at the top
+		t.Fatalf("gradient: %v -> %v", top, bottom)
 	}
 }
 
