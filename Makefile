@@ -85,7 +85,8 @@ notices:
 	{ echo "Third-party components of onefold $(VERSION). onefold itself: see LICENSE."; echo; \
 	  echo "=== Go standard library and runtime ($$(go env GOVERSION))"; cat "$$(go env GOROOT)/LICENSE"; echo; \
 	  { GOOS=linux go list -deps -f '{{with .Module}}{{if not .Main}}{{.Path}} {{.Version}} {{.Dir}}{{end}}{{end}}' $(PKG); \
-	    GOOS=windows go list -deps -f '{{with .Module}}{{if not .Main}}{{.Path}} {{.Version}} {{.Dir}}{{end}}{{end}}' $(PKG); } | sort -u | \
+	    GOOS=windows go list -deps -f '{{with .Module}}{{if not .Main}}{{.Path}} {{.Version}} {{.Dir}}{{end}}{{end}}' $(PKG); \
+	    GOOS=darwin go list -deps -f '{{with .Module}}{{if not .Main}}{{.Path}} {{.Version}} {{.Dir}}{{end}}{{end}}' $(PKG); } | sort -u | \
 	  while read -r mod ver dir; do echo "=== $$mod $$ver"; cat "$$dir"/LICENSE* "$$dir"/LICENCE* "$$dir"/COPYING* "$$dir"/UNLICENSE* 2>/dev/null; echo; done; \
 	  echo "=== GUI frontend (bundled JavaScript and CSS)"; cat internal/gui/web/dist/THIRD_PARTY_LICENSES.md; } > $(DIST)/THIRD_PARTY_NOTICES.txt
 
