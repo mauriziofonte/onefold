@@ -358,7 +358,6 @@ On Windows (x64), `onefold tools install all` (or the Doctor page of the GUI) do
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | how onefold works, in depth: file formats, dedup and naming rules, every mode, the GUI, the platform layer, tests, how to change it safely |
 | [LLMS.md](LLMS.md) | contributors and coding agents: build, layout, invariants, conventions in short |
-| [TODOS.md](TODOS.md) | open work that needs a decision or a person |
 | [CHANGELOG.md](CHANGELOG.md) | what changed in each version |
 | [CONTRIBUTING.md](CONTRIBUTING.md), [CONTRIBUTORS.md](CONTRIBUTORS.md) | how to test or change onefold, who did |
 | [SECURITY.md](SECURITY.md) | how to report a vulnerability privately |

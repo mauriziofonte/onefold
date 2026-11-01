@@ -9,7 +9,6 @@ Companion documents:
 | `README.md` | users: what onefold does, how to run it |
 | `LLMS.md` | coding agents: build commands, layout, invariants, conventions in short form |
 | `ARCHITECTURE.md` (this file) | everyone who changes the code: how every part works and why |
-| `TODOS.md` | open work that needs a person (a decision, rights, an install) |
 | `CHANGELOG.md`, `VERSION` | released versions; the version being prepared (section 5.4) |
 | `onefold help`, `onefold naming`, `onefold doctor` | the binary's own reference: flags, naming grammar, platform and tools |
 
@@ -233,7 +232,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 ├── assets/demo/            README demo GIFs
 ├── .github/                CI and release workflows
 ├── Makefile, go.mod, go.sum
-└── README.md, LLMS.md, ARCHITECTURE.md, TODOS.md, LICENSE
+└── README.md, LLMS.md, ARCHITECTURE.md, LICENSE
 ```
 
 ### 4.1 Packages
