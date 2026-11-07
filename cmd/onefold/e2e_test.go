@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -1135,6 +1136,35 @@ func TestSidecarsCLI(t *testing.T) {
 	for _, f := range []string{stem + ".AAE", acts[0].CanonName + ".json"} {
 		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
 			t.Errorf("%s not next to the golden file: %v", f, err)
+		}
+	}
+}
+
+// TestTakeoutCLI: catalog -takeout dates a photo without metadata from its
+// Google Takeout file and keeps the place; without the flag it does not.
+// The scratch config of TestMain sets the zone (Europe/Rome).
+func TestTakeoutCLI(t *testing.T) {
+	root := testfix.TempDir(t)
+	src := filepath.Join(root, "Takeout", "Google Photos", "Trip")
+	old := time.Date(2024, 3, 3, 3, 3, 3, 0, time.UTC)
+	must(t, testfix.File(filepath.Join(src, "beach.jpg"), "not really a jpeg", old))
+	must(t, testfix.File(filepath.Join(src, "beach.jpg.supplemental-metadata.json"),
+		`{"photoTakenTime":{"timestamp":"1620284889"},"geoData":{"latitude":41.890251,"longitude":12.492373}}`, old))
+	for _, on := range []bool{true, false} {
+		m := filepath.Join(root, fmt.Sprintf("m-%v.jsonl", on))
+		args := []string{"catalog", "-host", "pc", "-o", m, src}
+		if on {
+			args = append([]string{"catalog", "-takeout"}, args[1:]...)
+		}
+		dd(t, args...)
+		recs, err := catalog.LoadManifest(m)
+		must(t, err)
+		if len(recs) != 1 {
+			t.Fatalf("%d records", len(recs))
+		}
+		md := recs[0].Meta
+		if got := md.TimeSource == "takeout" && md.Time == "2021-05-06 09:08:09" && md.Lat == 41.890251; got != on {
+			t.Errorf("-takeout=%v: %s (%s) at %v,%v", on, md.Time, md.TimeSource, md.Lat, md.Lon)
 		}
 	}
 }

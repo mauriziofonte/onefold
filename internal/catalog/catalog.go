@@ -58,6 +58,8 @@ type Record struct {
 	// (Options.Sidecars) although its type is out of the scope: kept with its
 	// owner, left out when it has none.
 	Sidecar bool `json:"sidecar,omitempty"`
+	// Takeout: extracted with Options.Takeout (a reuse needs the same).
+	Takeout bool `json:"takeout,omitempty"`
 }
 
 // Summary is the aggregate view printed for inspection (no per-file personal data).
@@ -80,6 +82,7 @@ type Summary struct {
 	NoTime          int
 	FromMetadata    int
 	FromFilename    int
+	FromTakeout     int
 	FromMtime       int
 	SubSec          int
 	DimsMissing     int
@@ -145,6 +148,9 @@ type Options struct {
 	// whitelist, marked Record.Sidecar; the plan, merge and rearrange keep them
 	// with their owner (package sidecar).
 	Sidecars bool
+	// Takeout reads the Google Takeout metadata file next to each photo and
+	// video (meta.Options.Takeout): capture time, place, edited copies.
+	Takeout bool
 
 	Progress Progress     // optional (report.Reporter implements it)
 	Gate     *runctl.Gate // optional pause/stop (GUI); nil = never pauses
@@ -324,7 +330,7 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 		t0 := time.Now()
 		var rec Record
 		reused := false
-		if old, ok := o.Reuse[j.path]; ok && old.Size == j.size && old.MTimeNs == j.mtime && j.mtime != 0 && !(old.Quick && !o.Quick) {
+		if old, ok := o.Reuse[j.path]; ok && old.Size == j.size && old.MTimeNs == j.mtime && j.mtime != 0 && !(old.Quick && !o.Quick) && old.Takeout == o.Takeout {
 			rec, reused = old, true
 			rec.Room, rec.Host, rec.Sidecar = j.room, o.Host, j.side
 		} else {
@@ -355,7 +361,7 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 				return
 			}
 			te := perf.Start()
-			md, _ := meta.ExtractWith(j.path, meta.Options{Quick: o.Quick || j.side, Data: data}) // best-effort; never fatal
+			md, _ := meta.ExtractWith(j.path, meta.Options{Quick: o.Quick || j.side, Data: data, Takeout: o.Takeout}) // best-effort; never fatal
 			stage := "extract:" + md.Kind
 			if md.Kind == "archive" {
 				stage += ":" + kinds.Ext(j.path)
@@ -364,7 +370,7 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 			perf.Outlier(stage, j.path, te)
 			perf.Outlier("file-total", j.path, th)
 			rec = Record{Room: j.room, Path: j.path, Size: h.Size, Hash: h.Hex, Full: h.Full, Meta: md,
-				Host: o.Host, MTimeNs: j.mtime, Quick: o.Quick || j.side, Sidecar: j.side}
+				Host: o.Host, MTimeNs: j.mtime, Quick: o.Quick || j.side, Sidecar: j.side, Takeout: o.Takeout}
 			if h.Full {
 				rec.ContentHash = h.Hex
 			}
@@ -547,6 +553,8 @@ func accumulate(s *Summary, r Record) {
 		s.FromMetadata++
 	case "filename":
 		s.FromFilename++
+	case "takeout":
+		s.FromTakeout++
 	case "filemtime":
 		s.FromMtime++
 	default:

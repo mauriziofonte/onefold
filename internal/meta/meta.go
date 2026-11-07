@@ -36,7 +36,7 @@ import (
 type Meta struct {
 	Kind        string  `json:"kind"`        // photo | video | image | audio | document | text | archive | other
 	Time        string  `json:"time"`        // canonical "YYYY-MM-DD HH:MM:SS" (wall clock of the canonical zone, meta.Zone) or ""
-	TimeSource  string  `json:"timeSource"`  // "metadata" | "filename" | "filemtime" | "none"
+	TimeSource  string  `json:"timeSource"`  // "metadata" | "filename" | "takeout" | "filemtime" | "none"
 	SubSec      bool    `json:"subSec"`      // photo captured a sub-second
 	SubSecNs    int64   `json:"subSecNs"`    // sub-second VALUE (ns); disambiguates bursts in the photo cluster key
 	Device      string  `json:"device"`      // RAW make/model (photo/image) or vendor slug (video)
@@ -58,6 +58,10 @@ type Meta struct {
 	Entries      int    `json:"entries,omitempty"`      // archive: non-junk members
 	ExtMismatch  bool   `json:"extMismatch,omitempty"`  // magic bytes disagree with the extension
 	SniffExt     string `json:"sniffExt,omitempty"`     // extension implied by magic bytes (only if unambiguous)
+	// Lat, Lon: where a photo or video was taken, in degrees (WGS84); both 0
+	// = unknown. From its metadata, else from its Google Takeout file.
+	Lat float64 `json:"lat,omitempty"`
+	Lon float64 `json:"lon,omitempty"`
 }
 
 // Options tune extraction. Quick = generic kinds get filesystem time only (no
@@ -65,6 +69,10 @@ type Meta struct {
 type Options struct {
 	Quick bool
 	Data  []byte // whole file content already read by the caller (nil = read from disk)
+	// Takeout reads the Google Takeout metadata file next to a photo or
+	// video (applyTakeout): its capture time below the file's own metadata
+	// and name, its place, and "-edited" copies as edits.
+	Takeout bool
 }
 
 // InScope reports whether the extension belongs to the media scope (the
@@ -105,6 +113,9 @@ func ExtractWith(path string, o Options) (Meta, error) {
 		m = extractGeneric(path, ext, kind, o)
 	}
 	m.FileCategory = kinds.Category(ext)
+	if o.Takeout && kinds.IsMedia(kind) {
+		applyTakeout(path, &m)
+	}
 	tsn := perf.Start()
 	var fam string
 	if b, ok := preloadedHead(path, 16); ok {

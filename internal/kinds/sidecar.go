@@ -112,3 +112,33 @@ func IsSidecarExt(ext string) bool { t, _ := Lookup(ext); return t.Sidecar || t.
 
 // IsLive reports whether ext can be a half of a Live Photo.
 func IsLive(ext string) bool { t, _ := Lookup(ext); return t.Live }
+
+// TakeoutNames lists the names Google Takeout gives the metadata file of
+// the photo or video base, most likely first: "<base>.supplemental-metadata.json",
+// "<base>.json", their numbered forms for "<stem>(N).<ext>", and the forms
+// cut to 51 or 47 characters. An edited copy ("-edited") has none of its
+// own: the original's names follow.
+func TakeoutNames(base string) []string {
+	var out []string
+	add := func(b string) {
+		const sup, js = ".supplemental-metadata", ".json"
+		out = append(out, b+sup+js, b+js)
+		stem := trimExt(b)
+		if i := strings.LastIndexByte(stem, '('); i > 0 && strings.HasSuffix(stem, ")") {
+			name, n := stem[:i]+b[len(stem):], stem[i:]
+			out = append(out, name+sup+n+js, name+n+js)
+		}
+		for _, max := range []int{51, 47} {
+			for _, full := range []string{b + sup, b} {
+				if r := []rune(full); len(r)+len(js) > max {
+					out = append(out, string(r[:max-len(js)])+js)
+				}
+			}
+		}
+	}
+	add(base)
+	if orig := TakeoutEdited(base); orig != "" {
+		add(orig)
+	}
+	return out
+}

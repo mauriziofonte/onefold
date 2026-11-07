@@ -447,7 +447,7 @@ One JSON object per line after the header (`catalog.Record`):
 | `contentHash` | full XXH128 when known (full-hashed, verified, copied) |
 | `meta.kind` | `photo video image audio document text archive other` |
 | `meta.time` | `YYYY-MM-DD HH:MM:SS` wall clock of the canonical zone, or `""` |
-| `meta.timeSource` | `metadata`, `filename`, `filemtime`, `none` |
+| `meta.timeSource` | `metadata`, `filename`, `takeout`, `filemtime`, `none` |
 | `meta.subSec`, `meta.subSecNs` | photo captured with a sub-second, and its value in ns |
 | `meta.device` | photo/image: raw `Make Model`; video: vendor slug |
 | `meta.canonDevice` | canonical device name (photo/image) |
@@ -455,7 +455,9 @@ One JSON object per line after the header (`catalog.Record`):
 | `meta.width`, `meta.height`, `meta.durationSec` | pixels; seconds (video) |
 | `meta.fileCategory` | registry category of the extension |
 | `meta.title`, `author`, `album`, `tagYear`, `track`, `disc`, `pages`, `entries` | generic metadata (documents, audio, archives) |
+| `meta.lat`, `meta.lon` | where a photo or video was taken, degrees (WGS84), 6 decimals; absent = unknown |
 | `meta.extMismatch`, `meta.sniffExt` | the magic bytes disagree with the extension; the extension they imply when unambiguous |
+| `takeout` | extracted with `-takeout` (section 9.2) |
 | `sidecar` | cataloged only because it may belong to a photo or video (`catalog -sidecars`: its type is out of the scope); kept with its owner, never an asset (section 13.9) |
 
 Fields marked omitempty are absent in older manifests, which load and plan unchanged. The order of records is not deterministic (parallel workers).
@@ -680,7 +682,9 @@ Consequences:
 
 ### 9.2 Time sources and the clamp
 
-`meta.timeSource` says where a time came from: `metadata` (embedded in the file), `filename` (deduced from the name), `filemtime` (the filesystem), `none`. Every source is clamped to the years 1985 to next year; a value outside is ignored and the next source is tried. Every kind ends with file name, then file mtime.
+`meta.timeSource` says where a time came from: `metadata` (embedded in the file), `filename` (deduced from the name), `takeout` (the Google Takeout file next to it, below), `filemtime` (the filesystem), `none`. Every source is clamped to the years 1985 to next year; a value outside is ignored and the next source is tried. Every kind ends with file name, then file mtime.
+
+With `-takeout` (`Filters.Takeout`, catalog, merge and rearrange; off by default) a photo or video whose metadata and name give no time takes `photoTakenTime` of its Google Takeout file (Unix seconds, so an instant, converted to the canonical zone), before the file mtime; a file without a place takes its `geoDataExif`, else `geoData` (`meta.lat`, `meta.lon`). The file is found by name (`kinds.TakeoutNames`: `<name>.supplemental-metadata.json`, `<name>.json`, the numbered `<stem>.<ext>(N).json` of `<stem>(N).<ext>`, the forms Takeout cuts to 51 or 47 characters), at most 1 MiB. An edited copy Takeout exports next to the original (`IMG_1234-edited.jpg`, also `-bearbeitet`, `-modifié`, `-editado`, `-modificato`...; `kinds.TakeoutEdited`) reads the original's file and becomes an edit (category `editing`, prefix `EDT`): its own asset, never dropped as a lower-resolution variant of the original (section 12.3). Records carry `takeout: true`, and a reuse needs the same setting.
 
 | Kind | Metadata time |
 |---|---|
