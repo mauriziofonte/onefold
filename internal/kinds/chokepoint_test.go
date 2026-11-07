@@ -26,18 +26,21 @@ func TestChokePoint(t *testing.T) {
 	// Names onefold itself writes, container members and OS executables: not
 	// file-type knowledge.
 	exempt := map[string]map[string]bool{
-		"materialize.go": {".part": true},
-		"planreport.go":  {".md": true, ".part": true, ".html": true, ".htm": true},
-		"backup.go":      {".jsonl": true},
-		"dedupe.go":      {".jsonl": true},
-		"purge.go":       {".jsonl": true},
-		"rearrange.go":   {".jsonl": true},
-		"restore.go":     {".jsonl": true},
-		"native.go":      {".timer": true, ".plist": true},
-		"schedule.go":    {".json": true, ".log": true, ".old": true},
-		"sftp.go":        {".part": true},
-		"textexport.go":  {".txt": true, ".part": true, ".xml": true, ".xhtml": true, ".html": true, ".htm": true},
-		"tools.go":       {".exe": true, ".bat": true, ".cmd": true},
+		"materialize.go":   {".part": true},
+		"planreport.go":    {".md": true, ".part": true, ".html": true, ".htm": true},
+		"backup.go":        {".jsonl": true},
+		"dedupe.go":        {".jsonl": true},
+		"purge.go":         {".jsonl": true},
+		"rearrange.go":     {".jsonl": true},
+		"restore.go":       {".jsonl": true},
+		"native.go":        {".timer": true, ".plist": true},
+		"launch_bundle.go": {".app": true},
+		"manifests.go":     {".yaml": true},
+		"macapp.go":        {".app": true, ".plist": true, ".icns": true},
+		"schedule.go":      {".json": true, ".log": true, ".old": true},
+		"sftp.go":          {".part": true},
+		"textexport.go":    {".txt": true, ".part": true, ".xml": true, ".xhtml": true, ".html": true, ".htm": true},
+		"tools.go":         {".exe": true, ".bat": true, ".cmd": true},
 	}
 	testName := regexp.MustCompile(`^func (Test|Benchmark)\w+`)
 

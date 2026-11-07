@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=onefold
+GenericName=File deduplicator
+Comment=One copy of every file you own, under a name you can predict
+Comment[it]=Una copia di ogni tuo file, con un nome prevedibile
+Exec=onefold gui
+Icon=onefold
+Terminal=false
+Categories=Utility;FileTools;Archiving;
+Keywords=duplicates;deduplicate;merge;photos;videos;archive;backup;
+StartupNotify=false

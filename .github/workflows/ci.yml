@@ -115,6 +115,31 @@ jobs:
           go test -count=1 -run 'TestE2E$' -v ./cmd/onefold | tee e2e.log
           grep -q -- '--- PASS[:] TestE2E' e2e.log
 
+      - name: onefold.app starts the GUI when macOS opens it (LaunchServices, as from Finder)
+        if: runner.os == 'macOS'
+        run: |
+          go build -trimpath -o "$RUNNER_TEMP/onefold-darwin" ./cmd/onefold
+          go run internal/pack/gen_macapp.go -exe "$RUNNER_TEMP/onefold-darwin" -version v0.0.0-ci -o "$RUNNER_TEMP/app.zip"
+          mkdir -p "$RUNNER_TEMP/apps"
+          ditto -x -k "$RUNNER_TEMP/app.zip" "$RUNNER_TEMP/apps" # what Finder does with a downloaded zip
+          app="$RUNNER_TEMP/apps/onefold.app"
+          plutil -lint "$app/Contents/Info.plist"
+          test -x "$app/Contents/MacOS/onefold"
+          # Apple Silicon runs only signed code: the linker signs arm64 ad hoc
+          if [ "$(go env GOARCH)" = arm64 ]; then codesign --verify --verbose "$app/Contents/MacOS/onefold"; fi
+          state="$HOME/Library/Application Support/onefold"
+          rm -f "$state/gui.json"
+          open -g "$app"
+          for _ in $(seq 60); do [ -s "$state/gui.json" ] && break; sleep 1; done
+          pkill -f 'onefold.app/Contents/MacOS/onefold' || true
+          test -s "$state/gui.json" || { echo "onefold.app did not start the GUI"; exit 1; }
+
+      - name: the menu entry of the Linux packages is valid
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y -qq --no-install-recommends desktop-file-utils
+          desktop-file-validate packaging/linux/onefold.desktop
+
       - name: clones made on a file system that clones (Btrfs image on Linux, APFS on macOS)
         if: runner.os != 'Windows'
         run: |
