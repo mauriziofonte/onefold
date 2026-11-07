@@ -54,6 +54,10 @@ type Record struct {
 	// ContentHash = XXH128 of the WHOLE content when known (full-hashed files,
 	// verify-full, merge copies). Valid as long as size+mtime are unchanged.
 	ContentHash string `json:"contentHash,omitempty"`
+	// Sidecar: cataloged only because it may belong to a photo or video
+	// (Options.Sidecars) although its type is out of the scope: kept with its
+	// owner, left out when it has none.
+	Sidecar bool `json:"sidecar,omitempty"`
 }
 
 // Summary is the aggregate view printed for inspection (no per-file personal data).
@@ -64,7 +68,10 @@ type Summary struct {
 	Errors  int
 	Skipped int
 	Limited int // accepted by the filters but over --limit
-	Empty   int // 0-byte files (no content: never cataloged, never merged)
+	// Sidecars: files of a type out of the scope cataloged because they may
+	// belong to a photo or video (Options.Sidecars); not in the other counts.
+	Sidecars int
+	Empty    int // 0-byte files (no content: never cataloged, never merged)
 	// OnlineOnly: cloud files left out because their content is not on this
 	// computer (rule online-only), with their total size.
 	OnlineOnly      int
@@ -132,6 +139,12 @@ type Options struct {
 	// ones (nil = none). A digest that read the whole file is never taken
 	// from it: content identity always comes from this run's read.
 	Cache *hashcache.Cache
+
+	// Sidecars lets the files that may belong to a photo or video (.AAE,
+	// .xmp, .THM, Google Takeout .json: kinds.IsSidecarExt) through the type
+	// whitelist, marked Record.Sidecar; the plan, merge and rearrange keep them
+	// with their owner (package sidecar).
+	Sidecars bool
 
 	Progress Progress     // optional (report.Reporter implements it)
 	Gate     *runctl.Gate // optional pause/stop (GUI); nil = never pauses
@@ -268,6 +281,7 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 	type job struct {
 		room, path, key string
 		size, mtime     int64
+		side            bool
 	}
 	workers := o.Workers
 	if workers < 1 {
@@ -312,7 +326,7 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 		reused := false
 		if old, ok := o.Reuse[j.path]; ok && old.Size == j.size && old.MTimeNs == j.mtime && j.mtime != 0 && !(old.Quick && !o.Quick) {
 			rec, reused = old, true
-			rec.Room, rec.Host = j.room, o.Host
+			rec.Room, rec.Host, rec.Sidecar = j.room, o.Host, j.side
 		} else {
 			th := perf.Start()
 			var h sparsehash.Result
@@ -341,7 +355,7 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 				return
 			}
 			te := perf.Start()
-			md, _ := meta.ExtractWith(j.path, meta.Options{Quick: o.Quick, Data: data}) // best-effort; never fatal
+			md, _ := meta.ExtractWith(j.path, meta.Options{Quick: o.Quick || j.side, Data: data}) // best-effort; never fatal
 			stage := "extract:" + md.Kind
 			if md.Kind == "archive" {
 				stage += ":" + kinds.Ext(j.path)
@@ -350,7 +364,7 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 			perf.Outlier(stage, j.path, te)
 			perf.Outlier("file-total", j.path, th)
 			rec = Record{Room: j.room, Path: j.path, Size: h.Size, Hash: h.Hex, Full: h.Full, Meta: md,
-				Host: o.Host, MTimeNs: j.mtime, Quick: o.Quick}
+				Host: o.Host, MTimeNs: j.mtime, Quick: o.Quick || j.side, Sidecar: j.side}
 			if h.Full {
 				rec.ContentHash = h.Hex
 			}
@@ -361,7 +375,11 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 		}
 		mu.Lock()
 		emit(rec)
-		accumulate(sum, rec)
+		if rec.Sidecar {
+			sum.Sidecars++
+		} else {
+			accumulate(sum, rec)
+		}
 		if reused {
 			sum.Reused++
 		}
@@ -426,6 +444,10 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 			dm := markDir(&mu, dirs, path, base)
 			// Dotfiles (Android ".trashed-<ts>-…", "._" forks, ...) are never archive assets.
 			rule := o.fileRule(base, ext)
+			side := false
+			if rule == ReasonType && o.Sidecars && kinds.IsSidecarExt(ext) {
+				rule, side = "", true // may belong to a photo or video: the plan decides
+			}
 			if rule == "" {
 				rule = o.UserExclusion(room, path)
 			}
@@ -486,7 +508,7 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 			if o.Cache != nil && (o.WholeMax <= 0 || size > o.WholeMax) { // smaller files are read whole: never cached
 				key = hashcache.KeyOf(path, info)
 			}
-			jobs <- job{room: room, path: path, key: key, size: size, mtime: info.ModTime().UnixNano()}
+			jobs <- job{room: room, path: path, key: key, size: size, mtime: info.ModTime().UnixNano(), side: side}
 			return nil
 		}
 		conf := fastwalk.Config{NumWorkers: workers}

@@ -202,6 +202,7 @@ onefold.exe rearrange -resume D:\FILES\.onefold\rearrange-<date>.jsonl
 - `-naming` chooses the pattern: ready-made layouts by extension and year, by date, documents by author, music by artist and album, photos by device or timestamp, videos by resolution, ... or your own, e.g. `-naming "{EXT}/{year|\"UNDATED\"}/{month} - {month-name}/{stem-norm}.{ext}"`.
 - Three name variants: `{stem}` is the name untouched; `{stem-norm}` (used by the presets) removes the markers left by older tools and copies but keeps an `[origin] ` prefix; `{stem-clean}` removes that prefix too. Append `-clean` to any preset name to use `{stem-clean}`.
 - Collision suffixes of older tools (`-- frev.1`, ` (1)`, `_01` when the original is next to it) are cleaned; new collisions get `_01`, `_02`...
+- `-sidecars` keeps the files that belong to a photo or video with it (`IMG_1234.AAE`, `IMG_1234.xmp`, `IMG_1234.jpg.json`, the video of a Live Photo): they take the photo's new name, follow the copy that stays when the photo is a duplicate, and are never deleted as duplicates themselves. `merge -sidecars` does the same in the output.
 - Flags go before the folder: `onefold rearrange -execute D:\FILES`, not after it.
 
 In `merge` and `rearrange` photos and videos are files like the others: copied or moved unchanged and named by the pattern. Canonical photo and video names belong to the archive below; its scope and tree presets are refused here unless you add `-allow-mixed`.
@@ -288,7 +289,8 @@ Useful plan options:
 
 - `-verify-full` reads every candidate duplicate in full before dropping it (run it where the files are readable);
 - `-video-tolerance 1` treats re-encoded videos whose length changed by up to a second as the same video;
-- `-filename-seq` keeps the counter of date-only names (`IMG-20200101-WA0007.jpg` -> `IMG_20200101_100000_WA0007.jpg`) instead of numbering them `_01`, `_02`.
+- `-filename-seq` keeps the counter of date-only names (`IMG-20200101-WA0007.jpg` -> `IMG_20200101_100000_WA0007.jpg`) instead of numbering them `_01`, `_02`;
+- `-sidecars` (with `catalog -sidecars`) keeps the files that belong to a photo or video with it: the iPhone edits (`IMG_1234.AAE`), the Lightroom or darktable metadata (`IMG_1234.xmp`, `IMG_1234.CR2.xmp`), a camera's video thumbnail (`MVI_1234.THM`), the Google Takeout data (`IMG_1234.HEIC.json`) and the video of a Live Photo (`IMG_1234.MOV`, at most 6 seconds) are copied next to the golden file under its new name, so editors and photo apps still find them. They are never assets of their own. When the winner has none, those of a byte-identical copy on the same machine are taken.
 
 ### Adding files later
 

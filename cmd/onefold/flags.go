@@ -38,6 +38,7 @@ type catalogFlags struct {
 	skipCSV, keepCSV, minSize, maxSize, wholeMax            *string
 	noSweep, skipSysDirs, skipCloud, skipDev, skipSysExt    *bool
 	skipUnknown, skipNoExt, keepDot, keepJunk, quick        *bool
+	sidecars                                                *bool
 	excludePaths, excludeGlobs                              *multiFlag
 }
 
@@ -75,6 +76,7 @@ func addCatalogFlags(fs *flag.FlagSet, defPreset string, defJ int, regime string
 		limit:       fs.Int("limit", 0, "max accepted files per room (0 = unlimited)"),
 		wholeMax:    fs.String("whole-max", catalog.DefaultWholeMax, "read files up to SIZE once, sequentially, and hash/extract from memory (0 = seek-based sampling only)"),
 		quick:       fs.Bool("quick", false, "generic kinds: no archive listing, no document parsing, no external tools (time from the filename, else the filesystem)"),
+		sidecars:    fs.Bool("sidecars", false, "keep the files that belong to a photo or video with it: .AAE, .xmp, .THM, Google Takeout .json and the video of a Live Photo take its new name and are never deduplicated alone"),
 	}
 }
 
@@ -127,6 +129,9 @@ func (c *catalogFlags) filters(base catalog.Filters) (catalog.Filters, error) {
 	}
 	if set["quick"] {
 		f.Quick = *c.quick
+	}
+	if set["sidecars"] {
+		f.Sidecars = *c.sidecars
 	}
 	if set["limit"] {
 		f.Limit = *c.limit

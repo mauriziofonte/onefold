@@ -40,6 +40,7 @@ import (
 	"github.com/mauriziofonte/onefold/internal/naming"
 	"github.com/mauriziofonte/onefold/internal/perf"
 	"github.com/mauriziofonte/onefold/internal/runctl"
+	"github.com/mauriziofonte/onefold/internal/sidecar"
 	"github.com/mauriziofonte/onefold/internal/sparsehash"
 )
 
@@ -65,6 +66,14 @@ type Options struct {
 	// its canonical name (IMG-20200101-WA0007.jpg ->
 	// IMG_20200101_100000_WA0007.jpg) instead of a _NN given by hash order.
 	FilenameSeq bool
+	// Sidecars keeps the files that belong to a photo or video with it
+	// (package sidecar): the .AAE, .xmp, .THM and Google Takeout .json of the
+	// manifests (catalog -sidecars) and the video of a Live Photo go into the
+	// action of their owner's asset, under its canonical name, and are never
+	// assets of their own. Off: the files a catalog kept as possible
+	// sidecars are left out (Result.SidecarsLeftOut), the rest is the
+	// historical plan.
+	Sidecars bool
 }
 
 // Layouts lists the historical --layout aliases (any naming preset or
@@ -111,6 +120,18 @@ type Action struct {
 	DurationSec float64 `json:"durationSec,omitempty"`
 	Width       int     `json:"width,omitempty"`
 	Height      int     `json:"height,omitempty"`
+	// Sidecars are copied next to the golden file under its name
+	// (Options.Sidecars): the winner's, then those of its exact copies on the
+	// same host that the winner lacks.
+	Sidecars []Sidecar `json:"sidecars,omitempty"`
+}
+
+// Sidecar is a file that belongs to an action's winner: its source path (on
+// the action's host), size and relative path in the golden tree.
+type Sidecar struct {
+	Path string `json:"path"`
+	Size int64  `json:"size"`
+	Rel  string `json:"rel"`
 }
 
 // IsMediaAction reports whether the action goes through the media silvering path.
@@ -272,6 +293,7 @@ func BuildActionsWith(r *Result, o Options) []Action {
 			acts[i].CanonName = path.Base(acts[i].CanonRel)
 		}
 	}
+	placeSidecars(acts, r)
 	return acts
 }
 
@@ -320,6 +342,15 @@ type Result struct {
 	VerifiedGroups   int // multi-member hash groups whose members were full-hashed
 	VerifySplits     int // groups that turned out to contain different content
 	VerifyUnreadable int // members that could not be read (kept, never dropped)
+
+	// Options.Sidecars: the files kept with their owner, by the owner's
+	// memberKey; SidecarsAlone: files cataloged as possible sidecars that
+	// belong to no photo or video here; SidecarsLeftOut: such files of the
+	// manifests left out because the plan does not keep sidecars.
+	Sidecars        map[string][]catalog.Record
+	SidecarCount    int
+	SidecarsAlone   int
+	SidecarsLeftOut int
 }
 
 // ShotKey is the capture identity of the time clusters: a dated video by its
@@ -379,6 +410,7 @@ func Plan(recs []catalog.Record) *Result { return PlanWith(recs, Options{}) }
 // PlanWith applies the dedup+winner logic over all records.
 func PlanWith(recs []catalog.Record, o Options) *Result {
 	res_ := &Result{InputFiles: len(recs)}
+	recs = takeSidecars(recs, o.Sidecars, res_)
 	if o.VerifyFull {
 		recs = verifyFull(recs, res_)
 	}
@@ -593,6 +625,99 @@ func PlanWith(recs []catalog.Record, o Options) *Result {
 		res_.HashOnly++
 	}
 	return res_
+}
+
+// takeSidecars removes the sidecars from recs: with keep, the files that
+// belong to a photo or video go to r.Sidecars under their owner; the files
+// cataloged only as possible sidecars never become assets.
+func takeSidecars(recs []catalog.Record, keep bool, r *Result) []catalog.Record {
+	var owner []int
+	if keep {
+		owner = sidecar.Records(recs)
+	}
+	n := 0
+	for i := range recs {
+		if recs[i].Sidecar || (owner != nil && owner[i] >= 0) {
+			n++
+		}
+	}
+	if n == 0 {
+		return recs
+	}
+	out := make([]catalog.Record, 0, len(recs)-n)
+	for i := range recs {
+		switch {
+		case owner != nil && owner[i] >= 0:
+			if r.Sidecars == nil {
+				r.Sidecars = map[string][]catalog.Record{}
+			}
+			k := memberKey(recs[owner[i]])
+			r.Sidecars[k] = append(r.Sidecars[k], recs[i])
+			r.SidecarCount++
+		case recs[i].Sidecar && keep:
+			r.SidecarsAlone++
+		case recs[i].Sidecar:
+			r.SidecarsLeftOut++
+		default:
+			out = append(out, recs[i])
+		}
+	}
+	r.InputFiles = len(out)
+	return out
+}
+
+// PlaceSidecars sets the actions' Sidecars again from r.Sidecars after
+// their canonical paths changed (golden match renames names the tree holds).
+func PlaceSidecars(acts []Action, r *Result) {
+	for i := range acts {
+		acts[i].Sidecars = nil
+	}
+	placeSidecars(acts, r)
+}
+
+// placeSidecars fills the actions' Sidecars once their canonical paths are
+// final: the winner's, then the exact copies' on the winner's host that bring
+// a name the winner lacks. A name another file of the tree takes falls back
+// to the owner's whole name ("VID_x.mp4.THM"), else the sidecar is left out.
+func placeSidecars(acts []Action, r *Result) {
+	if len(r.Sidecars) == 0 {
+		return
+	}
+	taken := map[string]bool{}
+	for _, a := range acts {
+		taken[strings.ToLower(a.CanonRel)] = true
+	}
+	for i := range acts {
+		a := &acts[i]
+		owners := []catalog.Record{{Host: a.SrcHost, Path: a.SrcPath}}
+		for _, d := range a.Drops {
+			if d.Reason == "exact-dupe" && d.Host == a.SrcHost {
+				owners = append(owners, catalog.Record{Host: d.Host, Path: d.Path})
+			}
+		}
+		for _, o := range owners {
+			scs := r.Sidecars[memberKey(o)]
+			sort.Slice(scs, func(x, y int) bool { return scs[x].Path < scs[y].Path })
+			for _, sc := range scs {
+				rel := sidecar.Target(o.Path, a.CanonRel, sc.Path)
+				if rel == "" {
+					continue
+				}
+				if taken[strings.ToLower(rel)] {
+					if o.Path != a.SrcPath {
+						continue // the winner has its own of this name
+					}
+					// the stem form is another file's (two owners of one stem)
+					rel = path.Join(path.Dir(a.CanonRel), a.CanonName+filepath.Ext(sc.Path))
+					if taken[strings.ToLower(rel)] {
+						continue
+					}
+				}
+				taken[strings.ToLower(rel)] = true
+				a.Sidecars = append(a.Sidecars, Sidecar{Path: sc.Path, Size: sc.Size, Rel: rel})
+			}
+		}
+	}
 }
 
 // absorb attaches byte-identical generic copies to an existing media asset.

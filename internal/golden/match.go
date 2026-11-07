@@ -70,7 +70,8 @@ func Match(ix *Index, recs []catalog.Record, o plan.Options) *MatchResult {
 		}
 		fresh = append(fresh, a)
 	}
-	acts := plan.BuildActionsWith(&plan.Result{Golden: fresh}, o)
+	sub := &plan.Result{Golden: fresh, Sidecars: res.Sidecars}
+	acts := plan.BuildActionsWith(sub, o)
 	// names already in the tree: the next free _NN, in a stable order
 	sort.Slice(acts, func(i, j int) bool {
 		if acts[i].CanonRel != acts[j].CanonRel {
@@ -96,6 +97,9 @@ func Match(ix *Index, recs []catalog.Record, o plan.Options) *MatchResult {
 				break
 			}
 		}
+	}
+	if m.Renamed > 0 {
+		plan.PlaceSidecars(acts, sub) // under the new names
 	}
 	m.New = acts
 	sortKnown(m.Dupes)

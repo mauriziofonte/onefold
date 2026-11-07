@@ -255,6 +255,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 | `internal/hashcache` | digests of unchanged files remembered across runs | `Open`, `OpenIn`, `KeyOf`, `Cache.Sampled`, `Cache.Sparse`, `Cache.Full` |
 | `internal/catalog` | rooms -> records / manifest | `Build`, `Collect`, `Walk`, `Filters`, `LoadManifest` |
 | `internal/plan` | records -> assets -> actions | `PlanWith`, `BuildActionsWith`, `VerifyGroupsWith`, `Read`, `Write`, `ShotKey` |
+| `internal/sidecar` | the files that belong to a photo or video, paired with it | `Pair`, `Records`, `Target` |
 | `internal/names` | pure string functions on names | `SanitizeName`, `WithNN`, `ParseLegacy`, `IsCopyName`, `FoldKey` |
 | `internal/naming` | templates, presets, families, collisions | `Resolve`, `Layout`, `Compose`, `Assign`, `VarsOfCtx` |
 | `internal/golden` | what the golden tree holds, matching new files | `Build`, `Load`, `Match` |
@@ -300,10 +301,11 @@ Leaves: `kinds`, `fsx`, `perf`, `report`, `runctl`, `statedir`, `testfix`, `winr
 | `meta` | kinds, perf, tools |
 | `catalog` | fsx, hashcache, kinds, meta, names, perf, runctl, sparsehash |
 | `naming` | catalog, kinds, meta, names |
-| `plan` | catalog, kinds, meta, names, naming, perf, runctl, sparsehash |
+| `sidecar` | catalog, kinds, names |
+| `plan` | catalog, kinds, meta, names, naming, perf, runctl, sidecar, sparsehash |
 | `golden` | catalog, kinds, names, plan |
-| `merge` | catalog, fsx, names, naming, perf, plan, report, runctl |
-| `rearrange` | catalog, fsx, merge, names, naming, perf, plan, report, runctl, sparsehash |
+| `merge` | catalog, fsx, names, naming, perf, plan, report, runctl, sidecar |
+| `rearrange` | catalog, fsx, merge, names, naming, perf, plan, report, runctl, sidecar, sparsehash |
 | `settings` | catalog, merge, naming, rearrange |
 | `purge` | fsx, kinds, merge, report, runctl, sparsehash |
 | `stats` | fsx, hashcache, kinds, runctl, sparsehash |
@@ -454,6 +456,7 @@ One JSON object per line after the header (`catalog.Record`):
 | `meta.fileCategory` | registry category of the extension |
 | `meta.title`, `author`, `album`, `tagYear`, `track`, `disc`, `pages`, `entries` | generic metadata (documents, audio, archives) |
 | `meta.extMismatch`, `meta.sniffExt` | the magic bytes disagree with the extension; the extension they imply when unambiguous |
+| `sidecar` | cataloged only because it may belong to a photo or video (`catalog -sidecars`: its type is out of the scope); kept with its owner, never an asset (section 13.9) |
 
 Fields marked omitempty are absent in older manifests, which load and plan unchanged. The order of records is not deterministic (parallel workers).
 
@@ -482,6 +485,7 @@ One JSON object per line after the header (`plan.Action`):
 | `artist` | owner stamped on media copies ("" = none) |
 | `drops` | every other member: host, path, reason, size |
 | `subSecNs`, `durationSec`, `width`, `height` | the winner's metadata; written when the plan is self-contained (CLI and GUI default), omitted when zero |
+| `sidecars` | `plan -sidecars`: the files that belong to the winner (`path`, `size`, `rel` = their path in the golden tree, under the winner's canonical name), written by `apply` next to it (section 13.9); omitted when none |
 
 `plan.Read` is strict: blank lines are ignored, any other unreadable line fails the whole read (a plan applied with lines missing would silently leave assets out), the header must name the current zone.
 
@@ -553,7 +557,7 @@ Timestamps in these names are `yyyyMMdd-HHmmss.nnnnnnnnn`.
 | `group` | `IMAGE` | layout family, uppercase (`{group}`, naming selectors, presets) |
 | `format` | `jpeg` | parser dispatch (meta, textexport) and magic family |
 | `canonical` | `jpg` | harmonized extension (`NormalizeExt`, `{ext-norm}`, plan photo folder) |
-| `flags` | `common,personal` | `system`, `common`, `personal`, `transient`, `shortcut` |
+| `flags` | `common,personal` | `system`, `common`, `personal`, `transient`, `shortcut`; `sidecar` (`aae xmp thm`: belongs to the photo or video of the same name), `takeout` (`json`: Google Takeout metadata, `<name>.json`), `live` (`heic heif jpg jpeg mov`: a half of a Live Photo), read by the sidecar pairing (section 13.9) |
 | `description` | `JPEG image` | human text (`-` = none) |
 
 Lines starting with `# ` (hash and space) are comments; `##` and `###` are real extensions. A malformed row panics at init. A duplicate row silently wins over the earlier one.
@@ -807,7 +811,7 @@ Errors (an unreadable directory entry, a stat or hash failure) are counted and r
 | Entry | Left out when (reason) |
 |---|---|
 | directory (never the room root) | inside a `SkipDirs` path (merge: the output inside an input; silent); name starts with `.` (`dot-dirs`); junk name (`junk`); in `-prune` (`prune`); in `SystemDirs`, `CloudDirs`, `DevDirs` with their rule on; user exclusions (`exclude`, `exclude-path`, `exclude-glob`) |
-| file | name starts with `.` (`dotfile`, unless `-keep-dotfiles` in merge); onefold temp (silent); junk (`junk`); not in the extension whitelist (`type`); no extension with `noext` on (`noext`); transient (`transient`); shortcut (`shortcuts`); without a whitelist: system extension (`system-ext`), unknown extension (`unknown-ext`); user exclusions; content only in the cloud (`online-only`, from the stat data of the listing, section 24.1); 0 bytes (`empty`, unless `-keep-dotfiles`); outside `-min-size`/`-max-size`; over `-limit` per room (`limit`) |
+| file | name starts with `.` (`dotfile`, unless `-keep-dotfiles` in merge); onefold temp (silent); junk (`junk`); not in the extension whitelist (`type`; with `-sidecars` a file of a `sidecar` or `takeout` type passes, marked `sidecar`, section 13.9); no extension with `noext` on (`noext`); transient (`transient`); shortcut (`shortcuts`); without a whitelist: system extension (`system-ext`), unknown extension (`unknown-ext`); user exclusions; content only in the cloud (`online-only`, from the stat data of the listing, section 24.1); 0 bytes (`empty`, unless `-keep-dotfiles`); outside `-min-size`/`-max-size`; over `-limit` per room (`limit`) |
 
 The skip rules are named and switchable (`catalog.Rules`), all on by default:
 
@@ -868,6 +872,7 @@ Every file seen (also skipped ones) feeds `kinds.PackageMarkers` per directory. 
 | `SelfContained` | `-self-contained` | on (CLI, GUI); off in the zero value | write the winner's sub-second, duration and size into each action |
 | `VideoTolerance` | `-video-tolerance SEC` | 0 | cluster videos of one start time whose durations differ by at most SEC |
 | `FilenameSeq` | `-filename-seq` | off | keep the counter of a date-only file name in the canonical name |
+| `Sidecars` | `-sidecars` | off | pair the sidecars with their owners (section 13.9): they go into the owner's action, never into an asset; off, the records marked `sidecar` are left out (`SidecarsLeftOut`) |
 
 The zero value of `Options` is the historical behaviour the frozen tests pin.
 
@@ -1048,6 +1053,19 @@ Two naming regimes are never mixed:
 
 The CLI refuses preset `media` and the `library*` presets in merge and rearrange, and a scope wider than photos and videos in `catalog`, unless `-allow-mixed`. The GUI server always refuses them. Reason: a golden tree must contain only what the golden rules produce, and a merged folder must not half-follow them.
 
+### 13.9 Sidecars
+
+A sidecar is a file that belongs to a photo or video in its folder and only makes sense under its name: the iOS edits (`IMG_1234.AAE`), Lightroom or darktable metadata (`IMG_1234.xmp`, `IMG_1234.CR2.xmp`), a camera's video thumbnail (`MVI_1234.THM`), the Google Takeout data (`IMG_1234.HEIC.json`, `IMG_1234.HEIC.supplemental-metadata.json` and its cuts to 47 or 51 characters, `IMG_1234.jpg(1).json` for `IMG_1234(1).jpg`) and the video of a Live Photo (`IMG_1234.MOV` next to `IMG_1234.HEIC`, at most `sidecar.LiveMaxSec` = 6 seconds). Off by default everywhere: `-sidecars` in `catalog` (`Filters.Sidecars`), `plan`, `merge` and `rearrange`; one checkbox in the GUI filters.
+
+| Piece | Role |
+|---|---|
+| `types.tsv` flags `sidecar`, `takeout`, `live` | which types can be sidecars |
+| `kinds.SidecarRest(owner, other)` | the name rules above: whether other belongs to owner, and the part of its name it keeps (after the owner's stem, or after its whole name) |
+| `sidecar.Pair(files)` | per folder: first the Live Photo videos to their stills, then the other sidecars to a photo or a video that is not a Live half. A file two owners could claim is left alone, except a sidecar of a RAW and its JPEG of one stem (the RAW owns it). Deterministic |
+| `sidecar.Target(ownerOld, ownerNew, side)` | the sidecar's new path: ownerNew's folder, its stem (or whole name) plus the kept part; the sidecar's own extension stays as written |
+
+Rules: a paired file follows its owner and is never deduplicated on its own (two photos with the same edit file keep one each); a file cataloged only as a possible sidecar (`Record.Sidecar`) that has no owner is left out. In the golden plan the winner's sidecars come first, then those of its byte-identical copies on the winner's host for the names it lacks; a stem-form name another file of the tree takes falls back to the winner's whole name (`VID_x.mp4.THM`). Merge: a sidecar goes next to the output file holding its owner's content (copied, or already there with the same bytes under that name, or the next `_NN` name when other bytes are: its link to the photo is lost then, never its content). `match` places the sidecars of the new actions it renames again (`plan.PlaceSidecars`).
+
 ---
 
 ## 14. Apply: materializing the golden tree
@@ -1072,6 +1090,7 @@ The CLI refuses preset `media` and the `library*` presets in merge and rearrange
 
 4. Set the temp's mtime to the canonical capture time (the plan time parsed in the canonical zone).
 5. Publish with `fsx.RenameNoReplace`; a destination that appeared meanwhile -> temp removed, skipped.
+6. The action's `sidecars` (golden or skipped alike): each a byte copy (a clone with `-clone`, a hard link with `-link`) under a temp name with the source's mtime, published with `RenameNoReplace` at `rel`; an existing name is skipped, a failure counts as failed and does not stop the others (`RunStats.Sidecars`).
 
 With `apply -execute -clone` (`RunOptions.Clone`) each byte copy above (photo before stamping, RAW, MPEG-PS, everything else) starts as a clone of the source (`fsx.Clone`), then is flushed; exiftool then stamps the clone, which leaves the source as it is (copy on write). `cloned` counts them; where no clone is possible, the byte copy runs. Videos are remuxed by ffmpeg, never cloned. `-clone` and `-link` exclude each other.
 
@@ -1292,6 +1311,7 @@ With `-clone` (`Options.Clone`, GUI: Safety, "Clone instead of copying") steps 3
 | `-trust-sparse`, `-no-verify-copy`, `-no-fsync`, `-no-cache` | safety switches; the defaults are the safest |
 | `-verify-uncached` | read-back from the device (17.2) |
 | `-clone` | clones instead of byte copies where the file system allows (17.2) |
+| `-sidecars` | an input file that belongs to a photo or video lands next to the output file that holds its owner's content, under its name (section 13.9) |
 | `-copy-j N` | copy workers |
 | catalog filter flags | section 11.2, default `-preset all` |
 
@@ -1348,6 +1368,8 @@ The journal and the content check before each file are the same as for a deletio
 | moves | pass 1: `src -> <dst>.<id>.onefold-mv` (no-replace); pass 2: temp -> dst (no-replace); a failed pass 2 goes back to src when possible. Two passes make swaps and cycles (A->B, B->A) safe |
 | folders | parents of moved or deleted files removed deepest first when empty (`-keep-empty-dirs` keeps them) |
 | cache | rewritten with the new paths, deleted files dropped |
+
+With `-sidecars` (section 13.9) the sidecars are not items of the first `Assign`: after their owners are placed, a second `Assign` gives each the owner's new name (the keeper's when the owner is a duplicate to delete; its own sidecar first); they are never in a duplicate group.
 
 Workers: `-move-j` (default number of CPUs) for deletes and both passes.
 

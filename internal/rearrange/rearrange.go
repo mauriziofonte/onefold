@@ -39,6 +39,7 @@ import (
 	"github.com/mauriziofonte/onefold/internal/plan"
 	"github.com/mauriziofonte/onefold/internal/report"
 	"github.com/mauriziofonte/onefold/internal/runctl"
+	"github.com/mauriziofonte/onefold/internal/sidecar"
 	"github.com/mauriziofonte/onefold/internal/sparsehash"
 )
 
@@ -111,6 +112,8 @@ type Result struct {
 	DeleteBytes int64    `json:"deleteBytes"`
 	Skipped     int      `json:"skippedByFilters"`
 	Journal     string   `json:"journal,omitempty"`
+	// Sidecars: files kept with the photo or video they belong to (-sidecars).
+	Sidecars int `json:"sidecars,omitempty"`
 	// Excluded lists the files and directories the filters left out (they
 	// stay where they are), with their reason, sorted by path.
 	Excluded []catalog.Skip `json:"excluded,omitempty"`
@@ -263,9 +266,20 @@ func Run(o Options) (*Result, error) {
 	for i, r := range recs {
 		targets[i] = nm.Target(naming.VarsOfCtx(r, exists))
 	}
+	// -sidecars: a file that belongs to a photo or video follows it and is
+	// never deduplicated alone; one cataloged only as a possible sidecar
+	// (type out of the scope) that has no owner stays where it is
+	var owner []int
+	if o.Catalog.Sidecars {
+		owner = sidecar.Records(recs)
+	}
+	isSide := func(i int) bool { return owner != nil && owner[i] >= 0 }
+	alone := func(i int) bool { return isSide(i) || recs[i].Sidecar }
 	groups := map[string][]int{}
 	for i, r := range recs {
-		groups[r.Hash] = append(groups[r.Hash], i)
+		if !alone(i) {
+			groups[r.Hash] = append(groups[r.Hash], i)
+		}
 	}
 	drop := make([]bool, len(recs))
 	keeperOf := map[int]int{}
@@ -300,14 +314,15 @@ func Run(o Options) (*Result, error) {
 	}
 
 	// names not available: every path in the tree that is not an item
-	// (out-of-scope files, directories, files to delete, .onefold)
+	// (out-of-scope files, directories, files to delete, .onefold; the
+	// sidecars until their owners are placed)
 	all, err := listAll(root)
 	if err != nil {
 		return nil, err
 	}
 	isItem := map[string]bool{}
 	for i, r := range recs {
-		if !drop[i] {
+		if !drop[i] && !alone(i) {
 			isItem[names.FoldKey(rel(r.Path))] = true
 		}
 	}
@@ -320,13 +335,50 @@ func Run(o Options) (*Result, error) {
 	var idx []int
 	var items []naming.Item
 	for i, r := range recs {
-		if drop[i] {
+		if drop[i] || alone(i) {
 			continue
 		}
 		idx = append(idx, i)
 		items = append(items, naming.Item{Current: rel(r.Path), Target: targets[i], Tie: r.Hash + "\x00" + r.Path})
 	}
 	final := naming.Assign(items, taken)
+	if owner != nil {
+		// the sidecars, under their owner's new name (the owner's keeper when
+		// the owner is a duplicate to delete); its own sidecar before one
+		// that follows it from a deleted copy
+		finalOf := make(map[int]string, len(idx))
+		for k, i := range idx {
+			finalOf[i] = final[k]
+			for d := final[k]; d != ""; {
+				taken[names.FoldKey(d)] = true
+				if d = path.Dir(d); d == "." || d == "/" {
+					break
+				}
+			}
+		}
+		var side []naming.Item
+		var sIdx []int
+		for i := range recs {
+			if !isSide(i) {
+				continue
+			}
+			delete(taken, names.FoldKey(rel(recs[i].Path)))
+			j, a, tie := owner[i], owner[i], "0"
+			if drop[j] {
+				a, tie = keeperOf[j], "1"
+			}
+			fo := finalOf[a]
+			if fo == "" {
+				fo = rel(recs[a].Path) // no target: the owner stays
+			}
+			t := sidecar.Target(rel(recs[j].Path), fo, rel(recs[i].Path))
+			sIdx = append(sIdx, i)
+			side = append(side, naming.Item{Current: rel(recs[i].Path), Target: t, Tie: tie + recs[i].Hash + "\x00" + recs[i].Path})
+		}
+		idx = append(idx, sIdx...)
+		final = append(final, naming.Assign(side, taken)...)
+		res.Sidecars = len(sIdx)
+	}
 	id := 0
 	for k, i := range idx {
 		cur := rel(recs[i].Path)

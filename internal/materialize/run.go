@@ -49,6 +49,7 @@ type RunStats struct {
 	Pending    int      `json:"pending"`    // not started: gate stopped; a new run completes them
 	Unsilvered int      `json:"unsilvered"` // media written as faithful copies without canonical metadata (also in Written)
 	Cloned     int      `json:"cloned,omitempty"`
+	Sidecars   int      `json:"sidecars,omitempty"` // sidecars written next to their golden file
 	Errors     []string `json:"errors,omitempty"`
 	Stopped    bool     `json:"stopped,omitempty"`
 }
@@ -76,7 +77,7 @@ func ApplyAll(acts []plan.Action, target string, o RunOptions) RunStats {
 	}
 	var st RunStats
 	var mu sync.Mutex
-	var written, skipped, pending, unsilvered, cloned atomic.Int64
+	var written, skipped, pending, unsilvered, cloned, sidecars atomic.Int64
 	var dirs fsx.DirSet // folders of the tree that gained a file: flushed at the end
 	if o.Progress != nil && !o.Link {
 		// one notice per missing tool instead of one warning per file
@@ -138,6 +139,22 @@ func ApplyAll(acts []plan.Action, target string, o RunOptions) RunStats {
 			res, err = applyWith(a, target, batch, o.Silver, o.Clone)
 		}
 		record(a, res, err, t0)
+		if err == nil && len(a.Sidecars) > 0 {
+			done, serr := applySidecars(a, target, o.Link, o.Clone)
+			sidecars.Add(int64(len(done)))
+			for _, d := range done {
+				dirs.Add(d)
+			}
+			if serr != nil {
+				mu.Lock()
+				st.Failed++
+				st.Errors = append(st.Errors, fmt.Sprintf("%s -> %s: %v", a.SrcPath, a.CanonRel, serr))
+				mu.Unlock()
+				if o.Progress != nil {
+					o.Progress.Event(fmt.Sprintf("ERR %s: %v", a.CanonRel, serr))
+				}
+			}
+		}
 	}
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -181,7 +198,7 @@ func ApplyAll(acts []plan.Action, target string, o RunOptions) RunStats {
 		st.Errors = append(st.Errors, "flushing the target folders to disk: "+err.Error())
 	}
 	st.Written, st.Skipped, st.Pending = int(written.Load()), int(skipped.Load()), int(pending.Load())
-	st.Unsilvered, st.Cloned = int(unsilvered.Load()), int(cloned.Load())
+	st.Unsilvered, st.Cloned, st.Sidecars = int(unsilvered.Load()), int(cloned.Load()), int(sidecars.Load())
 	st.Stopped = o.Gate.Stopped()
 	return st
 }

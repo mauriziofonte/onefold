@@ -46,6 +46,9 @@ type Type struct {
 	Personal    bool   // typical personal file
 	Transient   bool   // incomplete download, temp or lock file
 	Shortcut    bool   // link to another file or site
+	Sidecar     bool   // belongs to the photo or video of the same name (edits, metadata, thumbnail)
+	Takeout     bool   // Google Takeout metadata: <name>.json next to the file
+	Live        bool   // a half of a Live Photo: the still or its short video
 	Description string
 }
 
@@ -75,6 +78,12 @@ var registry = func() map[string]Type {
 				t.Transient = true
 			case "shortcut":
 				t.Shortcut = true
+			case "sidecar":
+				t.Sidecar = true
+			case "takeout":
+				t.Takeout = true
+			case "live":
+				t.Live = true
 			}
 		}
 		if t.Description == "-" {

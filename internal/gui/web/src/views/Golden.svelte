@@ -134,7 +134,7 @@
       <label class="chk"><input type="checkbox" bind:checked={cfg.videoTier} />{t('golden.videoTier')}</label>
       <p class="text-xs text-slate-500">{t('golden.otherFiles')}</p>
       <p class="text-xs text-slate-500" data-testid="golden-owner">{t('golden.owner', { v: conf.artist || t('config.unset') })} <button class="link" onclick={() => (settings.view = 'config')}>{t('golden.change')}</button></p>
-      <button class="btn-primary w-full justify-center" disabled={busy || !cfg.manifests.length} onclick={() => run('plan', { manifests: cfg.manifests, verifyFull: cfg.verifyFull, videoTier: cfg.videoTier }, 'planJobId')}><ListChecks size={14} />{t('golden.runPlan')}</button>
+      <button class="btn-primary w-full justify-center" disabled={busy || !cfg.manifests.length} onclick={() => run('plan', { manifests: cfg.manifests, verifyFull: cfg.verifyFull, videoTier: cfg.videoTier, sidecars: !!cfg.filters.sidecars }, 'planJobId')}><ListChecks size={14} />{t('golden.runPlan')}</button>
       {#if pj?.summary?.plan}
         <div class="grid grid-cols-2 gap-2 text-center"><div class="mini"><div class="mini-v">{num(pj.summary.golden)}</div><div class="mini-l">{t('golden.goldenN')}</div></div><div class="mini"><div class="mini-v">{num(pj.summary.inputFiles - pj.summary.golden)}</div><div class="mini-l">{t('golden.dropped')}</div></div></div>
       {/if}
