@@ -84,6 +84,7 @@ type Result struct {
 	// Unsilvered is set when a photo or video was published as a faithful copy
 	// without its canonical metadata: the reason (tool missing or failing).
 	Unsilvered string
+	Cloned     bool // started as a clone of the source (RunOptions.Clone)
 }
 
 // Apply materializes a into target/<canonRel> without signature or language.
@@ -100,6 +101,12 @@ func Apply(a plan.Action, target string, batch *ExifBatch) (Result, error) {
 
 // ApplyWith is Apply with explicit silver tags.
 func ApplyWith(a plan.Action, target string, batch *ExifBatch, s Silver) (Result, error) {
+	return applyWith(a, target, batch, s, false)
+}
+
+// applyWith: clone = start each byte copy as a clone of the source where the
+// file system allows it (RunOptions.Clone).
+func applyWith(a plan.Action, target string, batch *ExifBatch, s Silver, clone bool) (Result, error) {
 	dst := filepath.Join(target, filepath.FromSlash(a.CanonRel))
 	// Idempotency: silvering (exiftool/ffmpeg) mutates the byte size, so a
 	// re-materialized file never matches SrcSize — skip on existence instead.
@@ -112,23 +119,24 @@ func ApplyWith(a plan.Action, target string, batch *ExifBatch, s Silver) (Result
 
 	var tmp, unsilvered string
 	var err error
+	var cloned bool
 	switch {
 	case !a.IsMediaAction():
 		// generic kinds: faithful byte copy, no metadata embedding.
 		tmp = fsx.TempFor(dst, false)
-		err = copyFile(a.SrcPath, tmp)
+		cloned, err = copyFile(a.SrcPath, tmp, clone)
 	case byteCopyMedia(a.SrcPath):
 		// camera RAW (the digital negative) and MPEG-PS (no metadata slots):
 		// byte-identical copy by design, not counted as unsilvered.
 		tmp = fsx.TempFor(dst, false)
-		err = copyFile(a.SrcPath, tmp)
+		cloned, err = copyFile(a.SrcPath, tmp, clone)
 	case a.Kind == "video":
 		// every other video container: remux with ffmpeg (payload copied, metadata stamped).
 		tmp, unsilvered, err = remuxVideo(a, dst, s)
 	default:
 		// photos (jpg, heic, png, webp, tiff...): byte copy, then exiftool stamp on the temp file.
 		tmp = fsx.TempFor(dst, false)
-		if err = copyFile(a.SrcPath, tmp); err == nil {
+		if cloned, err = copyFile(a.SrcPath, tmp, clone); err == nil {
 			if unsilvered = stampPhoto(a, tmp, batch, s); unsilvered == "" {
 				err = syncFile(tmp) // exiftool rewrote the file and does not sync it
 			}
@@ -150,7 +158,7 @@ func ApplyWith(a plan.Action, target string, batch *ExifBatch, s Silver) (Result
 		}
 		return Result{Dst: dst}, err
 	}
-	return Result{Dst: dst, Unsilvered: unsilvered}, nil
+	return Result{Dst: dst, Unsilvered: unsilvered, Cloned: cloned}, nil
 }
 
 // LinkOriginal materializes a as a hard link: target/<canonRel> becomes a
@@ -308,7 +316,8 @@ func remuxVideo(a plan.Action, dst string, s Silver) (tmp, unsilvered string, er
 	args = append(args, tmp)
 	cmd := tools.Command("ffmpeg", args...)
 	if cmd == nil {
-		return tmp, NoFfmpeg, copyFile(a.SrcPath, tmp) // no ffmpeg (Windows): faithful unsilvered copy
+		_, err := copyFile(a.SrcPath, tmp, false)
+		return tmp, NoFfmpeg, err // no ffmpeg (Windows): faithful unsilvered copy
 	}
 	if out, rerr := runBounded(cmd, toolTimeoutFor(a.SrcSize)); rerr != nil {
 		os.Remove(tmp)
@@ -316,38 +325,54 @@ func remuxVideo(a plan.Action, dst string, s Silver) (tmp, unsilvered string, er
 		// Sorenson: "codec not currently supported in container"). Rather than
 		// drop the video from the golden, fall back to a raw byte copy: the file
 		// is preserved bit-identical (just unsilvered — no embedded metadata).
-		return tmp, "ffmpeg: " + firstLine(out, rerr), copyFile(a.SrcPath, tmp)
+		_, err := copyFile(a.SrcPath, tmp, false)
+		return tmp, "ffmpeg: " + firstLine(out, rerr), err
 	}
 	return tmp, "", syncFile(tmp)
 }
 
 // copyFile copies src into tmp (created or truncated) and syncs it to disk.
 // The caller publishes tmp with a no-replace rename.
-func copyFile(src, tmp string) error {
+// copyFile copies src to tmp and flushes it; with clone, tmp is first tried
+// as a clone of src (cloned = true), flushed the same way.
+func copyFile(src, tmp string, clone bool) (cloned bool, err error) {
+	if clone {
+		os.Remove(tmp) // a stale temp of an earlier run: a clone needs a free name
+		switch cerr := fsx.Clone(src, tmp); {
+		case cerr == nil:
+			if err := fsx.SyncFile(tmp); err != nil {
+				os.Remove(tmp)
+				return false, err
+			}
+			return true, nil
+		case !errors.Is(cerr, fsx.ErrNoClone):
+			return false, cerr
+		}
+	}
 	in, err := os.Open(src)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer in.Close()
 	out, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if _, err := io.Copy(out, in); err != nil {
 		out.Close()
 		os.Remove(tmp)
-		return err
+		return false, err
 	}
 	if err := out.Sync(); err != nil {
 		out.Close()
 		os.Remove(tmp)
-		return err
+		return false, err
 	}
 	if err := out.Close(); err != nil {
 		os.Remove(tmp)
-		return err
+		return false, err
 	}
-	return nil
+	return false, nil
 }
 
 // syncFile flushes a file written by an external tool.

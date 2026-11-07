@@ -10,6 +10,7 @@ package main
 //go:generate go run gen_winres.go
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -455,6 +456,7 @@ func cmdApply(args []string) {
 	signature := fs.String("signature", "", "comment stamped on photo/video copies (default: `onefold config` signature, else \""+config.DefaultSignature(version)+"\"; \""+config.None+"\" = none)")
 	lang := fs.String("lang", "", "ISO 639-2 language stamped on the first video/audio stream of video copies (default: `onefold config` language, none if unset; \""+config.None+"\" = none)")
 	allowUnstamped := fs.Bool("allow-unstamped", false, "with --execute: publish photos/videos without canonical metadata when exiftool/ffmpeg are missing (default: refuse to start)")
+	clone := fs.Bool("clone", false, "with --execute: start each copy as a clone of its source where the file system allows it (same volume on APFS, Btrfs, XFS...): no extra space for byte-copied files; photos are then stamped on the clone, the source is never touched")
 	link := fs.Bool("link", false, "with --execute: publish each winner as a hard link of its source (original bytes, no copy, no canonical metadata, mtime untouched); target and sources on the same volume. Golden and source share their bytes: edit neither")
 	_ = fs.Parse(args)
 	if fs.NArg() != 1 {
@@ -481,7 +483,10 @@ func cmdApply(args []string) {
 		if err := (config.Config{Language: silver.Language}).Validate(); err != nil {
 			fatal(2, err)
 		}
-		cmdApplyExecute(acts, *target, *onlyHost, *heartbeat, *workers, silver, *allowUnstamped, *link)
+		if *clone && *link {
+			fatal(2, errors.New("apply: -clone and -link exclude each other"))
+		}
+		cmdApplyExecute(acts, *target, *onlyHost, *heartbeat, *workers, silver, *allowUnstamped, *link, *clone)
 		return
 	}
 
@@ -526,7 +531,7 @@ func cmdApply(args []string) {
 	}
 }
 
-func cmdApplyExecute(acts []plan.Action, target, onlyHost string, heartbeat time.Duration, workers int, silver materialize.Silver, allowUnstamped, link bool) {
+func cmdApplyExecute(acts []plan.Action, target, onlyHost string, heartbeat time.Duration, workers int, silver materialize.Silver, allowUnstamped, link, clone bool) {
 	// Photos are exiftool/CPU-bound and scale with parallelism; videos are
 	// ffmpeg + sequential reads where parallelism only causes seek contention:
 	// materialize.ApplyAll runs photos in a pool, videos serially, both groups
@@ -557,9 +562,12 @@ func cmdApplyExecute(acts []plan.Action, target, onlyHost string, heartbeat time
 		os.Exit(2)
 	}
 	rep := report.New(report.Options{Label: "materialize", TotalBytes: total, Heartbeat: heartbeat})
-	st := materialize.ApplyAll(sel, target, materialize.RunOptions{Workers: workers, Progress: rep, Silver: silver, Link: link})
+	st := materialize.ApplyAll(sel, target, materialize.RunOptions{Workers: workers, Progress: rep, Silver: silver, Link: link, Clone: clone})
 	rep.Finish()
 	fmt.Printf("  written %d, already present %d, failed %d\n", st.Written, st.Skipped, st.Failed)
+	if clone {
+		fmt.Printf("  cloned %d (the rest copied: another volume or a file system without clones)\n", st.Cloned)
+	}
 	if onlyHost != "" && filtered > 0 {
 		fmt.Printf("  (other-host actions skipped: %d)\n", filtered)
 	}

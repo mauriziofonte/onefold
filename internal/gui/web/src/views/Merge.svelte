@@ -53,7 +53,7 @@
       filters: { maxSize: cfg.filters.maxSize, exclude: cfg.filters.exclude, rules: { ...cfg.filters.rules },
         excludePaths: [...(cfg.filters.excludePaths || [])], excludeGlobs: [...(cfg.filters.excludeGlobs || [])] },
       trustSparse: !cfg.safety.verify, noVerifyCopy: !cfg.safety.verifyCopy, noFsync: !cfg.safety.fsync,
-      noCache: !cfg.safety.cache, workers: Number(cfg.safety.workers) || 0,
+      noCache: !cfg.safety.cache, clone: !!cfg.safety.clone, workers: Number(cfg.safety.workers) || 0,
     };
   }
 
@@ -166,6 +166,7 @@
         <label class="chk"><input type="checkbox" bind:checked={cfg.safety.verifyCopy} />{t('safety.verifyCopy')}</label>
         <label class="chk"><input type="checkbox" bind:checked={cfg.safety.fsync} />{t('safety.fsync')}</label>
         <label class="chk"><input type="checkbox" bind:checked={cfg.safety.cache} />{t('safety.cache')}</label>
+        <label class="chk"><input type="checkbox" bind:checked={cfg.safety.clone} data-testid="merge-clone" />{t('safety.clone')}</label>
         <p class="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">{t('safety.warn')}</p>
         <label class="block"><span class="lbl">{t('safety.workers')}</span><input class="input mt-1 w-24" type="number" min="0" bind:value={cfg.safety.workers} /></label>
       </div>

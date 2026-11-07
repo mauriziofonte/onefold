@@ -148,6 +148,7 @@ export default {
   'safety.verifyCopy': 'Re-read every copy and compare',
   'safety.fsync': 'Flush each copy to disk before publishing it',
   'safety.cache': 'Use the output cache (faster second run)',
+  'safety.clone': 'Clone instead of copying where the disk allows it (same drive on APFS, Btrfs, XFS: instant, no extra space)',
   'safety.warn': 'Turning off the first one can lose data: two different files can share a sparse fingerprint (seen on real data).',
   'safety.workers': 'Copy workers (0 = all CPUs)',
   'merge.result': 'Preview result',

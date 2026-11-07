@@ -39,7 +39,7 @@ export const defaults = () => ({
   wizard: wizardDefaults(),
   merge: {
     inputs: [], output: '', ...namingCfg(), filters: filters(),
-    safety: { verify: true, verifyCopy: true, fsync: true, cache: true, workers: 0 }, jobId: '', autoPreview: false,
+    safety: { verify: true, verifyCopy: true, fsync: true, cache: true, clone: false, workers: 0 }, jobId: '', autoPreview: false,
     purgeJobId: '', trash: false, tab: 'settings', stale: false,
   },
   rearrange: { root: '', ...namingCfg(), dupes: 'delete', keepEmptyDirs: false, filters: filters(), jobId: '', autoPreview: false,

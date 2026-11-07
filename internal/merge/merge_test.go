@@ -535,3 +535,44 @@ func TestNamesOneVolumeConfuses(t *testing.T) {
 		}
 	}
 }
+
+// -clone: on a file system that clones, every copy is a clone, with the same
+// bytes, times and names as a byte copy; elsewhere the byte copy runs and
+// nothing is cloned.
+func TestMergeClone(t *testing.T) {
+	scenarioIn := func(root string) (O, B string) {
+		O, B = filepath.Join(root, "OUT"), filepath.Join(root, "B")
+		write(t, filepath.Join(B, "docs/a.txt"), strings.Repeat("alpha ", 5000), t2015)
+		write(t, filepath.Join(B, "docs/b.pdf"), "%PDF "+strings.Repeat("beta ", 3000), t2020)
+		write(t, filepath.Join(B, "dup/a copy.txt"), strings.Repeat("alpha ", 5000), t2010)
+		return
+	}
+	check := func(root string, wantCloned bool) {
+		O, B := scenarioIn(root)
+		before := snap(t, B)
+		o := opts([]string{B}, O, true)
+		o.Clone = true
+		r := run(t, o)
+		if r.Copied != 2 || len(r.Failed) != 0 {
+			t.Fatalf("copied %d failed %v", r.Copied, r.Failed)
+		}
+		if wantCloned && r.Cloned != 2 || !wantCloned && r.Cloned != 0 {
+			t.Fatalf("cloned %d of %d (clone-capable: %v)", r.Cloned, r.Copied, wantCloned)
+		}
+		plain := filepath.Join(root, "PLAIN")
+		run(t, opts([]string{B}, plain, true))
+		got, want := snap(t, O), snap(t, plain)
+		if !mapsEqual(got, want) {
+			t.Fatalf("clones differ from copies:\n%v\n%v", got, want)
+		}
+		if !mapsEqual(snap(t, B), before) {
+			t.Fatal("the input changed")
+		}
+	}
+	if dir := testfix.CloneDir(t); dir != "" {
+		check(dir, true)
+		return
+	}
+	t.Log("no clone-capable file system: the byte-copy fallback ran (ONEFOLD_CLONE_DIR names one)")
+	check(testfix.TempDir(t), false)
+}

@@ -147,6 +147,7 @@ export default {
   'safety.verify': 'Conferma i duplicati sull\'intero contenuto prima di saltarli',
   'safety.verifyCopy': 'Rileggi ogni copia e confrontala',
   'safety.fsync': 'Scrivi ogni copia su disco prima di pubblicarla',
+  'safety.clone': 'Clona invece di copiare dove il disco lo consente (stesso disco su APFS, Btrfs, XFS: istantaneo, nessuno spazio in più)',
   'safety.cache': 'Usa la cache dell\'output (seconda esecuzione più veloce)',
   'safety.warn': 'Disattivare la prima opzione può far perdere dati: due file diversi possono avere la stessa impronta parziale (è successo su dati reali).',
   'safety.workers': 'Copie in parallelo (0 = tutte le CPU)',
