@@ -412,6 +412,10 @@ func audioNative(p, ext string, m *Meta) error {
 
 // ------------------------------------------------------------------ images
 
+// HEIFSize returns the size of the primary image of a HEIF, HEIC or AVIF
+// file, read from its head (0,0 when it does not say).
+func HEIFSize(path string) (w, h int) { return heifDims(head(path, 1<<20)) }
+
 // heifDims returns the largest image spatial extent ('ispe' property) found in
 // the head of a HEIF/HEIC/AVIF file: the primary image (a grid) is the largest,
 // its tiles and the thumbnail are smaller. 0,0 when none is found.

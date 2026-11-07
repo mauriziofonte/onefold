@@ -313,7 +313,7 @@ onefold apply --execute --target /golden new.jsonl
 
 ### Review and housekeeping
 
-- `onefold similar -o pairs.json plan.jsonl` lists photos that look alike (a resized copy, a scan of a print, a burst) for you to review; with `-docs` it also groups documents with the same text (the same report as docx and PDF, a file saved twice). It deletes and drops nothing.
+- `onefold similar -o pairs.json plan.jsonl` lists photos that look alike (a resized copy, a scan of a print, a burst) for you to review. It reads JPEG, PNG, GIF, TIFF and WebP itself, camera RAW through the full-size JPEG preview the camera stores inside them (so a RAW and the JPEG of the same shot show up as a pair), and HEIC, HEIF and AVIF through ffmpeg when it is installed (FFmpeg 7.1 or later for the tiled HEIC of phones; an older one is detected and the photo listed as unreadable). With `-docs` it also groups documents with the same text (the same report as docx and PDF, a file saved twice). It deletes and drops nothing.
 - The copies left behind (the duplicates the plan did not choose) stay where they are. `onefold reclaim -target /golden -script reclaim.sh -o reclaim.json plan.jsonl` re-reads every exact duplicate against the file the archive copy came from and writes a script that deletes the verified ones; read it, then run it yourself (PowerShell on Windows, sh elsewhere; `-ps` chooses). Lower-resolution and other variants are only listed.
 - A copy for a disk you put away: `onefold backup -execute /golden /mnt/cold` (same paths, only adds, every copy read back, a content manifest in `/mnt/cold/.onefold`); later `onefold backup -check /mnt/cold` reads every file again and names those that changed or went missing.
 
