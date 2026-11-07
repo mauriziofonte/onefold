@@ -221,6 +221,9 @@ onefold.exe stats D:\ C:\Users\me\Pictures E:\old-disk
 
 :: duplicates confirmed on the whole content, everything as JSON
 onefold.exe stats -dups full -json report.json D:\
+
+:: the same as a page with charts, to open in a browser or send to someone
+onefold.exe stats -dups full -html report.html D:\
 ```
 
 - Several folders or volumes are measured together; a folder inside another given one is counted once.
@@ -229,6 +232,7 @@ onefold.exe stats -dups full -json report.json D:\
 - A second run is faster: the digests of files that did not change since are remembered (in onefold's own state folder) instead of read again. Nothing is ever deleted on a remembered digest: deletions read the files again.
 - A hard-linked file is counted once. On Linux and macOS a walk stays on the volume of its folder (the volumes mounted below it are listed, `-one-volume=false` enters them) and the space used on disk is shown next to the size; Windows reports neither hard links nor the space on disk.
 - The JSON (`-json FILE`, `-` for the standard output) holds every breakdown, the folder tree (`-depth`, default 6 levels) and up to 100 largest files and duplicate groups; the tables print `-top` rows.
+- The HTML report (`-html FILE`) is one file with the breakdowns as charts, each with its numbers in a table below, in light or dark like your system. It contains no script and makes no network request, so it opens offline and can be mailed as it is. `plan -report plan.html` writes the plan report the same way.
 
 ### Cleaning up duplicates
 

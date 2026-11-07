@@ -4,8 +4,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package planreport renders the `plan --report` artifact: aggregate stats,
-// duplicate groups, document near-duplicates and extension mismatches, as JSON
-// or Markdown. Read-only: computed from manifests + plan result.
+// duplicate groups, document near-duplicates and extension mismatches, as JSON,
+// Markdown or one self-contained HTML file with charts. Read-only: computed
+// from manifests + plan result.
 package planreport
 
 import (
@@ -212,12 +213,20 @@ func orNone(s string) string {
 	return s
 }
 
-// Write renders the report to path: .md -> Markdown, anything else -> JSON.
+// Write renders the report to path: .md -> Markdown, .html or .htm -> HTML
+// with charts, anything else -> JSON.
 func Write(rep *Report, path string) error {
 	var b []byte
-	if strings.EqualFold(filepath.Ext(path), ".md") {
+	switch e := strings.ToLower(filepath.Ext(path)); {
+	case e == ".md":
 		b = []byte(Markdown(rep))
-	} else {
+	case e == ".html" || e == ".htm":
+		var sb strings.Builder
+		if err := HTML(&sb, rep); err != nil {
+			return err
+		}
+		b = []byte(sb.String())
+	default:
 		var err error
 		if b, err = json.MarshalIndent(rep, "", "  "); err != nil {
 			return err

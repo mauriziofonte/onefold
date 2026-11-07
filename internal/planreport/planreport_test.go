@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/mauriziofonte/onefold/internal/catalog"
+	"github.com/mauriziofonte/onefold/internal/htmlreport"
 	"github.com/mauriziofonte/onefold/internal/meta"
 	"github.com/mauriziofonte/onefold/internal/plan"
 )
@@ -61,11 +62,14 @@ func TestReport(t *testing.T) {
 	}
 
 	d := t.TempDir()
-	jp, mp := filepath.Join(d, "r.json"), filepath.Join(d, "r.md")
+	jp, mp, hp := filepath.Join(d, "r.json"), filepath.Join(d, "r.md"), filepath.Join(d, "r.HTML")
 	if err := Write(rep, jp); err != nil {
 		t.Fatal(err)
 	}
 	if err := Write(rep, mp); err != nil {
+		t.Fatal(err)
+	}
+	if err := Write(rep, hp); err != nil {
 		t.Fatal(err)
 	}
 	var back Report
@@ -77,6 +81,15 @@ func TestReport(t *testing.T) {
 	for _, want := range []string{"# onefold plan report", "## By kind", "Budget", "fake.jpg", "## Golden files"} {
 		if !strings.Contains(string(md), want) {
 			t.Fatalf("markdown missing %q", want)
+		}
+	}
+	h, _ := os.ReadFile(hp)
+	if err := htmlreport.Check(string(h)); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"<title>onefold plan report</title>", "By kind", "Budget", "fake.jpg", "Golden files"} {
+		if !strings.Contains(string(h), want) {
+			t.Fatalf("html missing %q", want)
 		}
 	}
 }

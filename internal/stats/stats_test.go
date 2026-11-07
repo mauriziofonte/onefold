@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/mauriziofonte/onefold/internal/hashcache"
+	"github.com/mauriziofonte/onefold/internal/htmlreport"
 	"github.com/mauriziofonte/onefold/internal/kinds"
 	"github.com/mauriziofonte/onefold/internal/testfix"
 )
@@ -270,5 +271,28 @@ func TestDupsHashCache(t *testing.T) {
 	}
 	if r.Dups.Extra != 2 {
 		t.Fatalf("a changed file was served from the cache: extra %d (%s)", r.Dups.Extra, other)
+	}
+}
+
+// The HTML report is one self-contained file with every breakdown.
+func TestHTML(t *testing.T) {
+	root, _ := tree(t)
+	r, err := Run(Options{Roots: []string{root}, Workers: 2, OneVolume: true, Dups: DupsFull})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	if err := HTML(&b, r, 20); err != nil {
+		t.Fatal(err)
+	}
+	s := b.String()
+	if err := htmlreport.Check(s); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"<title>onefold statistics</title>", "By family", "photos", "By extension", "jpg", "By year", "2020",
+		"Largest files", "beach.jpg", "Duplicates", "beach copy.jpg", "zzqq"} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("report missing %q", want)
+		}
 	}
 }
