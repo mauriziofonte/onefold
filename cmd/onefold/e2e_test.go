@@ -967,9 +967,46 @@ func TestStatsCLI(t *testing.T) {
 	if out := dd(t, "stats", "-mounts"); !strings.Contains(out, "VOLUME") {
 		t.Errorf("-mounts:\n%s", out)
 	}
-	for _, args := range [][]string{{"stats"}, {"stats", "-dups", "bogus", A}, {"stats", filepath.Join(root, "missing")}} {
-		if err := exec.Command(bin, args...).Run(); err == nil {
-			t.Errorf("onefold %v must fail", args)
+	// the tables: headline, sections, -top rows, duplicates with their paths
+	out = dd(t, "stats", "-dups", "full", "-top", "1", A, B)
+	for _, want := range []string{"files 5", "empty 1", "BY FAMILY", "photos", "DUPLICATES", "1 groups, 1 extra copies",
+		filepath.Join(pics, "IMG_0001.jpg"), filepath.Join(B, "IMG_0001 (1).jpg")} {
+		if !strings.Contains(out, want) {
+			t.Errorf("tables lack %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "only in the cloud") {
+		t.Errorf("local files reported as cloud-only:\n%s", out)
+	}
+	// -json FILE writes the same result and still prints the tables
+	jf := filepath.Join(t.TempDir(), "stats.json")
+	out = dd(t, "stats", "-dups", "off", "-json", jf, A)
+	var fr stats.Result
+	b, err := os.ReadFile(jf)
+	must(t, err)
+	must(t, json.Unmarshal(b, &fr))
+	if fr.Version != stats.FormatVersion || fr.Files != 2 || fr.Dups != nil || !strings.Contains(out, "BY FAMILY") {
+		t.Errorf("-json FILE: version %d files %d dups %v; tables printed: %v", fr.Version, fr.Files, fr.Dups, strings.Contains(out, "BY FAMILY"))
+	}
+	// exit codes: 2 = usage, 1 = a run that fails or cannot write its JSON
+	for _, c := range []struct {
+		args []string
+		code int
+	}{
+		{[]string{"stats"}, 2},
+		{[]string{"stats", "-dups", "bogus", A}, 2},
+		{[]string{"stats", "-dup-min", "lots", A}, 2},
+		{[]string{"stats", "-no-such-flag", A}, 2},
+		{[]string{"stats", filepath.Join(root, "missing")}, 1},
+		{[]string{"stats", "-json", filepath.Join(root, "no-dir", "x.json"), A}, 1},
+	} {
+		err := exec.Command(bin, c.args...).Run()
+		var ee *exec.ExitError
+		if code := 0; !errors.As(err, &ee) || ee.ExitCode() != c.code {
+			if ee != nil {
+				code = ee.ExitCode()
+			}
+			t.Errorf("onefold %v: exit %d (%v), want %d", c.args, code, err, c.code)
 		}
 	}
 	if snapshot(t, root) != before {
