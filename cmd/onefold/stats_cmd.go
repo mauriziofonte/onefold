@@ -6,6 +6,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -32,6 +33,7 @@ func cmdStats(args []string) {
 	depth := fs.Int("depth", 6, "folder levels kept in the tree (JSON) below each folder")
 	top := fs.Int("top", 10, "rows printed per section (the JSON keeps more)")
 	jsonOut := fs.String("json", "", "write the whole result as JSON to FILE (- = standard output, no tables)")
+	htmlOut := fs.String("html", "", "write a report with charts to FILE: one HTML file that opens offline in a browser and makes no network request")
 	readOnline := fs.Bool("read-online-only", false, "duplicates: also read cloud files that are not on this computer (OneDrive, iCloud, Dropbox placeholders), which downloads them")
 	workers := fs.Int("j", 0, "workers (0 = NumCPU)")
 	heartbeat := fs.Duration("heartbeat", report.DefaultHeartbeat, "progress log interval when output is not a terminal")
@@ -84,10 +86,24 @@ func cmdStats(args []string) {
 			return
 		}
 	}
+	if *htmlOut != "" {
+		if werr := writeStatsHTML(*htmlOut, res, max(20, *top)); werr != nil {
+			fatal(1, werr)
+		}
+		fmt.Fprintf(os.Stderr, "report: %s\n", *htmlOut)
+	}
 	printStats(os.Stdout, res, *top)
 	if err != nil {
 		fatal(1, err)
 	}
+}
+
+func writeStatsHTML(path string, res *stats.Result, top int) error {
+	var b bytes.Buffer
+	if err := stats.HTML(&b, res, top); err != nil {
+		return err
+	}
+	return os.WriteFile(path, b.Bytes(), 0o644)
 }
 
 func writeStatsJSON(path string, res *stats.Result) error {

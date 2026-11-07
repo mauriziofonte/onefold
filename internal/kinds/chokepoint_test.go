@@ -27,7 +27,7 @@ func TestChokePoint(t *testing.T) {
 	// file-type knowledge.
 	exempt := map[string]map[string]bool{
 		"materialize.go": {".part": true},
-		"planreport.go":  {".md": true, ".part": true},
+		"planreport.go":  {".md": true, ".part": true, ".html": true, ".htm": true},
 		"backup.go":      {".jsonl": true},
 		"dedupe.go":      {".jsonl": true},
 		"purge.go":       {".jsonl": true},

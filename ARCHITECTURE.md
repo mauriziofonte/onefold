@@ -124,7 +124,7 @@ The only files onefold writes are:
 | `export-text --target T` | `.txt` sidecars under T only |
 | `push` | the remote destination only |
 | `merge -execute` | new files in the output only, plus `<output>/.onefold/` |
-| `golden-index -o`, `match -o/-report`, `similar -o`, `reclaim -o/-script`, `seed -o/-list`, `stats -json`, `dedupe -script/-json` | the named files |
+| `golden-index -o`, `match -o/-report`, `similar -o`, `reclaim -o/-script`, `seed -o/-list`, `stats -json/-html`, `dedupe -script/-json` | the named files |
 | `dedupe -execute -expect N` | the extra copies inside its folders (to the Trash, or replaced by a hard link or a clone of the copy that stays), plus its journal in `<state dir>/dedupe/` |
 | `backup -execute SRC DST` | new files in DST, plus `DST/.onefold/` |
 | `backup -restore -execute -expect N -tree G DST` | the damaged or missing files of G or DST (from the other side), the replaced ones kept in `<side>/.onefold/damaged/`, plus its journal in `<state dir>/restore/` |
@@ -223,7 +223,8 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 │   ├── config/             per-user configuration
 │   ├── runctl/             pause/stop gate
 │   ├── report/             progress bars and heartbeat logs
-│   ├── planreport/         plan -report (Markdown/JSON)
+│   ├── planreport/         plan -report (Markdown/JSON/HTML)
+│   ├── htmlreport/         self-contained HTML reports with SVG charts
 │   ├── perf/               -perf telemetry
 │   ├── fsx/                no-replace rename, temp names, uncached reads
 │   ├── tools/              optional external tool registry
@@ -279,7 +280,8 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 | `internal/config` | per-user config | `Load`, `SaveTo`, `Apply`, `Override` |
 | `internal/runctl` | pause/stop | `New`, `Gate.Wait` |
 | `internal/report` | progress output | `New`, `Reporter`, `Printf`, `SetSink` |
-| `internal/planreport` | plan report | `Build`, `Write` |
+| `internal/planreport` | plan report | `Build`, `Write`, `HTML` |
+| `internal/htmlreport` | one-file HTML report: figures, SVG bar charts each with its table, tables | `New`, `Doc.Bars`, `Doc.Table`, `Doc.WriteTo`, `Check` |
 | `internal/perf` | telemetry | `Start`, `End`, `Print` |
 | `internal/fsx` | filesystem primitives | `RenameNoReplace`, `TempFor`, `IsTemp`, `OpenUncached` |
 | `internal/tools` | external tools | `Path`, `Command`, `Output`, `StartTree` |
@@ -312,10 +314,10 @@ Leaves: `kinds`, `fsx`, `perf`, `report`, `runctl`, `statedir`, `testfix`, `winr
 | `rearrange` | catalog, fsx, merge, names, naming, perf, plan, report, runctl, sidecar, sparsehash |
 | `settings` | catalog, merge, naming, rearrange |
 | `purge` | fsx, kinds, merge, report, runctl, sparsehash |
-| `stats` | fsx, hashcache, kinds, runctl, sparsehash |
+| `stats` | fsx, hashcache, htmlreport, kinds, report, runctl, sparsehash |
 | `dedupe` | fsx, hashcache, purge, runctl, sparsehash, statedir, stats |
 | `scan` | kinds, sparsehash |
-| `planreport` | catalog, kinds, plan, report |
+| `planreport` | catalog, htmlreport, kinds, plan, report |
 | `remote` | fsx |
 | `materialize` | fsx, kinds, meta, plan, runctl, tools |
 | `textexport` | fsx, kinds, meta, plan, tools |
@@ -538,13 +540,14 @@ Timestamps in these names are `yyyyMMdd-HHmmss.nnnnnnnnn`.
 | File | Content |
 |---|---|
 | `merge -report FILE` | JSON of `merge.Result`; after an execute it includes `settled` (input of `purge-sources`) |
-| `plan -report FILE` | `.md` = Markdown, else JSON: totals, by kind/category/extension/year, duplicate groups, document near-duplicates, extension mismatches, golden file list with `-extensive` |
+| `plan -report FILE` | `.md` = Markdown, `.html`/`.htm` = HTML with charts (section 23.3), else JSON: totals, by kind/category/extension/year, duplicate groups, document near-duplicates, extension mismatches, golden file list with `-extensive` |
 | `match -report FILE` | JSON: dupes, upgrades, counts |
 | `backup -check -tree -o FILE`, `backup -restore -o FILE` | JSON: manifests, tree and copy audits, repairs (rel, to, why, size, content, aside, error), lost, moved; a restore adds done, healthy, failed, journal |
 | `similar -o FILE` | JSON: hashed, rawPreviews, viaFfmpeg, skipped, noFfmpeg, flat, failed, pairs, docGroups |
 | `reclaim -o FILE`, `-script FILE` | JSON: safe, review, skipped; the sh or PowerShell script |
 | `seed -o FILE`, `-list FILE` | the sh or cmd script; the rsync file list |
 | `stats -json FILE` | JSON of `stats.Result` (`version` 1): totals, breakdowns, folder tree, duplicates, folder pairs, problems (section 16.6) |
+| `stats -html FILE` | one self-contained HTML file: the same figures and breakdowns as charts, each with its table (section 23.3) |
 | settings JSON (`-settings`, GUI export) | section 20 |
 | `<state dir>/config.json` | section 21 |
 | `<state dir>/jobs/<id>/...` | section 22 |
@@ -1274,7 +1277,7 @@ The manifests also say what the tree held when it was copied, so the tree can be
 - Workers: `-j` (default: CPUs) for both passes; CLI progress as in section 23.1 (`-heartbeat`, reporter labels `stats scan` and `stats duplicates`).
 - Live: `OnSnapshot` receives a partial result every second during the scan (the GUI shows the charts filling in); pause and stop go through `runctl` (a stopped run returns what it read, `stopped: true`).
 - `Mounts()`: the volumes with size and free space. Linux reads `/proc/self/mountinfo` (pseudo file systems such as `proc`, `sysfs`, `tmpfs`, `overlay` left out; network file systems marked remote), macOS `getfsstat`, Windows the logical drives with their type and label.
-- `-json FILE` (`-` = standard output) writes the whole `Result` (`version` 1); without it the CLI prints tables of `-top` rows.
+- `-json FILE` (`-` = standard output) writes the whole `Result` (`version` 1); without it the CLI prints tables of `-top` rows. `-html FILE` writes the same breakdowns as one HTML file with charts (section 23.3; at least 20 rows per list) and still prints the tables.
 - `OnGroup` receives every group confirmed on the whole content (`full` only, not just the `Top` kept in the result): what a cleanup acts on (section 16.7).
 
 ### 16.7 `dedupe`: cleaning up duplicate copies
@@ -1614,9 +1617,13 @@ Units are bytes (apply, push, merge copies, verify) or items (catalog, rearrange
 
 ### 23.2 Plan report (`internal/planreport`)
 
-`plan -report FILE` (`.md` = Markdown, anything else = JSON; `-extensive` lists everything instead of the top 50): totals with verification statistics; by kind (files, bytes, golden, dropped), category, extension and year; duplicate groups by reclaimable size; document near-duplicates (golden documents with the same title, author and page count but different bytes: listed, never dropped; `similar -docs` goes further, section 16.1); extension mismatches; with `-extensive` the golden file list.
+`plan -report FILE` (`.md` = Markdown, `.html` or `.htm` = HTML with charts, section 23.3, anything else = JSON; `-extensive` lists everything instead of the top 50): totals with verification statistics; by kind (files, bytes, golden, dropped), category, extension and year; duplicate groups by reclaimable size; document near-duplicates (golden documents with the same title, author and page count but different bytes: listed, never dropped; `similar -docs` goes further, section 16.1); extension mismatches; with `-extensive` the golden file list.
 
-### 23.3 Telemetry (`internal/perf`)
+### 23.3 HTML reports (`internal/htmlreport`)
+
+`stats -html FILE` and `plan -report FILE.html` write one HTML file that opens in any browser, offline. Everything is inside it: the CSS (light, and dark when the system asks for it, `prefers-color-scheme`, in the GUI's brand colors), the charts as inline SVG, and no script. A `Content-Security-Policy` meta tag (`default-src 'none'; style-src 'unsafe-inline'`) forbids every request, so the file cannot load or send anything even when edited by hand. Each chart is a horizontal bar chart (`role="img"` with a text summary of its first rows) followed by the same numbers as a table under a "Table" disclosure, for screen readers and for copying; every text is HTML-escaped (file names included). `htmlreport.Check` is what the tests of every report run: no script, no event attribute, no `http:`, `https:` or `//` reference, the policy present, and one table per chart.
+
+### 23.4 Telemetry (`internal/perf`)
 
 `-perf` (on `catalog`, `merge`, `rearrange`) prints a table of timings to stderr at exit; `-perf-out FILE` writes them as JSON. Stages include `stat`, `open`, `read:sniff512`, `read:whole`, `read:sparse`, `read:full`, `hash:sparse`, `hash:full`, `extract:<kind>`, `spawn:<tool>`, `exiftool:reader`, and merge `mkdir`, `copy`, `fsync`, `verify-copy`, `rename`; slow files are listed as outliers. Disabled telemetry costs one atomic load per probe.
 
@@ -1755,7 +1762,7 @@ Go's `flag` package: `-x` and `--x` are equivalent; flags go before positional a
 | `rearrange [flags] ROOT` | reorganize in place | ROOT |
 | `naming` | naming grammar, presets, placeholders | - |
 | `config [list\|get\|set\|unset\|path]` | user configuration | config file |
-| `stats [flags] FOLDER\|MOUNT...`, `stats -mounts` | what folders and volumes hold, duplicates | `-json` |
+| `stats [flags] FOLDER\|MOUNT...`, `stats -mounts` | what folders and volumes hold, duplicates | `-json`, `-html` |
 | `dedupe -action A [flags] FOLDER...`, `dedupe -resume J` | clean up duplicate copies (section 16.7) | the copies (Trash, link, clone), `-script`, `-json`, journal |
 | `doctor` | platform, zone, tools | - |
 | `tools [list\|install all\|ID...]` | pinned tool downloads (Windows) | state dir |
@@ -1867,7 +1874,7 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 | `winres` | `.syso` in sync, layout, logo pixels, version info |
 | `dedupe` | keep rules and `-keep-in`, links, clones (Btrfs, APFS), the Trash, refusals of a changed copy or an unflushed keeper, the script, `Resume` of a half-done replacement |
 | `power` | nested locks; Linux: a stand-in `systemd-inhibit` holds and releases the lock, a refused lock is reported, every thread gets the low I/O priority; macOS: the assertion is listed by `pmset -g assertions` and gone after release; Windows: execution state and background mode |
-| `cmd/onefold` | CLI end-to-end (`TestE2E` on a synthetic two-host corpus, `TestCorpusFlow`, merge, rearrange, desktop archive with purge, settings round trip, the golden delta flow with similar, reclaim, backup and seed, `apply -link`, `stats` with `-dups full`, `-json`, `-mounts` and bad input, `dedupe` dry run, script, execute and exit codes), `TestSourceHeaders`, `TestVersionFile` |
+| `cmd/onefold` | CLI end-to-end (`TestE2E` on a synthetic two-host corpus, `TestCorpusFlow`, merge, rearrange, desktop archive with purge, settings round trip, the golden delta flow with similar, reclaim, backup and seed, `apply -link`, `stats` with `-dups full`, `-json`, `-html`, `-mounts` and bad input, `plan -report` as Markdown, JSON and HTML, `dedupe` dry run, script, execute and exit codes), `TestSourceHeaders`, `TestVersionFile` |
 
 ### 27.1.1 Scale
 

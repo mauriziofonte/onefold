@@ -29,6 +29,7 @@ import (
 	"github.com/mauriziofonte/onefold/internal/catalog"
 	"github.com/mauriziofonte/onefold/internal/config"
 	"github.com/mauriziofonte/onefold/internal/dedupe"
+	"github.com/mauriziofonte/onefold/internal/htmlreport"
 	"github.com/mauriziofonte/onefold/internal/meta"
 	"github.com/mauriziofonte/onefold/internal/naming"
 	"github.com/mauriziofonte/onefold/internal/plan"
@@ -290,6 +291,10 @@ func TestE2E(t *testing.T) {
 		t.Fatalf("plan output: %s", out)
 	}
 	dd(t, "plan", "-o", filepath.Join(work, "plan2.jsonl"), "-layout", "document", "-verify-full", "-fix-ext", "-report", filepath.Join(work, "r.json"), ma, mb)
+	dd(t, "plan", "-o", filepath.Join(work, "plan3.jsonl"), "-layout", "document", "-report", filepath.Join(work, "r.html"), ma, mb)
+	if hb, err := os.ReadFile(filepath.Join(work, "r.html")); err != nil || htmlreport.Check(string(hb)) != nil || !strings.Contains(string(hb), "By kind") {
+		t.Fatalf("plan -report r.html: %v %v", err, htmlreport.Check(string(hb)))
+	}
 	acts := loadPlan(t, pp)
 	got := byName(acts)
 	expect := map[string]string{
@@ -1010,6 +1015,14 @@ func TestStatsCLI(t *testing.T) {
 	must(t, json.Unmarshal(b, &fr))
 	if fr.Version != stats.FormatVersion || fr.Files != 2 || fr.Dups != nil || !strings.Contains(out, "BY FAMILY") {
 		t.Errorf("-json FILE: version %d files %d dups %v; tables printed: %v", fr.Version, fr.Files, fr.Dups, strings.Contains(out, "BY FAMILY"))
+	}
+	// -html FILE writes one self-contained report and still prints the tables
+	hf := filepath.Join(t.TempDir(), "stats.html")
+	out = dd(t, "stats", "-dups", "full", "-html", hf, A, B)
+	hb, err := os.ReadFile(hf)
+	must(t, err)
+	if err := htmlreport.Check(string(hb)); err != nil || !strings.Contains(string(hb), "Duplicates") || !strings.Contains(out, "BY FAMILY") {
+		t.Errorf("-html FILE: %v; duplicates in report: %v; tables printed: %v", err, strings.Contains(string(hb), "Duplicates"), strings.Contains(out, "BY FAMILY"))
 	}
 	// exit codes: 2 = usage, 1 = a run that fails or cannot write its JSON
 	for _, c := range []struct {
