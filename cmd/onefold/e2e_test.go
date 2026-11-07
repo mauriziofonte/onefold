@@ -942,6 +942,62 @@ func TestApplyLinkCLI(t *testing.T) {
 // counted once), finds the copy shared by two folders, confirms it on the
 // whole content with -dups full, tells apart same-size files with other
 // bytes, prints the tables, refuses bad input and never writes into a root.
+// schedule: a job written for this system (external tools off: nothing is
+// turned on, the commands are printed), run as the system scheduler would
+// start it, listed, its log, removed; a command that deletes is refused.
+func TestScheduleCLI(t *testing.T) {
+	root := testfix.TempDir(t)
+	src := filepath.Join(root, "src")
+	must(t, testfix.File(filepath.Join(src, "a.txt"), "alpha", time.Date(2020, 1, 2, 3, 4, 5, 0, time.Local)))
+	state := filepath.Join(root, "state")
+	env := append(os.Environ(), "ONEFOLD_STATE_DIR="+state, "ONEFOLD_NO_EXTERNAL=1", "HOME="+root, "XDG_CONFIG_HOME="+filepath.Join(root, "config"))
+	run := func(want int, args ...string) string {
+		t.Helper()
+		cmd := exec.Command(bin, args...)
+		cmd.Dir, cmd.Env = root, env
+		out, err := cmd.CombinedOutput()
+		code := 0
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			code = ee.ExitCode()
+		} else if err != nil {
+			t.Fatal(err)
+		}
+		if code != want {
+			t.Fatalf("onefold %v: exit %d, want %d\n%s", args, code, want, out)
+		}
+		return string(out)
+	}
+	out := run(0, "schedule", "add", "-name", "nightly", "-every", "daily", "-at", "02:15", "--", "stats", "-dups", "off", "-json", "report.json", src)
+	if !strings.Contains(out, "wrote ") || !strings.Contains(out, "to turn it on, run:") {
+		t.Fatalf("add:\n%s", out)
+	}
+	run(1, "schedule", "add", "-name", "nightly", "--", "stats", src) // the name is taken
+	run(2, "schedule", "add", "-name", "tidy", "--", "rearrange", "-execute", src)
+	run(2, "schedule", "add", "-name", "fix", "--", "backup", "-restore", "-execute", "-tree", src, root)
+	run(0, "schedule", "run", "-state", state, "nightly")
+	var r stats.Result
+	b, err := os.ReadFile(filepath.Join(root, "report.json")) // a relative path: the folder of the add
+	must(t, err)
+	must(t, json.Unmarshal(b, &r))
+	if r.Files != 1 {
+		t.Fatalf("the scheduled stats counted %d files", r.Files)
+	}
+	if out := run(0, "schedule", "list"); !strings.Contains(out, "nightly") || !strings.Contains(out, "every day at 02:15") || !strings.Contains(out, "exit 0") {
+		t.Fatalf("list:\n%s", out)
+	}
+	if out := run(0, "schedule", "log", "-name", "nightly"); !strings.Contains(out, "onefold stats -dups off") || !strings.Contains(out, "exit 0 after") {
+		t.Fatalf("log:\n%s", out)
+	}
+	if out := run(0, "schedule", "remove", "-name", "nightly"); !strings.Contains(out, "removed ") {
+		t.Fatalf("remove:\n%s", out)
+	}
+	if out := run(0, "schedule", "list"); !strings.Contains(out, "no scheduled jobs") {
+		t.Fatalf("list after remove:\n%s", out)
+	}
+	run(1, "schedule", "remove", "-name", "nightly")
+}
+
 func TestStatsCLI(t *testing.T) {
 	root := testfix.TempDir(t)
 	A, B := filepath.Join(root, "A"), filepath.Join(root, "B")

@@ -33,6 +33,8 @@ func TestChokePoint(t *testing.T) {
 		"purge.go":       {".jsonl": true},
 		"rearrange.go":   {".jsonl": true},
 		"restore.go":     {".jsonl": true},
+		"native.go":      {".timer": true, ".plist": true},
+		"schedule.go":    {".json": true, ".log": true, ".old": true},
 		"sftp.go":        {".part": true},
 		"textexport.go":  {".txt": true, ".part": true, ".xml": true, ".xhtml": true, ".html": true, ".htm": true},
 		"tools.go":       {".exe": true, ".bat": true, ".cmd": true},

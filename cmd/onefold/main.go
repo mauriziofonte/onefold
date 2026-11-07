@@ -121,6 +121,8 @@ func main() {
 		cmdStats(os.Args[2:])
 	case "dedupe":
 		cmdDedupe(os.Args[2:])
+	case "schedule":
+		cmdSchedule(os.Args[2:])
 	case "version", "--version", "-version", "-V":
 		fmt.Println(versionLine())
 	case "-h", "--help", "help":
@@ -216,6 +218,8 @@ usage:
   onefold stats -mounts                    list the volumes
   onefold dedupe -action trash|link|clone|script [-execute -expect N] <folder>...   clean up duplicate copies: one stays
   onefold dedupe -resume JOURNAL           finish or undo an interrupted dedupe
+  onefold schedule add -name N -every daily|weekly|hourly [-at HH:MM] -- COMMAND...   run a command on a timetable (systemd timer, launchd, Task Scheduler)
+  onefold schedule list | log -name N | remove -name N   the scheduled jobs, the output of their runs
   onefold hash <file> | index <dir> | version
 
 catalog: -o FILE  -j N  -blocks N  -preset media|all|common|image|audio|video|document|archive (CSV, default media)
