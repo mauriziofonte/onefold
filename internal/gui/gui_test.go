@@ -29,7 +29,9 @@ import (
 func TestPreferredLang(t *testing.T) {
 	for in, want := range map[string]string{
 		"it-IT,it;q=0.9,en-US;q=0.8": "it", "it": "it", "en-US,en;q=0.9,it;q=0.8": "en",
-		"de-DE,de;q=0.9": "en", "": "en", "fr;q=0.5,it;q=0.9": "it", "*": "en",
+		"de-DE,de;q=0.9": "de", "": "en", "fr;q=0.5,it;q=0.9": "it", "*": "en",
+		"pt-PT,pt;q=0.9": "pt-BR", "pt-BR": "pt-BR", "es-419,es;q=0.9": "es", "fr-CA": "fr",
+		"nl-NL,nl;q=0.9,de;q=0.8": "de", "nl-NL,nl;q=0.9": "en", "ja,it;q=0": "en",
 	} {
 		if got := PreferredLang(in); got != want {
 			t.Errorf("%q -> %s, want %s", in, got, want)

@@ -49,7 +49,7 @@ onefold is a single static Go binary that deduplicates photo/video archives and 
 | `internal/hashcache` | digests of unchanged files across runs (`<state dir>/hashes.tsv`): sampled digests for catalog, both for stats reports; never for verification or before a deletion |
 | `internal/report`, `internal/planreport`, `internal/htmlreport`, `internal/perf` | progress output (stdout = results, stderr = progress); plan report (Markdown, JSON, HTML); one-file HTML reports (`stats -html`, `plan -report x.html`: inline SVG charts each with its table, no script, a CSP that forbids every request; tests run `htmlreport.Check`); `-perf` telemetry |
 | `internal/gui` | local GUI: HTTP server on 127.0.0.1 (one-time link -> session cookie, CSP), job manager with runs persisted in the per-user state dir, guided setup (quick scan + real preview on a sample, recipes), WebView2 window on Windows / browser elsewhere |
-| `internal/gui/web` | Svelte 5 + Vite frontend (English/Italian); `dist/` is committed and embedded, so Go builds never need Node; `TestWebDistInSync` fails when it is stale |
+| `internal/gui/web` | Svelte 5 + Vite frontend (six languages, one JSON per language in `src/lib/locales`, `TestLocales` keeps them in step with `en.json`); `dist/` is committed and embedded, so Go builds never need Node; `TestWebDistInSync` fails when it is stale |
 | `internal/runctl` | pause/stop gate the engine waits on between units of work |
 | `internal/fsx`, `internal/tools`, `internal/testfix` | no-replace rename; optional tool registry; test fixture builders |
 | `internal/tooldl`, `internal/statedir` | pinned downloads of the optional tools (Windows); per-user durable state dir |
