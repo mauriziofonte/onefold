@@ -18,10 +18,10 @@ func TestWindowFallsBackToBrowser(t *testing.T) {
 	openBrowser = func(u string) { got = u }
 	defer func() { openBrowser = OpenBrowser }()
 	opened := make(chan struct{})
-	if OpenWindow("http://127.0.0.1:1/?t=x", t.TempDir(), "onefold test", opened) {
+	if OpenWindow("http://127.0.0.1:1/?c=x", t.TempDir(), "onefold test", opened) {
 		t.Fatal("a window was created without a runtime")
 	}
-	if got != "http://127.0.0.1:1/?t=x" {
+	if got != "http://127.0.0.1:1/?c=x" {
 		t.Fatalf("browser got %q", got)
 	}
 }

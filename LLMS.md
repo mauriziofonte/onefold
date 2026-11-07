@@ -43,7 +43,7 @@ onefold is a single static Go binary that deduplicates photo/video archives and 
 | `internal/materialize`, `internal/textexport`, `internal/remote` | golden copy + metadata stamping; text sidecars; pure-Go SFTP push |
 | `internal/sparsehash`, `internal/scan` | XXH128 sparse/full digests; `index` throughput probe |
 | `internal/report`, `internal/planreport`, `internal/perf` | progress output (stdout = results, stderr = progress); plan report; `-perf` telemetry |
-| `internal/gui` | local GUI: HTTP server on 127.0.0.1 (session token), job manager with runs persisted in the per-user state dir, guided setup (quick scan + real preview on a sample, recipes), WebView2 window on Windows / browser elsewhere |
+| `internal/gui` | local GUI: HTTP server on 127.0.0.1 (one-time link -> session cookie, CSP), job manager with runs persisted in the per-user state dir, guided setup (quick scan + real preview on a sample, recipes), WebView2 window on Windows / browser elsewhere |
 | `internal/gui/web` | Svelte 5 + Vite frontend (English/Italian); `dist/` is committed and embedded, so Go builds never need Node; `TestWebDistInSync` fails when it is stale |
 | `internal/runctl` | pause/stop gate the engine waits on between units of work |
 | `internal/fsx`, `internal/tools`, `internal/testfix` | no-replace rename; optional tool registry; test fixture builders |

@@ -20,6 +20,7 @@ import (
 
 	"github.com/mauriziofonte/onefold/internal/config"
 	"github.com/mauriziofonte/onefold/internal/gui"
+	"github.com/mauriziofonte/onefold/internal/statedir"
 )
 
 type guiOptions struct {
@@ -41,26 +42,44 @@ func cmdGUI(args []string) {
 	runGUI(guiOptions{port: *port, noWindow: *noWindow, noOpen: *noOpen, keep: *keep, stateDir: *state})
 }
 
+// guiLock is gui.json: the running instance of a state dir, and the launch
+// secret that gets a fresh one-time link from it (the file is owner-only).
 type guiLock struct {
-	PID int    `json:"pid"`
-	URL string `json:"url"`
+	PID    int    `json:"pid"`
+	Addr   string `json:"addr"`
+	Secret string `json:"secret"`
 }
 
-// aliveGUI reports whether the session link of a running instance answers.
-func aliveGUI(url string) bool {
-	c := http.Client{Timeout: 2 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	resp, err := c.Get(url)
-	if err != nil {
-		return false
+// freshLink asks the instance of lk for a new one-time session link; ok =
+// false when no instance answers there (a stale lock file).
+func freshLink(lk guiLock) (string, bool) {
+	if lk.Addr == "" || lk.Secret == "" {
+		return "", false
 	}
-	resp.Body.Close()
-	return resp.StatusCode == http.StatusSeeOther
+	req, err := http.NewRequest(http.MethodPost, "http://"+lk.Addr+gui.OpenLinkPath, nil)
+	if err != nil {
+		return "", false
+	}
+	req.Header.Set("X-Onefold-Launch", lk.Secret)
+	c := http.Client{Timeout: 2 * time.Second}
+	resp, err := c.Do(req)
+	if err != nil {
+		return "", false
+	}
+	defer resp.Body.Close()
+	var v struct {
+		URL string `json:"url"`
+	}
+	if resp.StatusCode != http.StatusOK || json.NewDecoder(resp.Body).Decode(&v) != nil || v.URL == "" {
+		return "", false
+	}
+	return v.URL, true
 }
 
-// redact drops the session token from a URL before logging it.
+// redact drops the one-time code from a URL before logging it.
 func redact(url string) string {
-	if i := strings.Index(url, "?t="); i >= 0 {
-		return url[:i] + "?t=…"
+	if i := strings.Index(url, "?c="); i >= 0 {
+		return url[:i] + "?c=…"
 	}
 	return url
 }
@@ -82,20 +101,23 @@ func runGUI(o guiOptions) {
 		}
 		dir = d
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := statedir.Ensure(dir); err != nil {
 		fatal(1, err)
 	}
 	dlog("gui: state dir %s", dir)
 	lockPath := filepath.Join(dir, "gui.json")
 	var lk guiLock
-	if b, err := os.ReadFile(lockPath); err == nil && json.Unmarshal(b, &lk) == nil && lk.URL != "" && aliveGUI(lk.URL) {
-		// one instance per state dir: show the running one
-		dlog("gui: instance already running at %s (pid %d): opening it", redact(lk.URL), lk.PID)
-		fmt.Fprintln(os.Stderr, "onefold GUI already running:", lk.URL)
-		if !o.noOpen {
-			gui.OpenBrowser(lk.URL)
+	if b, err := os.ReadFile(lockPath); err == nil && json.Unmarshal(b, &lk) == nil {
+		if url, ok := freshLink(lk); ok {
+			// one instance per state dir: show the running one
+			dlog("gui: instance already running at %s (pid %d): opening it", lk.Addr, lk.PID)
+			fmt.Fprintln(os.Stderr, "onefold GUI already running:", url)
+			fmt.Fprintln(os.Stderr, "(the link works once, within 5 minutes; run `onefold gui` again for a new one)")
+			if !o.noOpen {
+				gui.OpenBrowser(url)
+			}
+			return
 		}
-		return
 	}
 	srv, err := gui.New(gui.Options{Port: o.port, StateDir: dir, Version: version, Build: buildLabel(),
 		OnConfig: func(c config.Config) { setDiag(c.DiagLog) }})
@@ -104,8 +126,9 @@ func runGUI(o guiOptions) {
 	}
 	url := srv.URL()
 	dlog("gui: listening on %s", redact(url))
-	b, _ := json.Marshal(guiLock{PID: os.Getpid(), URL: url})
-	os.WriteFile(lockPath, b, 0o600)
+	b, _ := json.Marshal(guiLock{PID: os.Getpid(), Addr: srv.Addr(), Secret: srv.LaunchSecret()})
+	os.Remove(lockPath) // a file left by an older version may carry wider modes
+	os.WriteFile(lockPath, b, statedir.FileMode)
 	defer os.Remove(lockPath)
 
 	done := make(chan struct{})
@@ -129,7 +152,7 @@ func runGUI(o guiOptions) {
 		dlog("gui: signal %v: pausing the active job and exiting", s)
 		srv.Shutdown() // pauses and persists the running job: resumable at next start
 	}()
-	fmt.Fprintf(os.Stderr, "onefold %s GUI: %s\n(state: %s; Ctrl+C pauses the running job and exits)\n", version, url, dir)
+	fmt.Fprintf(os.Stderr, "onefold %s GUI: %s\n(the link works once, within 5 minutes: run `onefold gui` again for a new one;\n state: %s; Ctrl+C pauses the running job and exits)\n", version, url, dir)
 
 	if !o.noWindow && !o.noOpen {
 		if gui.OpenWindow(url, filepath.Join(dir, "webview2"), "onefold", srv.Opened()) {

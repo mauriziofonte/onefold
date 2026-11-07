@@ -6,6 +6,8 @@ The version being prepared is in the `VERSION` file; a release is the tag `v<VER
 
 ## [Unreleased]
 
+- GUI security: the link that opens a session works once and for 5 minutes, so the copy visible in the process list while the browser starts opens nothing afterwards; the session secret only travels in its cookie. Running `onefold gui` again asks the running instance for a new link. Pages are served under a strict Content-Security-Policy (scripts only from the embedded bundle, no connection to other sites).
+- The state dir is private: created with mode 0700 (an existing one is tightened at the GUI start), its files with mode 0600. It holds archive paths in runs and logs.
 - Safer deletion: `purge-sources` (and the GUI purge) flushes each copy in the output and its folder to the disk before deleting the source, and refuses the deletion when that fails. A merge run with `-no-fsync`, or a drive that caches writes, could otherwise lose both after a power cut.
 - Names written by `merge`, `apply`, `export-text`, `backup` and `rearrange` reach the disk by the end of the run: each folder that gained or lost a file is flushed once.
 - Fixed: the GUI job bar read "Merge· execute" instead of "Merge · execute".

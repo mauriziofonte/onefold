@@ -49,9 +49,11 @@ test.afterAll(() => server?.kill('SIGTERM'));
 async function sessionURL() {
   for (let i = 0; i < 100; i++) {
     try {
+      // gui.json holds the running instance's address and launch secret: a
+      // POST with the secret answers a fresh one-time session link
       const l = JSON.parse(readFileSync(join(state, 'gui.json'), 'utf8'));
-      const r = await fetch(l.url, { redirect: 'manual' });
-      if (r.status === 303) return l.url;
+      const r = await fetch(`http://${l.addr}/api/open-link`, { method: 'POST', headers: { 'X-Onefold-Launch': l.secret } });
+      if (r.ok) return (await r.json()).url;
     } catch { /* not up yet */ }
     await new Promise((r) => setTimeout(r, 100));
   }
