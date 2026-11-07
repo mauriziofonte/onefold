@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mauriziofonte/onefold/internal/fsx"
 	"github.com/mauriziofonte/onefold/internal/kinds"
 	"github.com/mauriziofonte/onefold/internal/runctl"
 	"github.com/mauriziofonte/onefold/internal/sparsehash"
@@ -48,8 +49,8 @@ func (s *scan) duplicates() (*Dups, error) {
 	var mu sync.Mutex
 	seen := map[inodeKey]bool{}
 	for _, root := range s.o.Roots {
-		err := s.walkRoot(root, seen, false, nopProgress{}, func(path string, size int64, _ fs.FileInfo, _ fileSys) {
-			if size < s.o.DupMin {
+		err := s.walkRoot(root, seen, false, nopProgress{}, func(path string, size int64, fi fs.FileInfo, _ fileSys) {
+			if size < s.o.DupMin || (!s.o.ReadOnlineOnly && fsx.OnlineOnly(fi)) {
 				return
 			}
 			s.mu.Lock()

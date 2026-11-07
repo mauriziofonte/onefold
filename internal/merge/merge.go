@@ -127,6 +127,10 @@ type Result struct {
 	Failed         []string         `json:"failed,omitempty"`
 	SkippedByRules int              `json:"inputFilesSkippedByFilters"`
 	EmptyInputs    int              `json:"inputEmptyFilesSkipped"`
+	// OnlineOnly input files were left out: their content is in the cloud,
+	// not on this computer (catalog rule online-only).
+	OnlineOnly      int   `json:"inputOnlineOnly,omitempty"`
+	OnlineOnlyBytes int64 `json:"inputOnlineOnlyBytes,omitempty"`
 	// Pending copies were not started because the gate was stopped; a new run
 	// with the same options completes them.
 	Pending int  `json:"pendingCopies,omitempty"`
@@ -320,6 +324,7 @@ func Run(o Options) (*Result, error) {
 		res.InputFiles = len(rs)
 		res.SkippedByRules = sum.Skipped - sum.Empty
 		res.EmptyInputs = sum.Empty
+		res.OnlineOnly, res.OnlineOnlyBytes = sum.OnlineOnly, sum.OnlineOnlyBytes
 		res.Packages = sum.Packages
 		catalog.SortSkips(res.Excluded)
 	}

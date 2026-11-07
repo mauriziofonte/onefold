@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -312,4 +313,44 @@ func canonFull(recs []Record) string {
 	}
 	sort.Strings(lines)
 	return strings.Join(lines, "\n")
+}
+
+// A cloud file whose content is not on this computer is left out (reading it
+// would download it), also with -no-sweep; -keep online-only reads it.
+func TestOnlineOnlyRule(t *testing.T) {
+	for _, c := range []struct {
+		f    Filters
+		want bool
+	}{{Filters{}, true}, {Filters{NoSweep: true}, true}, {Filters{Rules: map[string]bool{RuleOnlineOnly: false}}, false}} {
+		if got := c.f.RuleOn(RuleOnlineOnly); got != c.want {
+			t.Errorf("%+v: RuleOn(online-only) = %v, want %v", c.f, got, c.want)
+		}
+	}
+	room := testfix.TempDir(t)
+	for _, n := range []string{"here.txt", "cloud.txt"} {
+		if err := testfix.File(filepath.Join(room, n), "content of "+n, t0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := testfix.SetOffline(filepath.Join(room, "cloud.txt")); errors.Is(err, testfix.ErrNoOffline) {
+		t.Skip("no settable online-only marker here: fsx tests cover the flag")
+	} else if err != nil {
+		t.Fatal(err)
+	}
+	o, err := Filters{}.Options("all")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var reasons []string
+	o.OnSkip = func(s Skip) { reasons = append(reasons, filepath.Base(s.Path)+":"+s.Rule) }
+	recs, sum := run(t, []string{room}, o)
+	eq(t, rels(room, recs), []string{"here.txt"})
+	if sum.OnlineOnly != 1 || sum.OnlineOnlyBytes != int64(len("content of cloud.txt")) || strings.Join(reasons, ",") != "cloud.txt:"+RuleOnlineOnly {
+		t.Fatalf("online-only %d (%d bytes), reasons %v", sum.OnlineOnly, sum.OnlineOnlyBytes, reasons)
+	}
+	if o, err = (Filters{Rules: map[string]bool{RuleOnlineOnly: false}}).Options("all"); err != nil {
+		t.Fatal(err)
+	}
+	recs, _ = run(t, []string{room}, o)
+	eq(t, rels(room, recs), []string{"cloud.txt", "here.txt"})
 }

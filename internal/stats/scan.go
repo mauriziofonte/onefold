@@ -16,6 +16,7 @@ import (
 
 	"github.com/charlievieth/fastwalk"
 
+	"github.com/mauriziofonte/onefold/internal/fsx"
 	"github.com/mauriziofonte/onefold/internal/kinds"
 )
 
@@ -332,6 +333,10 @@ func (s *scan) count(ri int, root, path string, size int64, fi fs.FileInfo, sys 
 	if kinds.IsJunk(base) {
 		s.res.Junk.add(size)
 	}
+	online := fsx.OnlineOnly(fi)
+	if online {
+		s.res.OnlineOnly.add(size)
+	}
 	s.families[fi0].add(size)
 	cat := t.Category
 	if !known {
@@ -384,7 +389,7 @@ func (s *scan) count(ri int, root, path string, size int64, fi fs.FileInfo, sys 
 		n.agg.add(size)
 		n.fam[fi0] += size
 	}
-	if size >= s.o.DupMin {
+	if size >= s.o.DupMin && (!online || s.o.ReadOnlineOnly) {
 		s.sizeN[size]++
 	}
 }

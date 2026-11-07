@@ -141,6 +141,10 @@ func cmdMerge(args []string) {
 	if len(res.Excluded) > 0 {
 		fmt.Printf("excluded:          %s\n", excludedSummary(res.Excluded))
 	}
+	if res.OnlineOnly > 0 {
+		fmt.Printf("online-only:       %d input files, %s in the cloud, left out (reading them downloads them; -keep online-only merges them)\n",
+			res.OnlineOnly, report.HumanBytes(res.OnlineOnlyBytes))
+	}
 	printPackages(res.Packages)
 	fmt.Printf("distinct contents: %d\n", res.Distinct)
 	fmt.Printf("already in output: %d input files (not copied)\n", res.AlreadyPresent)

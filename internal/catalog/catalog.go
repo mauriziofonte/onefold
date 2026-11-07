@@ -57,26 +57,30 @@ type Record struct {
 
 // Summary is the aggregate view printed for inspection (no per-file personal data).
 type Summary struct {
-	Assets       int
-	Photos       int
-	Videos       int
-	Errors       int
-	Skipped      int
-	Limited      int // accepted by the filters but over --limit
-	Empty        int // 0-byte files (no content: never cataloged, never merged)
-	Reused       int // copied from the --reuse manifest (path+size+mtime unchanged)
-	NoTime       int
-	FromMetadata int
-	FromFilename int
-	FromMtime    int
-	SubSec       int
-	DimsMissing  int
-	LogicalBytes int64
-	ByKind       map[string]int
-	ByDevice     map[string]int
-	ByYear       map[string]int
-	Elapsed      time.Duration
-	Samples      []Record // a few examples for eyeballing
+	Assets  int
+	Photos  int
+	Videos  int
+	Errors  int
+	Skipped int
+	Limited int // accepted by the filters but over --limit
+	Empty   int // 0-byte files (no content: never cataloged, never merged)
+	// OnlineOnly: cloud files left out because their content is not on this
+	// computer (rule online-only), with their total size.
+	OnlineOnly      int
+	OnlineOnlyBytes int64
+	Reused          int // copied from the --reuse manifest (path+size+mtime unchanged)
+	NoTime          int
+	FromMetadata    int
+	FromFilename    int
+	FromMtime       int
+	SubSec          int
+	DimsMissing     int
+	LogicalBytes    int64
+	ByKind          map[string]int
+	ByDevice        map[string]int
+	ByYear          map[string]int
+	Elapsed         time.Duration
+	Samples         []Record // a few examples for eyeballing
 	// Packages: folders that look like driver or installer packages and
 	// hold cataloged files, sorted by folder.
 	Packages []Package
@@ -112,6 +116,7 @@ type Options struct {
 	SkipNoExt      bool
 	SkipTransient  bool  // incomplete downloads, temp and lock files (kinds.IsTransient)
 	SkipShortcuts  bool  // lnk, url, website... (kinds.IsShortcut)
+	SkipOnlineOnly bool  // cloud placeholders: reading would download them (fsx.OnlineOnly)
 	MinSize        int64 // bytes; 0 = off (0-byte files are always skipped)
 	MaxSize        int64 // bytes; 0 = off
 	Limit          int   // max accepted files per room; 0 = unlimited
@@ -422,6 +427,14 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 				return nil
 			}
 			size := info.Size()
+			if o.SkipOnlineOnly && fsx.OnlineOnly(info) {
+				mu.Lock()
+				sum.OnlineOnly++
+				sum.OnlineOnlyBytes += size
+				mu.Unlock()
+				skip(path, RuleOnlineOnly, false)
+				return nil
+			}
 			// Empty files: nothing to hash, nothing to materialize.
 			if size == 0 && !o.KeepEmpty {
 				mu.Lock()

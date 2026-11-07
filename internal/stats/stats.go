@@ -50,6 +50,10 @@ type Options struct {
 	DupMin    int64  // smallest file size checked for duplicates (default 1 byte)
 	Depth     int    // folder levels kept below each root (default 6)
 	Top       int    // largest files and duplicate groups kept (default 100)
+	// ReadOnlineOnly lets the duplicate pass read cloud files whose content
+	// is not on this computer (fsx.OnlineOnly), which downloads them; by
+	// default they are counted (Result.OnlineOnly) and never read.
+	ReadOnlineOnly bool
 
 	Gate *runctl.Gate // optional pause/stop
 	// ProgressFor returns the progress of a phase ("scan", "dups") and its
@@ -190,6 +194,10 @@ type Result struct {
 	Empty     int64     `json:"empty"`               // 0-byte files
 	Junk      Agg       `json:"junk"`                // OS droppings (.DS_Store, Thumbs.db...)
 	Symlinks  int64     `json:"symlinks"`            // not followed
+	// OnlineOnly: files counted above whose content is in the cloud, not on
+	// this computer (OneDrive, iCloud, Dropbox placeholders: Windows, macOS);
+	// never read unless Options.ReadOnlineOnly.
+	OnlineOnly Agg `json:"onlineOnly"`
 	// HardLinks: extra names of a file already counted (Linux, macOS)
 	HardLinks    Agg       `json:"hardLinks"`
 	OtherVolumes []string  `json:"otherVolumes,omitempty"` // mount points not entered
