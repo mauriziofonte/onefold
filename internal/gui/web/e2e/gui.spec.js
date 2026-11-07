@@ -351,18 +351,19 @@ test('GUI end to end', async ({ browser }) => {
       writeFileSync(join(root, 'STATS', 'b', `copy${i}.txt`), body);
     }
     writeFileSync(join(root, 'STATS', 'a', 'only.md'), 'only here');
-    // notifications: turned on in Config (the browser grants the permission),
-    // shown when a job ends while the window is not in front
-    await ctx.grantPermissions(['notifications']);
-    await page.getByTestId('nav-config').click();
-    await page.getByTestId('config-notify-on').check();
-    await expect(page.getByTestId('config-notify-on')).toBeChecked();
+    // notifications: turned on in Config, shown when a job ends while the
+    // window is not in front. A stand-in Notification that has the permission:
+    // headless Chromium keeps Notification.permission at "denied" even after
+    // grantPermissions, and Config would then (rightly) leave the box off.
     await page.evaluate(() => {
       window.shownNotifications = [];
       window.Notification = function (title, o) { window.shownNotifications.push(title + ' | ' + (o?.body || '')); this.close = () => {}; };
       window.Notification.permission = 'granted';
       document.hasFocus = () => false;
     });
+    await page.getByTestId('nav-config').click();
+    await page.getByTestId('config-notify-on').check();
+    await expect(page.getByTestId('config-notify-on')).toBeChecked();
     await page.getByTestId('nav-stats').click();
     await page.getByTestId('stats-roots-input').fill(join(root, 'STATS'));
     await page.getByTestId('stats-roots-input').press('Enter');
