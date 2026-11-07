@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/mauriziofonte/onefold/internal/catalog"
+	"github.com/mauriziofonte/onefold/internal/hashcache"
 	"github.com/mauriziofonte/onefold/internal/report"
 	"github.com/mauriziofonte/onefold/internal/stats"
 )
@@ -66,7 +67,9 @@ func cmdStats(args []string) {
 		r := report.New(report.Options{Label: label, Unit: unit, Growing: phase == "scan", Heartbeat: *heartbeat})
 		return r, r.Stop
 	}
+	o.Cache = hashcache.Open()
 	res, err := stats.Run(o)
+	o.Cache.Close()
 	if res == nil {
 		fatal(1, err)
 	}
@@ -266,6 +269,9 @@ func printStats(w io.Writer, r *stats.Result, top int) {
 		report.HumanBytes(d.Wasted), strings.TrimSpace(sharePct(d.Wasted, r.Bytes)))
 	if d.Errors > 0 {
 		fmt.Fprintf(w, ", %s unreadable", thousands(d.Errors))
+	}
+	if d.Cached > 0 {
+		fmt.Fprintf(w, " (%s digests taken from the hash cache instead of reading the files)", thousands(d.Cached))
 	}
 	fmt.Fprintln(w)
 	for _, b := range d.ByFamily {

@@ -250,6 +250,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 | `internal/kinds` | the only source of file-type knowledge | `Lookup`, `KindOf`, `Format`, `Group`, `NormalizeExt`, `PresetExts`, `SniffFile`, `Family` |
 | `internal/meta` | one file -> its canonical metadata | `ExtractWith`, `Zone`, `SetZone`, `CanonicalDevice`, `VendorSlug`, `DeduceFromFilename` |
 | `internal/sparsehash` | file identity | `HashFile`, `HashFileWhole`, `HashBytes`, `FullFile` |
+| `internal/hashcache` | digests of unchanged files remembered across runs | `Open`, `OpenIn`, `KeyOf`, `Cache.Sampled`, `Cache.Sparse`, `Cache.Full` |
 | `internal/catalog` | rooms -> records / manifest | `Build`, `Collect`, `Walk`, `Filters`, `LoadManifest` |
 | `internal/plan` | records -> assets -> actions | `PlanWith`, `BuildActionsWith`, `VerifyGroupsWith`, `Read`, `Write`, `ShotKey` |
 | `internal/names` | pure string functions on names | `SanitizeName`, `WithNN`, `ParseLegacy`, `IsCopyName`, `FoldKey` |
@@ -288,10 +289,11 @@ Leaves: `kinds`, `fsx`, `perf`, `report`, `runctl`, `statedir`, `testfix`, `winr
 |---|---|
 | `names` | kinds |
 | `sparsehash` | perf |
+| `hashcache` | names, sparsehash, statedir |
 | `tools` | perf, statedir |
 | `tooldl` | fsx |
 | `meta` | kinds, perf, tools |
-| `catalog` | fsx, kinds, meta, names, perf, runctl, sparsehash |
+| `catalog` | fsx, hashcache, kinds, meta, names, perf, runctl, sparsehash |
 | `naming` | catalog, kinds, meta, names |
 | `plan` | catalog, kinds, meta, names, naming, perf, runctl, sparsehash |
 | `golden` | catalog, kinds, names, plan |
@@ -299,7 +301,7 @@ Leaves: `kinds`, `fsx`, `perf`, `report`, `runctl`, `statedir`, `testfix`, `winr
 | `rearrange` | catalog, fsx, merge, names, naming, perf, plan, report, runctl, sparsehash |
 | `settings` | catalog, merge, naming, rearrange |
 | `purge` | fsx, kinds, merge, report, runctl, sparsehash |
-| `stats` | kinds, runctl, sparsehash |
+| `stats` | fsx, hashcache, kinds, runctl, sparsehash |
 | `scan` | kinds, sparsehash |
 | `planreport` | catalog, kinds, plan, report |
 | `remote` | fsx |
@@ -632,6 +634,17 @@ The parameters (`-cov`, `-s`, `-blocks`) are part of the identity: changing them
 ### 8.3 Full-content verification
 
 `FullFile(path)` reads every byte (4 MiB buffer) and returns the XXH128. `plan.VerifyGroupsWith` uses it on every group of records that share a sparse hash and are not all full-hashed: members whose content differs are split into separate groups (their hash gets a `-<16 hex>` suffix for the rest of the run), unreadable members get a unique `<hash>-unreadable<NNNNNNNN>` key so they never count as duplicates. Members that already carry a `contentHash` are not read again. Merge, rearrange and `plan -verify-full` all go through it.
+
+### 8.4 Hash cache
+
+`internal/hashcache` remembers digests across commands in `<state dir>/hashes.tsv` (mode 0600; a header line `onefold-hashes<TAB>1`, then `key<TAB>coverage/sample/blocks<TAB>sampled digest<TAB>whole-content digest` per line, appended; the last line of a key wins). The key (`KeyOf`) is the version of a file: on Linux and macOS device, inode, size, modification and status-change times in nanoseconds (a write changes the status-change time even when a tool puts the modification time back); on Windows the folded absolute path, size, creation and last-write times (the listing has no file ID; a tool that rewrites a file in place and restores its last-write time defeats it there). What it serves:
+
+| User | Takes from the cache | Records |
+|---|---|---|
+| `catalog` (and `merge`, `rearrange`, the GUI jobs through it) | the sampled digest of a file larger than `-whole-max` (a digest that read the whole file never: content identity, `contentHash`, always comes from the run's own read; smaller files are read whole anyway for extraction) | every digest it computes |
+| `stats` duplicates | sampled and whole-content digests (a report; `dups.cached` counts them) | both |
+
+Never from the cache: the full-content verification of duplicate groups (section 8.3), the re-reads before any deletion (purge, rearrange, reclaim, duplicate cleanup), backup audits. A stale entry can therefore only group files that verification then splits, or miss a group. The file is rewritten (most recently used entries first kept, at most 2,000,000) when it holds more than twice its entries plus 10,000 lines. A cache that cannot be opened is no cache; `ONEFOLD_NO_HASH_CACHE=1` turns it off.
 
 ---
 
@@ -1434,6 +1447,7 @@ On Windows, `onefold.exe` with no arguments opens the GUI when it was started by
 | `recipes.json` | saved guided-setup answers |
 | `tools/` | downloaded external tools (section 24.3) |
 | `config.json` | the user configuration |
+| `hashes.tsv` | the hash cache (section 8.4), shared by the CLI and the GUI |
 
 ### 22.4 Jobs
 
@@ -1717,6 +1731,7 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 |---|---|
 | `ONEFOLD_STATE_DIR` | state dir (GUI, tools, config) |
 | `ONEFOLD_NO_EXTERNAL=1` | disable every external tool |
+| `ONEFOLD_NO_HASH_CACHE=1` | no hash cache (section 8.4) |
 | `TZ` | canonical zone when config `timezone` is unset |
 | `ONEFOLD_DIAG=1` | Windows diagnostic log |
 | `SSH_AUTH_SOCK` | ssh-agent for `push` |

@@ -18,6 +18,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/mauriziofonte/onefold/internal/hashcache"
 	"github.com/mauriziofonte/onefold/internal/runctl"
 )
 
@@ -54,6 +55,10 @@ type Options struct {
 	// is not on this computer (fsx.OnlineOnly), which downloads them; by
 	// default they are counted (Result.OnlineOnly) and never read.
 	ReadOnlineOnly bool
+	// Cache serves and records the digests of the duplicate pass (nil =
+	// every candidate is read): a report, so whole-content digests are taken
+	// from it too; anything deleting from these groups reads the bytes again.
+	Cache *hashcache.Cache
 
 	Gate *runctl.Gate // optional pause/stop
 	// ProgressFor returns the progress of a phase ("scan", "dups") and its
@@ -171,6 +176,7 @@ type Dups struct {
 	Extra      int64      `json:"extra"`  // copies beyond the first of each group
 	Wasted     int64      `json:"wasted"` // bytes of those copies
 	Errors     int64      `json:"errors"`
+	Cached     int64      `json:"cached,omitempty"` // digests taken from the hash cache instead of reading the file
 	ByFamily   []Bucket   `json:"byFamily"`
 	ByExt      []Bucket   `json:"byExt"`
 	Top        []DupGroup `json:"top"`

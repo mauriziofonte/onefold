@@ -24,6 +24,7 @@ import (
 	"github.com/mauriziofonte/onefold/internal/catalog"
 	"github.com/mauriziofonte/onefold/internal/config"
 	"github.com/mauriziofonte/onefold/internal/fsx"
+	"github.com/mauriziofonte/onefold/internal/hashcache"
 	"github.com/mauriziofonte/onefold/internal/materialize"
 	"github.com/mauriziofonte/onefold/internal/meta"
 	"github.com/mauriziofonte/onefold/internal/plan"
@@ -299,7 +300,9 @@ func cmdCatalog(args []string) {
 	fmt.Fprintf(os.Stderr, "cataloging %d room(s) with %d workers (READ-ONLY)…\n", len(rooms), *j)
 	prog := report.New(report.Options{Label: "catalog", Unit: report.Items, Growing: true, Heartbeat: *heartbeat})
 	o.Progress = prog
+	o.Cache = hashcache.Open()
 	sum, err := catalog.Build(rooms, o)
+	o.Cache.Close()
 	prog.Stop()
 	if err != nil {
 		fatal(1, err)

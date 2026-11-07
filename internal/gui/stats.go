@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/mauriziofonte/onefold/internal/hashcache"
 	"github.com/mauriziofonte/onefold/internal/report"
 	"github.com/mauriziofonte/onefold/internal/runctl"
 	"github.com/mauriziofonte/onefold/internal/stats"
@@ -41,7 +42,9 @@ func (m *Manager) runStats(j *Job, g *runctl.Gate) (map[string]any, error) {
 	if err := json.Unmarshal(j.Params, &p); err != nil {
 		return nil, err
 	}
-	o := stats.Options{Roots: p.Roots, OneVolume: !p.AllVolume, Dups: p.Dups, DupMin: p.DupMin, Gate: g,
+	cache := hashcache.OpenIn(m.st.dir)
+	defer cache.Close()
+	o := stats.Options{Roots: p.Roots, OneVolume: !p.AllVolume, Dups: p.Dups, DupMin: p.DupMin, Gate: g, Cache: cache,
 		OnSnapshot: func(r *stats.Result) { setLiveStats(j.ID, r) }}
 	o.ProgressFor = func(phase string) (stats.Progress, func()) {
 		label := "stats scan"

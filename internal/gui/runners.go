@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/mauriziofonte/onefold/internal/catalog"
+	"github.com/mauriziofonte/onefold/internal/hashcache"
 	"github.com/mauriziofonte/onefold/internal/materialize"
 	"github.com/mauriziofonte/onefold/internal/merge"
 	"github.com/mauriziofonte/onefold/internal/plan"
@@ -319,7 +320,9 @@ func (m *Manager) runMerge(j *Job, g *runctl.Gate, execute, resume bool) (map[st
 			return nil
 		}
 	}
+	o.Catalog.Cache = hashcache.OpenIn(m.st.dir)
 	r, err := merge.Run(o)
+	o.Catalog.Cache.Close()
 	if r == nil {
 		return nil, 0, err
 	}
@@ -515,7 +518,9 @@ func (m *Manager) runRearrange(j *Job, g *runctl.Gate, execute, resume bool) (ma
 			m.log(j, LogEntry{Level: "info", Key: "log.journal", Path: path})
 		}
 	}
+	o.Catalog.Cache = hashcache.OpenIn(m.st.dir)
 	r, err := rearrange.Run(o)
+	o.Catalog.Cache.Close()
 	if r == nil {
 		return nil, 0, err
 	}
@@ -595,7 +600,9 @@ func (m *Manager) runIndex(j *Job, g *runctl.Gate, resume bool) (map[string]any,
 	}
 	rep := report.New(report.Options{Label: "catalog", Unit: report.Items, Growing: true})
 	co.Progress = rep
+	co.Cache = hashcache.OpenIn(m.st.dir)
 	sum, err := catalog.Build(p.Rooms, co)
+	co.Cache.Close()
 	rep.Stop()
 	if sum == nil {
 		return nil, err

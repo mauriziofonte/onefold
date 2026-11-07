@@ -222,6 +222,7 @@ onefold.exe stats -dups full -json report.json D:\
 - Several folders or volumes are measured together; a folder inside another given one is counted once.
 - Duplicates: files of the same size are compared on a sample of their content (`-dups fast`, the default), on their whole content (`-dups full`), or not at all (`-dups off`). The result tells how much space the extra copies take, by family and extension, the largest groups of copies with their paths, and the pairs of folders that hold copies of the same files (good candidates for a merge).
 - Cloud files that are only online (OneDrive, iCloud Drive, Dropbox; Windows and macOS) are counted with their size and shown apart, and never read for duplicates, which would download them (`-read-online-only` reads them).
+- A second run is faster: the digests of files that did not change since are remembered (in onefold's own state folder) instead of read again. Nothing is ever deleted on a remembered digest: deletions read the files again.
 - A hard-linked file is counted once. On Linux and macOS a walk stays on the volume of its folder (the volumes mounted below it are listed, `-one-volume=false` enters them) and the space used on disk is shown next to the size; Windows reports neither hard links nor the space on disk.
 - The JSON (`-json FILE`, `-` for the standard output) holds every breakdown, the folder tree (`-depth`, default 6 levels) and up to 100 largest files and duplicate groups; the tables print `-top` rows.
 

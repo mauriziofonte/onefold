@@ -30,6 +30,7 @@ import (
 	"github.com/charlievieth/fastwalk"
 
 	"github.com/mauriziofonte/onefold/internal/fsx"
+	"github.com/mauriziofonte/onefold/internal/hashcache"
 	"github.com/mauriziofonte/onefold/internal/kinds"
 	"github.com/mauriziofonte/onefold/internal/meta"
 	"github.com/mauriziofonte/onefold/internal/names"
@@ -126,6 +127,11 @@ type Options struct {
 
 	Host  string            // label stored in every record
 	Reuse map[string]Record // previous manifest by path
+	// Cache serves the sampled digests of files larger than WholeMax that
+	// are unchanged since another command hashed them, and records the new
+	// ones (nil = none). A digest that read the whole file is never taken
+	// from it: content identity always comes from this run's read.
+	Cache *hashcache.Cache
 
 	Progress Progress     // optional (report.Reporter implements it)
 	Gate     *runctl.Gate // optional pause/stop (GUI); nil = never pauses
@@ -260,8 +266,8 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 	// every file of one directory on the goroutine that read it: measured
 	// concurrency ~1 on D:\FILES\HTML).
 	type job struct {
-		room, path  string
-		size, mtime int64
+		room, path, key string
+		size, mtime     int64
 	}
 	workers := o.Workers
 	if workers < 1 {
@@ -309,11 +315,22 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 			rec.Room, rec.Host = j.room, o.Host
 		} else {
 			th := perf.Start()
-			h, data, herr := sparsehash.HashFileWhole(j.path, o.Coverage, o.Sample, o.WholeMax)
-			if h.Full {
-				perf.End("hash:full", th, h.SampledBytes)
+			var h sparsehash.Result
+			var data []byte
+			var herr error
+			if hex, ok := o.Cache.Sampled(j.key, o.Coverage, o.Sample); ok && (o.WholeMax <= 0 || j.size > o.WholeMax) {
+				h = sparsehash.Result{Hex: hex, Size: j.size}
+				perf.End("hash:cached", th, 0)
 			} else {
-				perf.End("hash:sparse", th, h.SampledBytes)
+				h, data, herr = sparsehash.HashFileWhole(j.path, o.Coverage, o.Sample, o.WholeMax)
+				if herr == nil {
+					o.Cache.PutSparse(j.key, o.Coverage, o.Sample, h)
+				}
+				if h.Full {
+					perf.End("hash:full", th, h.SampledBytes)
+				} else {
+					perf.End("hash:sparse", th, h.SampledBytes)
+				}
 			}
 			if herr != nil {
 				mu.Lock()
@@ -465,7 +482,11 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 			dm.planned++
 			dm.bytes += size
 			mu.Unlock()
-			jobs <- job{room: room, path: path, size: size, mtime: info.ModTime().UnixNano()}
+			key := ""
+			if o.Cache != nil {
+				key = hashcache.KeyOf(path, info)
+			}
+			jobs <- job{room: room, path: path, key: key, size: size, mtime: info.ModTime().UnixNano()}
 			return nil
 		}
 		conf := fastwalk.Config{NumWorkers: workers}
