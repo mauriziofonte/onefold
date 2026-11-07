@@ -100,7 +100,7 @@ const CacheDir = ".onefold"
 
 // Copy is one planned copy.
 type Copy struct {
-	Src     catalog.Record `json:"-"`
+	Src     *catalog.Record `json:"-"` // into the run's records: one copy of each, not two
 	SrcPath string         `json:"src"`
 	Rel     string         `json:"target"` // slash-separated, relative to the output
 	Size    int64          `json:"size"`
@@ -485,7 +485,7 @@ func decide(o Options, nm *naming.Naming, res *Result, recs []catalog.Record, ou
 	for i, in := range res.Rooms[1:] {
 		inputRank[fold(in)] = i
 	}
-	rank := func(r catalog.Record) int {
+	rank := func(r *catalog.Record) int {
 		best := len(inputRank)
 		for dir, i := range inputRank {
 			if within(r.Path, dir) && i < best {
@@ -499,21 +499,24 @@ func decide(o Options, nm *naming.Naming, res *Result, recs []catalog.Record, ou
 		known[names.FoldKey(r.Path)] = true
 	}
 	exists := func(p string) bool { return known[names.FoldKey(p)] }
-	groups := map[string][]catalog.Record{}
+	// groups hold indices: a record is 400 bytes, a million of them copied
+	// once more would be 400 MB
+	groups := map[string][]int32{}
 	var order []string
-	for _, r := range recs {
+	for i, r := range recs {
 		if _, ok := groups[r.Hash]; !ok {
 			order = append(order, r.Hash)
 		}
-		groups[r.Hash] = append(groups[r.Hash], r)
+		groups[r.Hash] = append(groups[r.Hash], int32(i))
 	}
 	sort.Strings(order)
 	res.Distinct = len(order)
 	for _, h := range order {
 		g := groups[h]
-		var ins, outs []catalog.Record
-		for _, r := range g {
-			if within(r.Path, out) {
+		delete(groups, h)
+		var ins, outs []*catalog.Record
+		for _, i := range g {
+			if r := &recs[i]; within(r.Path, out) {
 				outs = append(outs, r)
 			} else {
 				ins = append(ins, r)
@@ -558,7 +561,7 @@ func decide(o Options, nm *naming.Naming, res *Result, recs []catalog.Record, ou
 			return a.Path < b.Path
 		})
 		w := ins[0]
-		c := Copy{Src: w, SrcPath: w.Path, Size: w.Size, Rel: nm.Target(naming.VarsOfCtx(w, exists))}
+		c := Copy{Src: w, SrcPath: w.Path, Size: w.Size, Rel: nm.Target(naming.VarsOfCtx(*w, exists))}
 		for _, d := range ins[1:] {
 			c.Dupes = append(c.Dupes, d.Path)
 		}
@@ -655,7 +658,7 @@ func execute(o Options, res *Result, out string) []catalog.Record {
 					rep.Event(fmt.Sprintf("ERR %s -> %s: %v", c.SrcPath, c.Rel, err))
 				} else {
 					res.CopiedBytes += c.Size
-					nr := c.Src
+					nr := *c.Src
 					nr.Path, nr.Room, nr.Host, nr.ContentHash = dst, out, "output", content
 					copied = append(copied, nr)
 					dirs.Add(dst)
@@ -696,7 +699,7 @@ var errChanged = errors.New("source changed since cataloging (size differs)")
 // (fsx.ErrExists when dst appeared). size is the expected source size. It
 // returns the content hash of what was written (sparsehash.FullFile form).
 func CopyVerified(srcPath, dst string, size int64, buf []byte) (string, error) {
-	return copyOne(Copy{SrcPath: srcPath, Size: size}, dst, buf, Options{})
+	return copyOne(Copy{Src: &catalog.Record{}, SrcPath: srcPath, Size: size}, dst, buf, Options{})
 }
 
 // copyOne: temp in the target dir -> hash while copying -> fsync -> re-read
