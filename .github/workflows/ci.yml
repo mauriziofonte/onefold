@@ -104,9 +104,10 @@ jobs:
 
       - name: Recycle Bin / Trash tests ran (not skipped)
         run: |
-          go test -count=1 -run 'TestTrash' -v ./internal/purge | tee trash.log
+          go test -count=1 -run 'TestTrash' -v ./internal/purge ./internal/dedupe | tee trash.log
           if grep -q -- '--- SKIP' trash.log; then echo "a Trash test was skipped"; exit 1; fi
           grep -q -- '--- PASS: TestTrashOption' trash.log
+          grep -q -- '--- PASS: TestTrashCopies' trash.log
 
       - name: end-to-end ran (not skipped)
         run: |

@@ -80,6 +80,9 @@
     } else if (j.kind === 'stats') {
       settings.stats.jobId = j.id;
       settings.view = 'stats';
+    } else if (j.kind === 'dedupe') {
+      settings.stats.dedupeJobId = j.id;
+      settings.view = 'stats';
     } else if (j.kind === 'recover') {
       settings.view = 'journals';
     } else {

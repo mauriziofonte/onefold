@@ -31,7 +31,7 @@ const (
 
 // Progress receives the progress of one phase (report.Reporter implements it).
 type Progress interface {
-	AddTotal(n int64)
+	AddTotal(bytes int64) // one more item of this size
 	TotalKnown()
 	Item(bytes int64, d time.Duration)
 	Advance(bytes int64)
@@ -59,6 +59,10 @@ type Options struct {
 	// every candidate is read): a report, so whole-content digests are taken
 	// from it too; anything deleting from these groups reads the bytes again.
 	Cache *hashcache.Cache
+	// OnGroup receives every group of copies confirmed on the whole content
+	// (DupsFull only; Result keeps the Top largest), sorted by path: what
+	// a duplicate cleanup acts on.
+	OnGroup func(size int64, content string, paths []string)
 
 	Gate *runctl.Gate // optional pause/stop
 	// ProgressFor returns the progress of a phase ("scan", "dups") and its

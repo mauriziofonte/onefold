@@ -20,6 +20,7 @@
   import Treemap from '../components/charts/Treemap.svelte';
   import YearBars from '../components/charts/YearBars.svelte';
   import HBars from '../components/charts/HBars.svelte';
+  import DedupeCard from '../components/DedupeCard.svelte';
 
   const cfg = settings.stats;
   const busy = $derived(!!store.active);
@@ -351,6 +352,7 @@
             {#if (d.top || []).length > 8}<button class="link mt-1 text-xs" onclick={() => (allGroups = !allGroups)}>{allGroups ? t('stats.showLess') : t('stats.showAll', { n: num(Math.min(100, d.top.length)) })}</button>{/if}
           </div>
           {#if d.mode === 'fast'}<p class="flex items-center gap-1.5 text-xs text-slate-500"><Info size={12} />{t('stats.fastNote')}</p>{/if}
+          {#if !running}<DedupeCard roots={res.roots || []} />{/if}
         {:else if res.phase !== 'dups'}
           <p class="text-sm text-emerald-700">{t('stats.noDups')}</p>
         {/if}

@@ -719,3 +719,82 @@ func TestListQueryAndTree(t *testing.T) {
 		t.Fatalf("exts: %v", exts)
 	}
 }
+
+// Dedupe job: a preview lists the copies, the execute needs their typed
+// count and replaces them by hard links; a folder that changed after the
+// preview refuses the execute; the script action writes a script and
+// deletes nothing.
+func TestDedupeJob(t *testing.T) {
+	m := newTestManager(t)
+	root := testfix.TempDir(t)
+	A, B := filepath.Join(root, "A"), filepath.Join(root, "B")
+	body := strings.Repeat("same bytes ", 300)
+	writeFile(t, filepath.Join(A, "x.bin"), body)
+	writeFile(t, filepath.Join(B, "x.bin"), body)
+	writeFile(t, filepath.Join(B, "deep", "x.bin"), body)
+	writeFile(t, filepath.Join(B, "only.txt"), "unique")
+	if _, err := m.Start("dedupe", []byte(`{"roots":["`+jsonPath(A)+`"],"action":"zap"}`)); err == nil {
+		t.Fatal("an unknown action was accepted")
+	}
+	if _, err := m.Start("dedupe", []byte(`{"roots":["`+jsonPath(A)+`"],"action":"script"}`)); err == nil {
+		t.Fatal("a script action without its file was accepted")
+	}
+	b, _ := json.Marshal(DedupeParams{Roots: []string{A, B}, Keep: "first", Action: "link"})
+	j, err := m.Start("dedupe", b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pv := waitStatus(t, m, j.ID, stPreviewed, stFailed)
+	if pv.Status != stPreviewed || asInt(pv.Summary["items"]) != 2 || asInt(pv.Summary["groups"]) != 1 {
+		t.Fatalf("preview: %s %q %v", pv.Status, pv.Error, pv.Summary)
+	}
+	if err := m.Execute(j.ID, 1); err == nil {
+		t.Fatal("a wrong typed count was accepted")
+	}
+	if err := m.Execute(j.ID, 2); err != nil {
+		t.Fatal(err)
+	}
+	dj := waitStatus(t, m, j.ID, stDone, stFailed)
+	if dj.Status != stDone || asInt(dj.Summary["done"]) != 2 || dj.Journal == "" {
+		t.Fatalf("execute: %s %q %v", dj.Status, dj.Error, dj.Summary)
+	}
+	ka, _ := os.Stat(filepath.Join(A, "x.bin"))
+	for _, p := range []string{filepath.Join(B, "x.bin"), filepath.Join(B, "deep", "x.bin")} {
+		if fi, err := os.Stat(p); err != nil || !os.SameFile(ka, fi) {
+			t.Errorf("%s is not a link of the kept copy (%v)", p, err)
+		}
+	}
+
+	// a new copy after the preview: the confirmed plan no longer matches
+	writeFile(t, filepath.Join(A, "y.bin"), "another pair")
+	writeFile(t, filepath.Join(B, "y.bin"), "another pair")
+	j2, _ := m.Start("dedupe", b)
+	waitStatus(t, m, j2.ID, stPreviewed)
+	writeFile(t, filepath.Join(B, "z.bin"), "another pair")
+	if err := m.Execute(j2.ID, 1); err != nil {
+		t.Fatal(err)
+	}
+	if fj := waitStatus(t, m, j2.ID, stFailed, stDone); fj.Status != stFailed {
+		t.Fatalf("a changed folder executed: %s %v", fj.Status, fj.Summary)
+	}
+
+	script := filepath.Join(root, "clean.sh")
+	b, _ = json.Marshal(DedupeParams{Roots: []string{A, B}, Action: "script", Script: script})
+	j3, _ := m.Start("dedupe", b)
+	p3 := waitStatus(t, m, j3.ID, stPreviewed, stFailed)
+	n := asInt(p3.Summary["items"])
+	if err := m.Execute(j3.ID, n); err != nil {
+		t.Fatal(err)
+	}
+	if sj := waitStatus(t, m, j3.ID, stDone, stFailed); sj.Status != stDone || asInt(sj.Summary["done"]) != n {
+		t.Fatalf("script: %s %q %v", sj.Status, sj.Error, sj.Summary)
+	}
+	if s, _ := os.ReadFile(script); strings.Count(string(s), "\nrm -- '") != n || n != 2 {
+		t.Fatalf("script with %d copies:\n%s", n, s)
+	}
+	for _, p := range []string{filepath.Join(B, "y.bin"), filepath.Join(B, "z.bin")} {
+		if _, err := os.Stat(p); err != nil {
+			t.Fatalf("the script action deleted %s", p)
+		}
+	}
+}

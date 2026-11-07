@@ -124,16 +124,18 @@ The only files onefold writes are:
 | `export-text --target T` | `.txt` sidecars under T only |
 | `push` | the remote destination only |
 | `merge -execute` | new files in the output only, plus `<output>/.onefold/` |
-| `golden-index -o`, `match -o/-report`, `similar -o`, `reclaim -o/-script`, `seed -o/-list`, `stats -json` | the named files |
+| `golden-index -o`, `match -o/-report`, `similar -o`, `reclaim -o/-script`, `seed -o/-list`, `stats -json`, `dedupe -script/-json` | the named files |
+| `dedupe -execute -expect N` | the extra copies inside its folders (to the Trash, or replaced by a hard link or a clone of the copy that stays), plus its journal in `<state dir>/dedupe/` |
 | `backup -execute SRC DST` | new files in DST, plus `DST/.onefold/` |
 | GUI | its state dir; and what the mode it runs writes |
 | `config set` | `<state dir>/config.json` |
 | `tools install` | `<state dir>/tools/` (Windows) |
 
-Two operations delete source files, both only when asked explicitly, both dry runs by default:
+Three operations delete or replace files in the folders they are given, each only when asked explicitly, each a dry run by default:
 
 - `rearrange -execute` renames files inside its root and deletes duplicates confirmed on their full content (keeper and duplicate re-read right before the deletion). Every run writes an fsync'ed journal first; moves can be undone.
 - `purge-sources -execute -expect N` deletes the input files of an executed merge whose copy in the output is read again in full and found equal right before, after the user typed the number of files the preview listed. It is journaled. With `-trash` the files go to the Recycle Bin (Windows) or the Trash (macOS, Linux).
+- `dedupe -execute -expect N` acts on the extra copies of groups of identical files (section 16.7): each is read again in full with the copy that stays and both must hold the group's content right before; it goes to the Recycle Bin / Trash, or is replaced by a hard link or a clone of the copy that stays (the name keeps the same bytes; a replacement steps the original aside and removes it only after the new file holds the name). Nothing is deleted for good; the run is journaled and the typed count is the one of the dry run. `-action script` deletes nothing: it writes a script the user may run.
 
 `reclaim` never deletes: it writes a script the user may run.
 
@@ -246,7 +248,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 
 | Package | Role | Main entry points |
 |---|---|---|
-| `cmd/onefold` | parses commands and flags, wires packages into the pipelines, prints summaries (stdout) and progress (stderr), sets exit codes | `main`, `cmdCatalog`, `cmdPlan`, `cmdApply`, `cmdMerge`, `cmdRearrange`, `cmdPurgeSources`, `cmdGoldenIndex`, `cmdMatch`, `cmdSimilar`, `cmdReclaim`, `cmdBackup`, `cmdSeed`, `cmdStats`, `cmdGUI`... |
+| `cmd/onefold` | parses commands and flags, wires packages into the pipelines, prints summaries (stdout) and progress (stderr), sets exit codes | `main`, `cmdCatalog`, `cmdPlan`, `cmdApply`, `cmdMerge`, `cmdRearrange`, `cmdPurgeSources`, `cmdGoldenIndex`, `cmdMatch`, `cmdSimilar`, `cmdReclaim`, `cmdBackup`, `cmdSeed`, `cmdStats`, `cmdDedupe`, `cmdGUI`... |
 | `internal/kinds` | the only source of file-type knowledge | `Lookup`, `KindOf`, `Format`, `Group`, `NormalizeExt`, `PresetExts`, `SniffFile`, `Family` |
 | `internal/meta` | one file -> its canonical metadata | `ExtractWith`, `Zone`, `SetZone`, `CanonicalDevice`, `VendorSlug`, `DeduceFromFilename` |
 | `internal/sparsehash` | file identity | `HashFile`, `HashFileWhole`, `HashBytes`, `FullFile` |
@@ -267,6 +269,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 | `internal/rearrange` | in-place rearrange | `Run`, `RecoverWith` |
 | `internal/purge` | delete merged sources | `Plan`, `Run`, `ReadReport` |
 | `internal/stats` | what folders and volumes hold, duplicates included (read-only) | `Run`, `Mounts`, `VolumeOf` |
+| `internal/dedupe` | duplicate cleanup: Trash, hard links, clones or a script | `Plan`, `Run`, `Script`, `Resume` |
 | `internal/settings` | merge/rearrange settings | `Merge.Options`, `Rearrange.Options`, `Load`, `Args` |
 | `internal/config` | per-user config | `Load`, `SaveTo`, `Apply`, `Override` |
 | `internal/runctl` | pause/stop | `New`, `Gate.Wait` |
@@ -302,6 +305,7 @@ Leaves: `kinds`, `fsx`, `perf`, `report`, `runctl`, `statedir`, `testfix`, `winr
 | `settings` | catalog, merge, naming, rearrange |
 | `purge` | fsx, kinds, merge, report, runctl, sparsehash |
 | `stats` | fsx, hashcache, kinds, runctl, sparsehash |
+| `dedupe` | fsx, hashcache, purge, runctl, sparsehash, statedir, stats |
 | `scan` | kinds, sparsehash |
 | `planreport` | catalog, kinds, plan, report |
 | `remote` | fsx |
@@ -1216,6 +1220,20 @@ The script is POSIX sh (`rm -- '...'`, `set -e`) or PowerShell (`Remove-Item -Li
 - Live: `OnSnapshot` receives a partial result every second during the scan (the GUI shows the charts filling in); pause and stop go through `runctl` (a stopped run returns what it read, `stopped: true`).
 - `Mounts()`: the volumes with size and free space. Linux reads `/proc/self/mountinfo` (pseudo file systems such as `proc`, `sysfs`, `tmpfs`, `overlay` left out; network file systems marked remote), macOS `getfsstat`, Windows the logical drives with their type and label.
 - `-json FILE` (`-` = standard output) writes the whole `Result` (`version` 1); without it the CLI prints tables of `-top` rows.
+- `OnGroup` receives every group confirmed on the whole content (`full` only, not just the `Top` kept in the result): what a cleanup acts on (section 16.7).
+
+### 16.7 `dedupe`: cleaning up duplicate copies
+
+`onefold dedupe -action trash|link|clone|script [-keep RULE] [-keep-in DIR] [-execute -expect N] FOLDER...` and the "Clean up duplicates" card of the Statistics view (a `dedupe` job, section 22.4). `internal/dedupe`.
+
+- Plan (read-only): `stats` with `full` duplicates on the folders (`OneVolume`; cloud files that are only online are never read), every confirmed group through `OnGroup`. In each group one copy stays: `-keep oldest` (default; modification time), `newest`, `shortest` (path) or `first` (under the first folder given); ties end on the shorter path, then the older time, then the path, so the choice is stable. With `-keep-in DIR` the copy that stays is one inside DIR (the rule picks among several there); a group without a copy there is left alone (`skipped`, with why). A copy that is gone, not a regular file or changed in size since the scan is not counted; a copy that already is the same file as the one that stays (a hard link: Windows walks list both names) is not an extra copy. For `link` and `clone` a copy on another volume than the one that stays is left alone. `-min-size` (default 1 byte) leaves smaller files alone.
+- Execute: `-execute` needs `-expect N`, the count of copies of the dry run, checked before anything is touched (a mismatch: the folders changed, exit 1). `trash` first refuses volumes without a Recycle Bin (`purge.CheckTrash`, section 18.3). A journal `<state dir>/dedupe/dedupe-<ts>.jsonl` (mode 0600, every event fsync'ed) is opened before the first change. Per copy, in parallel workers: the copy and the one that stays are read in full (`sparsehash.FullFile`) and must both hold the group's content, else `NOT touched`; the copy that stays and its folder are flushed (`fsx.Durable`), else `NOT touched`; then:
+  - `trash`: the copy goes to the Recycle Bin / Trash as `purge-sources -trash` does;
+  - `link`, `clone`: the new file is made under a onefold temporary name next to the copy (`fsx.LinkNoReplace`, or `fsx.Clone`, read back in full, given the copy's mode and modification time) and flushed; the journal records the replacement; the copy steps aside to `.NAME.onefold-dd` (`fsx.RenameNoReplace`), the new file takes the name, the original is read once more (written to meanwhile: it is put back and the new file removed), the folder is flushed, and only then the original is removed (`done` in the journal). The name is never empty and never holds other bytes.
+  - A hard link makes the names one file: a change through one name shows in all of them. A clone shares the blocks and stays an independent file (APFS, Btrfs, XFS, section 24.1); a file system that cannot clone fails the copy, which stays.
+- `-action script -script FILE` (`-ps` PowerShell, the default on Windows, else POSIX sh): every copy is read again with the one that stays and only verified ones are written (`rm -- 'PATH'` / `Remove-Item -LiteralPath 'PATH'`, the copy that stays in a comment); the script stops at the first failure; onefold runs nothing.
+- `-resume JOURNAL` finishes what an interrupted run left: where an original still waits under its `.onefold-dd` name it is removed when the name holds the new file and both hold the content, or put back when the name is empty; anything else is reported and left. The GUI's Continue does the same before it re-plans.
+- `-list` prints `TRASH|LINK|CLONE|SCRIPT` and `LEFT` lines; `-json FILE` (`-`: standard output) writes the result. Exit codes: 0, 1 (a folder unreadable, a count mismatch, a copy that failed, a resume problem), 2 (usage).
 
 ---
 
@@ -1448,15 +1466,16 @@ On Windows, `onefold.exe` with no arguments opens the GUI when it was started by
 | `tools/` | downloaded external tools (section 24.3) |
 | `config.json` | the user configuration |
 | `hashes.tsv` | the hash cache (section 8.4), shared by the CLI and the GUI |
+| `dedupe/` | the journals of duplicate cleanups (section 16.7), CLI and GUI |
 
 ### 22.4 Jobs
 
-A job has an id, a kind (`merge rearrange recover index plan apply purge stats`), a stage (`preview`, `execute`), a status (`running paused previewed done failed stopped interrupted`), phases, params (the request), a summary, an error, a journal path, counters and live progress (label, unit, done, total, rate, ETA).
+A job has an id, a kind (`merge rearrange recover index plan apply purge stats dedupe`), a stage (`preview`, `execute`), a status (`running paused previewed done failed stopped interrupted`), phases, params (the request), a summary, an error, a journal path, counters and live progress (label, unit, done, total, rate, ETA).
 
 - One job at a time: another start answers 409. A tool download and a job exclude each other.
-- merge, rearrange, apply and purge start with a preview; recover, index, plan and stats run directly. A stats job's phases are `scan` and `dups`; its result is saved in the state dir and served by `/api/jobs/{id}/stats` (while it runs: the latest live snapshot, `null` before the first).
-- Execute (previewed jobs only) re-plans with `BeforeExecute` and requires the plan to equal the confirmed preview's fingerprint (merge: source + target + size per copy; rearrange: moves and deletes; purge: source + keeper per candidate). Otherwise the job fails with "the folders changed since the preview" and nothing is written. A rearrange execute also needs the typed number of deletions, a purge the typed number of files.
-- Continue (interrupted, stopped, failed): a preview is run again; an execute resumes: merge re-plans and the plan must be a subset of the confirmed one (done copies are present now), rearrange runs `RecoverWith` on its journal, index reuses its partial manifest, apply re-runs (idempotent).
+- merge, rearrange, apply, purge and dedupe start with a preview; recover, index, plan and stats run directly. A stats job's phases are `scan` and `dups`; its result is saved in the state dir and served by `/api/jobs/{id}/stats` (while it runs: the latest live snapshot, `null` before the first).
+- Execute (previewed jobs only) re-plans with `BeforeExecute` and requires the plan to equal the confirmed preview's fingerprint (merge: source + target + size per copy; rearrange: moves and deletes; purge: source + keeper per candidate; dedupe: copy + the copy that stays + content). Otherwise the job fails with "the folders changed since the preview" and nothing is written. A rearrange execute also needs the typed number of deletions, a purge the typed number of files, a dedupe the typed number of copies (a script needs none: it deletes nothing).
+- Continue (interrupted, stopped, failed): a preview is run again; an execute resumes: merge re-plans and the plan must be a subset of the confirmed one (done copies are present now), rearrange runs `RecoverWith` on its journal, dedupe runs `dedupe.Resume` on its journal and re-plans (subset), index reuses its partial manifest, apply re-runs (idempotent).
 - Pause, Resume, Stop act on the job's gate (`runctl`); the status follows and is persisted at each change. Closing the window or Ctrl+C pauses and persists the active job; at the next start it is listed as interrupted and resumable, also after a power loss.
 - Retention: the newest 100 jobs; per-job log capped at 20,000 warnings and errors (counters stay exact).
 - The user config is applied before every job; a plan job takes the configured owner and an apply preview the configured comment and language, recorded in the params so execute and resume stamp what the preview showed.
@@ -1662,6 +1681,7 @@ Go's `flag` package: `-x` and `--x` are equivalent; flags go before positional a
 | `naming` | naming grammar, presets, placeholders | - |
 | `config [list\|get\|set\|unset\|path]` | user configuration | config file |
 | `stats [flags] FOLDER\|MOUNT...`, `stats -mounts` | what folders and volumes hold, duplicates | `-json` |
+| `dedupe -action A [flags] FOLDER...`, `dedupe -resume J` | clean up duplicate copies (section 16.7) | the copies (Trash, link, clone), `-script`, `-json`, journal |
 | `doctor` | platform, zone, tools | - |
 | `tools [list\|install all\|ID...]` | pinned tool downloads (Windows) | state dir |
 | `gui [flags]` | the GUI | state dir |
@@ -1715,14 +1735,14 @@ Go's `flag` package: `-x` and `--x` are equivalent; flags go before positional a
 
 ### 26.4 merge, rearrange, purge-sources
 
-Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default `-preset all`), `-naming`, `-name`, `-settings`, `-print-settings`, `-list`, `-report`, `-allow-mixed`, `-perf`. rearrange adds `-dupes delete|report`, `-keep-empty-dirs`, `-no-cache`, `-move-j`, `-resume J`, `-undo J`. purge-sources: `-from`, `-execute`, `-expect N`, `-trash`, `-list`, `-j`, `-heartbeat`.
+Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default `-preset all`), `-naming`, `-name`, `-settings`, `-print-settings`, `-list`, `-report`, `-allow-mixed`, `-perf`. rearrange adds `-dupes delete|report`, `-keep-empty-dirs`, `-no-cache`, `-move-j`, `-resume J`, `-undo J`. purge-sources: `-from`, `-execute`, `-expect N`, `-trash`, `-list`, `-j`, `-heartbeat`. dedupe (section 16.7): `-action trash|link|clone|script`, `-keep oldest|newest|shortest|first`, `-keep-in DIR`, `-script FILE`, `-ps`, `-min-size SIZE`, `-execute`, `-expect N`, `-resume J`, `-list`, `-json FILE|-`, `-j`, `-heartbeat`.
 
 ### 26.5 Exit codes
 
 | Code | Meaning |
 |---|---|
 | 0 | success |
-| 1 | runtime failure: a file failed (merge `missing after run` > 0, rearrange or purge failures, export-text errors, push failure or conflicts, apply failed actions, backup conflicts or an unclean audit, a stats run that fails or cannot write its JSON) |
+| 1 | runtime failure: a file failed (merge `missing after run` > 0, rearrange or purge failures, export-text errors, push failure or conflicts, apply failed actions, backup conflicts or an unclean audit, a stats run that fails or cannot write its JSON, a dedupe copy left as it was, a dedupe count mismatch or resume problem) |
 | 2 | usage errors, invalid flags or config, regime refusals, a purge confirmation mismatch, `apply --execute` without the tools, `apply -link` refused by the target |
 
 ### 26.6 Environment variables

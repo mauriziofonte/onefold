@@ -47,6 +47,7 @@ One static binary for Linux (amd64, arm64), macOS (Apple Silicon, Intel) and Win
 | Merge folders | one folder holding every distinct file of several folders exactly once, named by a pattern you choose | `merge`, then optionally `purge-sources` |
 | Reorganize in place | the same folder, files renamed and moved to a pattern, exact duplicates removed | `rearrange` |
 | Statistics | what fills a disk or a set of folders (file types, folders, years, sizes) and how much space duplicates waste, read-only | `stats` |
+| Clean up duplicates | one copy of each group of identical files stays; the others go to the Recycle Bin / Trash, become hard links or clones of it, or are listed in a script you run | `dedupe` |
 | Photo and video archive | a "golden" tree with one file per photo or video, canonical names such as `PICTURES/JPG/2021/IMG_20210506_070809.jpg`, the capture date and device written into each copy | `catalog`, `plan`, `apply`; later `golden-index`, `match` |
 
 Around them: lists of look-alike photos and same-text documents to review (`similar`), a verified list of leftover copies with a deletion script you run yourself (`reclaim`), a copy for a disk you put away with a later integrity check (`backup`), plain-text copies of documents (`export-text`), transfer helpers (`push` over SFTP, `seed` scripts for rsync or robocopy).
@@ -225,6 +226,28 @@ onefold.exe stats -dups full -json report.json D:\
 - A second run is faster: the digests of files that did not change since are remembered (in onefold's own state folder) instead of read again. Nothing is ever deleted on a remembered digest: deletions read the files again.
 - A hard-linked file is counted once. On Linux and macOS a walk stays on the volume of its folder (the volumes mounted below it are listed, `-one-volume=false` enters them) and the space used on disk is shown next to the size; Windows reports neither hard links nor the space on disk.
 - The JSON (`-json FILE`, `-` for the standard output) holds every breakdown, the folder tree (`-depth`, default 6 levels) and up to 100 largest files and duplicate groups; the tables print `-top` rows.
+
+### Cleaning up duplicates
+
+`dedupe` acts on what `stats -dups full` finds: in each group of identical files one copy stays, and you choose what happens to the others. It is a dry run until you add `-execute` with the number of copies the dry run listed. In the GUI: Statistics, "Clean up duplicates", under the duplicates.
+
+```bat
+:: what would happen: the oldest copy of each group stays, the others would go to the Recycle Bin
+onefold.exe dedupe -action trash -list D:\Photos E:\old-disk
+
+:: do it: the number is the one the dry run printed
+onefold.exe dedupe -action trash -execute -expect 1234 D:\Photos E:\old-disk
+
+:: keep the copies inside D:\Photos, replace the others on the same drive by hard links
+onefold.exe dedupe -action link -keep-in D:\Photos D:\
+
+:: delete nothing: write a script of the deletions, read it, run it yourself
+onefold.exe dedupe -action script -script clean.ps1 D:\
+```
+
+- The copy that stays: `-keep oldest` (the default), `newest`, `shortest` (path) or `first` (under the first folder given); `-keep-in DIR` keeps the one inside DIR and leaves the groups without one alone.
+- The others: `trash` (they can be put back; network shares and removable drives on Windows have no Recycle Bin and are refused), `link` (every name stays and points to one file, so the space is freed at once; but a change through one name shows in all of them), `clone` (every name stays, the copies share their blocks and stay independent: APFS on macOS, Btrfs or XFS on Linux), `script` (`rm` lines, or PowerShell on Windows).
+- Groups are confirmed on the whole content, and right before each action the copy and the one that stays are read again in full: a copy that changed is left alone. Nothing is deleted for good, every run is journaled, and a replacement never leaves a name empty: an interrupted one is finished or undone with `onefold dedupe -resume JOURNAL` (the GUI's Continue does it).
 
 ## Photo and video archive
 

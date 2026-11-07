@@ -38,7 +38,7 @@ const (
 // execute, resumable after a stop or a power loss.
 type Job struct {
 	ID       string          `json:"id"`
-	Kind     string          `json:"kind"` // merge rearrange recover index plan apply purge stats
+	Kind     string          `json:"kind"` // merge rearrange recover index plan apply purge stats dedupe
 	Status   string          `json:"status"`
 	Stage    string          `json:"stage"` // preview | execute
 	Phases   []string        `json:"phases"`
@@ -135,6 +135,10 @@ func phasesFor(kind, stage string) []string {
 		return []string{"plan", "delete"}
 	case "stats/execute":
 		return []string{"scan", "dups"}
+	case "dedupe/preview":
+		return []string{"scan", "dups"}
+	case "dedupe/execute":
+		return []string{"scan", "dups", "dedupe"}
 	}
 	return []string{"recover"}
 }
@@ -164,6 +168,8 @@ func labelPhase(kind, label string) string {
 		return "scan"
 	case "stats duplicates":
 		return "dups"
+	case "dedupe":
+		return "dedupe"
 	}
 	return ""
 }
@@ -309,7 +315,7 @@ func (m *Manager) Start(kind string, params json.RawMessage) (*Job, error) {
 		return nil, err
 	}
 	stage := "execute"
-	if kind == "merge" || kind == "rearrange" || kind == "apply" || kind == "purge" {
+	if kind == "merge" || kind == "rearrange" || kind == "apply" || kind == "purge" || kind == "dedupe" {
 		stage = "preview"
 	}
 	now := time.Now()
@@ -347,6 +353,9 @@ func (m *Manager) Execute(id string, confirm int) error {
 	}
 	if j.Kind == "purge" && asInt(j.Summary["candidates"]) != confirm {
 		return fmt.Errorf("confirmation mismatch: type the number of files to delete")
+	}
+	if j.Kind == "dedupe" && asInt(j.Summary["items"]) != confirm {
+		return fmt.Errorf("confirmation mismatch: type the number of copies")
 	}
 	return m.begin(j, "execute", false)
 }
@@ -483,6 +492,8 @@ func (m *Manager) run(j *Job, stage string, resume bool, g *runctl.Gate) {
 			sum, pending, err = m.runPurge(j, g, stage == "execute", resume)
 		case "stats":
 			sum, err = m.runStats(j, g)
+		case "dedupe":
+			sum, pending, err = m.runDedupe(j, g, stage == "execute", resume)
 		default:
 			err = fmt.Errorf("unknown kind %q", j.Kind)
 		}

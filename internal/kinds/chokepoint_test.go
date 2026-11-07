@@ -29,6 +29,7 @@ func TestChokePoint(t *testing.T) {
 		"materialize.go": {".part": true},
 		"planreport.go":  {".md": true, ".part": true},
 		"backup.go":      {".jsonl": true},
+		"dedupe.go":      {".jsonl": true},
 		"purge.go":       {".jsonl": true},
 		"rearrange.go":   {".jsonl": true},
 		"sftp.go":        {".part": true},

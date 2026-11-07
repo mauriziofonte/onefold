@@ -86,7 +86,9 @@ func (s *scan) duplicates() (*Dups, error) {
 	}
 	cands = kept
 	d.Candidates = int64(len(cands))
-	prog.AddTotal(int64(len(cands)))
+	for _, c := range cands {
+		prog.AddTotal(c.size) // one item each
+	}
 	prog.TotalKnown()
 
 	// sample digest of every candidate
@@ -135,6 +137,15 @@ func (s *scan) duplicates() (*Dups, error) {
 	}
 	summarize(d, groups, verified, s.o.Top)
 	d.Cached = s.o.Cache.Hits() - hits0
+	if s.o.OnGroup != nil && verified {
+		for _, g := range groups {
+			paths := make([]string, len(g))
+			for i, c := range g {
+				paths[i] = c.path
+			}
+			s.o.OnGroup(g[0].size, g[0].hash, paths)
+		}
+	}
 	return d, nil
 }
 

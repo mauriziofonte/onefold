@@ -26,6 +26,7 @@ import (
 
 	"github.com/mauriziofonte/onefold/internal/catalog"
 	"github.com/mauriziofonte/onefold/internal/config"
+	"github.com/mauriziofonte/onefold/internal/dedupe"
 	"github.com/mauriziofonte/onefold/internal/meta"
 	"github.com/mauriziofonte/onefold/internal/naming"
 	"github.com/mauriziofonte/onefold/internal/plan"
@@ -1011,5 +1012,86 @@ func TestStatsCLI(t *testing.T) {
 	}
 	if snapshot(t, root) != before {
 		t.Fatal("stats modified a root")
+	}
+}
+
+// onefold dedupe: the dry run touches nothing; the script deletes nothing;
+// an execute needs the typed count and leaves one copy of each group; the
+// exit codes.
+func TestDedupeCLI(t *testing.T) {
+	root := testfix.TempDir(t)
+	A, B := filepath.Join(root, "A"), filepath.Join(root, "B")
+	old, newer := time.Date(2012, 1, 2, 3, 4, 5, 0, time.Local), time.Date(2020, 1, 2, 3, 4, 5, 0, time.Local)
+	photo := strings.Repeat("photo bytes ", 100)
+	must(t, testfix.File(filepath.Join(A, "IMG_0001.jpg"), photo, old))
+	must(t, testfix.File(filepath.Join(B, "IMG_0001 (1).jpg"), photo, newer))
+	must(t, testfix.File(filepath.Join(B, "copy", "IMG_0001.jpg"), photo, newer))
+	must(t, testfix.File(filepath.Join(B, "only.txt"), "only here", old))
+	before := snapshot(t, root)
+
+	var r dedupe.Result
+	must(t, json.Unmarshal([]byte(dd(t, "dedupe", "-action", "link", "-json", "-", A, B)), &r))
+	if r.Groups != 1 || len(r.Items) != 2 || r.Bytes != int64(2*len(photo)) || r.Items[0].Keep != filepath.Join(A, "IMG_0001.jpg") {
+		t.Fatalf("dry run: %+v", r)
+	}
+	if out := dd(t, "dedupe", "-action", "link", "-list", A, B); !strings.Contains(out, "DRY-RUN") || !strings.Contains(out, "copies:           2") ||
+		!strings.Contains(out, "LINK\t"+filepath.Join(B, "copy", "IMG_0001.jpg")) {
+		t.Errorf("dry run text:\n%s", out)
+	}
+	script := filepath.Join(t.TempDir(), "clean.sh")
+	if out := dd(t, "dedupe", "-action", "script", "-script", script, "-ps=false", "-keep", "newest", A, B); !strings.Contains(out, "SCRIPT") {
+		t.Errorf("script run:\n%s", out)
+	}
+	if b, _ := os.ReadFile(script); strings.Count(string(b), "\nrm -- '") != 2 || !strings.Contains(string(b), filepath.Join(A, "IMG_0001.jpg")) {
+		t.Errorf("script:\n%s", b)
+	}
+	if snapshot(t, root) != before {
+		t.Fatal("a dry run or the script action changed the folders")
+	}
+	// exit codes: 2 = usage, 1 = a run that fails
+	for _, c := range []struct {
+		args []string
+		code int
+	}{
+		{[]string{"dedupe", A}, 2},
+		{[]string{"dedupe", "-action", "zap", A}, 2},
+		{[]string{"dedupe", "-action", "link", "-keep", "biggest", A}, 2},
+		{[]string{"dedupe", "-action", "link", "-execute", A}, 2},
+		{[]string{"dedupe", "-action", "script", A}, 2},
+		{[]string{"dedupe", "-action", "link", "-script", script, A}, 2},
+		{[]string{"dedupe", "-action", "link", "-min-size", "lots", A}, 2},
+		{[]string{"dedupe", "-action", "link", filepath.Join(root, "missing")}, 1},
+		{[]string{"dedupe", "-action", "link", "-execute", "-expect", "5", A, B}, 1},
+		{[]string{"dedupe", "-resume", filepath.Join(root, "missing.jsonl")}, 1},
+	} {
+		err := exec.Command(bin, c.args...).Run()
+		var ee *exec.ExitError
+		if code := 0; !errors.As(err, &ee) || ee.ExitCode() != c.code {
+			if ee != nil {
+				code = ee.ExitCode()
+			}
+			t.Errorf("onefold %v: exit %d (%v), want %d", c.args, code, err, c.code)
+		}
+	}
+	if snapshot(t, root) != before {
+		t.Fatal("a refused run changed the folders")
+	}
+	out := dd(t, "dedupe", "-action", "link", "-execute", "-expect", "2", A, B)
+	if !strings.Contains(out, "EXECUTED") || !strings.Contains(out, "journal:") {
+		t.Errorf("execute:\n%s", out)
+	}
+	for _, p := range []string{filepath.Join(B, "IMG_0001 (1).jpg"), filepath.Join(B, "copy", "IMG_0001.jpg")} {
+		a, err1 := os.Stat(filepath.Join(A, "IMG_0001.jpg"))
+		b, err2 := os.Stat(p)
+		if err1 != nil || err2 != nil || !os.SameFile(a, b) {
+			t.Errorf("%s is not a link of the kept copy (%v %v)", p, err1, err2)
+		}
+	}
+	if b, _ := os.ReadFile(filepath.Join(B, "only.txt")); string(b) != "only here" {
+		t.Error("the unique file changed")
+	}
+	must(t, json.Unmarshal([]byte(dd(t, "dedupe", "-action", "link", "-json", "-", A, B)), &r))
+	if len(r.Items) != 0 {
+		t.Errorf("after the execute, still %d copies: %+v", len(r.Items), r.Items)
 	}
 }
