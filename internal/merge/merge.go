@@ -46,6 +46,7 @@ import (
 	"github.com/mauriziofonte/onefold/internal/plan"
 	"github.com/mauriziofonte/onefold/internal/report"
 	"github.com/mauriziofonte/onefold/internal/runctl"
+	"github.com/mauriziofonte/onefold/internal/sidecar"
 )
 
 // Options configure a merge.
@@ -101,11 +102,12 @@ const CacheDir = ".onefold"
 // Copy is one planned copy.
 type Copy struct {
 	Src     *catalog.Record `json:"-"` // into the run's records: one copy of each, not two
-	SrcPath string         `json:"src"`
-	Rel     string         `json:"target"` // slash-separated, relative to the output
-	Size    int64          `json:"size"`
-	Renamed bool           `json:"renamed,omitempty"` // collision suffix applied
-	Dupes   []string       `json:"inputDupes,omitempty"`
+	SrcPath string          `json:"src"`
+	Rel     string          `json:"target"` // slash-separated, relative to the output
+	Size    int64           `json:"size"`
+	Renamed bool            `json:"renamed,omitempty"` // collision suffix applied
+	Dupes   []string        `json:"inputDupes,omitempty"`
+	Sidecar bool            `json:"sidecar,omitempty"` // follows the photo or video it belongs to (-sidecars)
 }
 
 // Result is the merge plan + outcome.
@@ -155,6 +157,9 @@ type Result struct {
 	present      []Settle          // input files already in the output (decide)
 	CachedVerify int               `json:"cachedVerify,omitempty"` // -verify-uncached copies verified through the cache (OS refused an uncached read)
 	Cloned       int               `json:"cloned,omitempty"`       // copies made as clones (-clone): no extra space
+	// Sidecars: input files kept with the photo or video they belong to
+	// (-sidecars): copied under its name, or already there.
+	Sidecars int `json:"sidecars,omitempty"`
 }
 
 // Settle pairs an input file with the output file holding its content.
@@ -499,11 +504,22 @@ func decide(o Options, nm *naming.Naming, res *Result, recs []catalog.Record, ou
 		known[names.FoldKey(r.Path)] = true
 	}
 	exists := func(p string) bool { return known[names.FoldKey(p)] }
+	// -sidecars: an input file that belongs to a photo or video follows it
+	// (placed after it) and is never deduplicated alone; one cataloged only as
+	// a possible sidecar (type out of the scope) that has no owner is left out
+	var owner []int
+	if o.Catalog.Sidecars {
+		owner = sidecar.Records(recs)
+	}
+	isSide := func(i int) bool { return owner != nil && owner[i] >= 0 && !within(recs[i].Path, out) }
 	// groups hold indices: a record is 400 bytes, a million of them copied
 	// once more would be 400 MB
 	groups := map[string][]int32{}
 	var order []string
 	for i, r := range recs {
+		if isSide(i) || (r.Sidecar && !within(r.Path, out)) {
+			continue
+		}
 		if _, ok := groups[r.Hash]; !ok {
 			order = append(order, r.Hash)
 		}
@@ -590,6 +606,125 @@ func decide(o Options, nm *naming.Naming, res *Result, recs []catalog.Record, ou
 		kept = append(kept, c)
 	}
 	res.Copies = kept
+	if owner != nil {
+		placeSidecars(res, recs, owner, isSide, out, occupied, files)
+	}
+}
+
+// placeSidecars plans the input sidecars next to the output file that holds
+// their owner's content, under its name: a copy, nothing when the same bytes
+// are already there under that name, the next _NN name when other bytes are
+// (their link to the photo is lost then, never their content).
+func placeSidecars(res *Result, recs []catalog.Record, owner []int, isSide func(int) bool, out string, occupied, files map[string]bool) {
+	type place struct {
+		rel    string
+		winner bool // the owner is the copy's winner: its own sidecar comes first
+	}
+	at := map[string]place{} // owner path -> where its content is
+	taken := make(map[string]bool, len(occupied)+len(res.Copies))
+	for k := range occupied {
+		taken[k] = true
+	}
+	for _, c := range res.Copies {
+		at[c.SrcPath] = place{c.Rel, true}
+		for _, d := range c.Dupes {
+			at[d] = place{c.Rel, false}
+		}
+		for d := c.Rel; d != "." && d != "/"; d = path.Dir(d) {
+			taken[names.FoldKey(d)] = true
+		}
+	}
+	for _, p := range res.present {
+		if r, err := filepath.Rel(out, p.Keeper); err == nil {
+			at[p.Src] = place{filepath.ToSlash(r), false}
+		}
+	}
+	outAt := map[string]*catalog.Record{}
+	for i := range recs {
+		if within(recs[i].Path, out) {
+			if r, err := filepath.Rel(out, recs[i].Path); err == nil {
+				outAt[names.FoldKey(filepath.ToSlash(r))] = &recs[i]
+			}
+		}
+	}
+	type cand struct {
+		i   int
+		rel string
+		tie string
+	}
+	var cands []cand
+	for i := range recs {
+		if !isSide(i) {
+			continue
+		}
+		o := &recs[owner[i]]
+		pl, ok := at[o.Path]
+		if !ok { // the owner's copy is blocked
+			res.Blocked = append(res.Blocked, recs[i].Path+" -> (with "+filepath.Base(o.Path)+")")
+			continue
+		}
+		tie := "1"
+		if pl.winner {
+			tie = "0"
+		}
+		cands = append(cands, cand{i, sidecar.Target(o.Path, pl.rel, recs[i].Path), tie + recs[i].Path})
+	}
+	sort.Slice(cands, func(a, b int) bool {
+		if ka, kb := names.FoldKey(cands[a].rel), names.FoldKey(cands[b].rel); ka != kb {
+			return ka < kb
+		}
+		return cands[a].tie < cands[b].tie
+	})
+	var copies []Copy
+	var ties []string
+	for k := 0; k < len(cands); {
+		key := names.FoldKey(cands[k].rel)
+		end := k
+		for end < len(cands) && names.FoldKey(cands[end].rel) == key {
+			end++
+		}
+		byHash := map[string]int{} // hash -> index into copies
+		for _, c := range cands[k:end] {
+			r := &recs[c.i]
+			res.Sidecars++
+			if have := outAt[key]; have != nil && have.Hash == r.Hash {
+				content := r.ContentHash
+				if content == "" {
+					content = have.ContentHash
+				}
+				res.AlreadyPresent++
+				res.present = append(res.present, Settle{Src: r.Path, Keeper: have.Path, Size: r.Size, Content: content})
+				continue
+			}
+			if j, ok := byHash[r.Hash]; ok {
+				copies[j].Dupes = append(copies[j].Dupes, r.Path)
+				res.InputDupes++
+				continue
+			}
+			byHash[r.Hash] = len(copies)
+			copies = append(copies, Copy{Src: r, SrcPath: r.Path, Size: r.Size, Rel: c.rel, Sidecar: true})
+			ties = append(ties, c.tie)
+		}
+		k = end
+	}
+	items := make([]naming.Item, len(copies))
+	for i, c := range copies {
+		items[i] = naming.Item{Target: c.Rel, Tie: ties[i]}
+	}
+	final := naming.Assign(items, taken)
+	for i, c := range copies {
+		if final[i] != c.Rel {
+			c.Rel, c.Renamed = final[i], true
+			res.Renamed++
+		}
+		if blockedParent(c.Rel, files) {
+			res.Blocked = append(res.Blocked, c.SrcPath+" -> "+c.Rel)
+			continue
+		}
+		res.CopyBytes += c.Size
+		res.Copies = append(res.Copies, c)
+	}
+	res.Distinct += len(copies)
 }
 
 // blockedParent: some parent directory of rel exists in the output as a FILE.

@@ -59,6 +59,9 @@ type Filters struct {
 	KeepJunk     bool `json:"keepJunk,omitempty"`
 	Quick        bool `json:"quick,omitempty"`
 	Limit        int  `json:"limit,omitempty"`
+	// Sidecars keeps the files that belong to a photo or video with it
+	// (Options.Sidecars): its edits and metadata take its new name.
+	Sidecars bool `json:"sidecars,omitempty"`
 }
 
 // RuleOn reports whether the skip rule name is on for f.
@@ -101,7 +104,7 @@ func (f Filters) RuleOn(name string) bool {
 func (f Filters) Options(defPreset string) (Options, error) {
 	o := Options{Coverage: sparsehash.DefaultCoverage, Sample: sparsehash.DefaultSampleSize,
 		KeepDotDirs: !f.RuleOn(RuleDotDirs), KeepJunk: !f.RuleOn(RuleJunk), Quick: f.Quick, Limit: f.Limit,
-		KeepDotfiles: f.KeepDotfiles, KeepEmpty: f.KeepDotfiles}
+		KeepDotfiles: f.KeepDotfiles, KeepEmpty: f.KeepDotfiles, Sidecars: f.Sidecars}
 	for n := range f.Rules {
 		if !KnownRule(n) {
 			return o, fmt.Errorf("unknown skip rule %q", n)

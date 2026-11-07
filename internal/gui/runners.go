@@ -70,6 +70,7 @@ type PlanParams struct {
 	FixExt     bool     `json:"fixExt"`
 	Artist     string   `json:"artist"` // set from the user's config at start ("" = none)
 	Out        string   `json:"out"`    // "" = <state>/golden/plan-<time>.jsonl
+	Sidecars   bool     `json:"sidecars,omitempty"`
 }
 
 // ApplyParams mirror `apply --execute`.
@@ -642,7 +643,7 @@ func (m *Manager) runPlan(j *Job, g *runctl.Gate) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	opts := plan.Options{Layout: p.Layout, FixExt: p.FixExt, VideoTier: p.VideoTier, Artist: p.Artist, SelfContained: true}
+	opts := plan.Options{Layout: p.Layout, FixExt: p.FixExt, VideoTier: p.VideoTier, Artist: p.Artist, SelfContained: true, Sidecars: p.Sidecars}
 	var vs plan.VerifyStats
 	if p.VerifyFull {
 		m.setPhase(j, "verify")
@@ -666,7 +667,7 @@ func (m *Manager) runPlan(j *Job, g *runctl.Gate) (map[string]any, error) {
 	}
 	return map[string]any{"plan": p.Out, "inputFiles": r.InputFiles, "golden": r.Assets, "exactDupes": r.ExactDupes,
 		"lowerRes": r.LowerRes, "smaller": r.SmallerVar, "goldenBytes": r.GoldenBytes, "reclaimBytes": r.ReclaimBytes,
-		"verifyGroups": r.VerifiedGroups, "verifySplits": r.VerifySplits, "hosts": planHosts(acts)}, nil
+		"verifyGroups": r.VerifiedGroups, "verifySplits": r.VerifySplits, "hosts": planHosts(acts), "sidecars": r.SidecarCount}, nil
 }
 
 func writePlan(path string, acts []plan.Action) error {

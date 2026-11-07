@@ -4,7 +4,7 @@
 # photo/video kinds are FROZEN to the media contract = the golden scope (ADR 0002): photo = jpg jpeg heic heif avif png webp tif tiff + camera RAW (group RAW, minus the nksc sidecar and the eip package); video = mov mp4 mkv avi 3gp webm flv wmv mpg mpeg m4v; other video containers are kind "other", group VIDEO.
 # canonical is FROZEN to jpeg/jpe->jpg tif->tiff htm->html yml->yaml mpeg->mpg: it names golden files ({ext-norm}); a new alias renames existing golden trees.
 # format = parser/container id (dispatch + magic family); canonical = harmonized extension;
-# flags = system (OS artifact), common (frequent file types), personal (typical personal files), transient (incomplete downloads, temp and lock files), shortcut (links to other files or sites).
+# flags = system (OS artifact), common (frequent file types), personal (typical personal files), transient (incomplete downloads, temp and lock files), shortcut (links to other files or sites), sidecar (belongs to the photo or video of the same name: edits, metadata, thumbnail), takeout (Google Takeout metadata, <name>.json), live (a half of a Live Photo: the still or its short video).
 !bt	other	misc	OTHER	none	!bt	-	BitTorrent Incomplete Download File
 !qb	other	misc	OTHER	none	!qb	-	qBittorrent Partial Download File
 !sync	other	misc	OTHER	none	!sync	-	BitTorrent Partially Synced File
@@ -230,7 +230,7 @@ aa3	audio	audio	AUDIO	none	aa3	-	ATRAC Audio File
 aaa	other	encoded	ENCODED	none	aaa	-	CryptoWall Ransomware Encrypted File
 aab	other	executable	EXE	zip	aab	-	Android package
 aac	audio	audio	AUDIO	aac	aac	personal	AAC audio
-aae	other	image_editing	DESIGN	text	aae	common	Apple photo edit sidecar
+aae	other	image_editing	DESIGN	text	aae	common,sidecar	Apple photo edit sidecar
 aaf	other	video	VIDEO	none	aaf	-	Advanced Authoring Format File
 aai	image	raster_image	IMAGE	none	aai	-	Dune HD AAI Image
 aam	other	data	DATA	none	aam	-	Authorware Map File
@@ -3787,8 +3787,8 @@ he1	other	game	GAME	none	he1	-	Humongous Entertainment Game Archive
 he2	other	game	GAME	none	he2	-	Humongous Entertainment Game Archive
 he4	other	game	GAME	none	he4	-	Humongous Entertainment Sound Archive
 heartssave-ms	other	game	GAME	none	heartssave-ms	-	Microsoft Hearts Save File
-heic	photo	raster_image	IMAGE	heif	heic	common	HEIF/HEIC image (iPhone)
-heif	photo	raster_image	IMAGE	heif	heif	common	HEIF/HEIC image (iPhone)
+heic	photo	raster_image	IMAGE	heif	heic	common,live	HEIF/HEIC image (iPhone)
+heif	photo	raster_image	IMAGE	heif	heif	common,live	HEIF/HEIC image (iPhone)
 help	other	system	SYSTEM	none	help	-	Mac OS X Help Book
 helpcfg	other	settings	CONFIG	none	helpcfg	-	Adobe Community Help Configuration File
 helpindex	other	data	DATA	none	helpindex	-	Help Index Document
@@ -4451,9 +4451,9 @@ jpa	other	backup	BACKUP	none	jpa	-	Akeeba Backup Archive
 jpc	image	raster_image	IMAGE	none	jpc	-	JPEG 2000 Code Stream File
 jpd	image	raster_image	IMAGE	none	jpd	-	Joint PhotoDefiner Image
 jpe	image	raster_image	IMAGE	jpeg	jpg	-	JPEG image
-jpeg	photo	raster_image	IMAGE	jpeg	jpg	common,personal	JPEG image
+jpeg	photo	raster_image	IMAGE	jpeg	jpg	common,personal,live	JPEG image
 jpf	image	raster_image	IMAGE	none	jpf	-	JPEG 2000 Image
-jpg	photo	raster_image	IMAGE	jpeg	jpg	common,personal	JPEG image
+jpg	photo	raster_image	IMAGE	jpeg	jpg	common,personal,live	JPEG image
 jpg-large	image	raster_image	IMAGE	none	jpg-large	-	Twitter Large-sized JPEG Image
 jpg2	image	raster_image	IMAGE	none	jpg2	-	JPEG 2000 Image
 jpg_large	image	raster_image	IMAGE	none	jpg_large	-	Twitter Large JPEG Image
@@ -4488,7 +4488,7 @@ jsf	other	executable	EXE	none	jsf	-	Java Script Command File
 jsfl	other	developer	CODE	none	jsfl	-	Animate JSFL Script File
 jsh	other	developer	CODE	none	jsh	-	JAWS Script Header File
 jsl	image	vector_image	VECTOR	none	jsl	-	Corel PaintShop Pro Shape Library
-json	text	data	DATA	text	json	common,personal	JSON data
+json	text	data	DATA	text	json	common,personal,takeout	JSON data
 json.crypt14	other	settings	CONFIG	none	json.crypt14	-	WhatsApp Backup Settings
 json5	other	web	WEB	none	json5	-	JSON5 Data File
 jsonc	other	developer	CODE	none	jsonc	-	JSON With Comments File
@@ -5510,7 +5510,7 @@ motn	other	settings	CONFIG	none	motn	-	Apple Motion Generator Project Template
 motr	other	settings	CONFIG	none	motr	-	Apple Motion Transition Project Template
 mou	other	compressed	ARCHIVE	none	mou	-	WinMount Compressed File
 mountain	other	game	GAME	none	mountain	-	A Short Hike Saved Game
-mov	video	video	VIDEO	isobmff	mov	common,personal	QuickTime movie
+mov	video	video	VIDEO	isobmff	mov	common,personal,live	QuickTime movie
 movie	other	video	VIDEO	none	movie	-	QuickTime Movie File
 movpkg	other	compressed	ARCHIVE	none	movpkg	-	High-Resolution Lossless Media File
 mox	other	plugin	PLUGIN	none	mox	-	Montax Imposer Template Document
@@ -8865,7 +8865,7 @@ thespace	other	settings	CONFIG	none	thespace	-	The Space Workspace Configuration
 thing	other	3d_image	3D	none	thing	-	MakerBot Thing File
 thk	other	data	DATA	none	thk	-	Symthink Document
 thl	other	3d_image	3D	none	thl	-	Total 3D Home Design File
-thm	other	executable	EXE	none	thm	-	Thermwood Macro File
+thm	other	executable	EXE	none	thm	sidecar	Camera thumbnail sidecar or Thermwood macro
 thmx	other	settings	CONFIG	none	thmx	-	Office 2007 Theme
 thor	other	encoded	ENCODED	none	thor	-	Locky Ransomware Encrypted File
 thp	other	video	VIDEO	none	thp	-	Wii/GameCube Video File
@@ -10205,7 +10205,7 @@ xmm	other	3d_image	3D	none	xmm	-	3ds Max XML Animation Map File
 xmmap	image	vector_image	VECTOR	none	xmmap	-	MindManager XML Map
 xmmas	other	settings	CONFIG	none	xmmas	-	MindManager XML Map Theme File
 xmmat	image	vector_image	VECTOR	none	xmmat	-	MindManager XML Map Template
-xmp	other	image_editing	DESIGN	text	xmp	-	XMP sidecar metadata
+xmp	other	image_editing	DESIGN	text	xmp	sidecar	XMP sidecar metadata
 xmpz	other	data	DATA	none	xmpz	-	Miradi XML Project File
 xms	audio	audio	AUDIO	none	xms	-	XMS-Tracker Music Module
 xmt	other	page_layout	DOC	none	xmt	-	XMind Template

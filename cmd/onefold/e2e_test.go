@@ -17,6 +17,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -1093,5 +1094,47 @@ func TestDedupeCLI(t *testing.T) {
 	must(t, json.Unmarshal([]byte(dd(t, "dedupe", "-action", "link", "-json", "-", A, B)), &r))
 	if len(r.Items) != 0 {
 		t.Errorf("after the execute, still %d copies: %+v", len(r.Items), r.Items)
+	}
+}
+
+// TestSidecarsCLI: catalog -sidecars keeps the .AAE and Takeout .json of a
+// photo (out of the golden scope) in the manifest, plan -sidecars puts them
+// in the photo's action, apply writes them next to the golden file under its
+// name, and a plan without -sidecars leaves them out.
+func TestSidecarsCLI(t *testing.T) {
+	root := testfix.TempDir(t)
+	src, G := filepath.Join(root, "src"), filepath.Join(root, "golden")
+	old := time.Date(2012, 1, 2, 3, 4, 5, 0, time.Local)
+	writeJPEG(t, filepath.Join(src, "IMG_20120102_030405.jpg"), 7)
+	must(t, os.Chtimes(filepath.Join(src, "IMG_20120102_030405.jpg"), old, old))
+	must(t, testfix.File(filepath.Join(src, "IMG_20120102_030405.AAE"), "<plist/>", old))
+	must(t, testfix.File(filepath.Join(src, "IMG_20120102_030405.jpg.json"), `{"title":"x"}`, old))
+	must(t, testfix.File(filepath.Join(src, "notes.json"), `{"nobody":"s"}`, old))
+	m, p, p0 := filepath.Join(root, "m.jsonl"), filepath.Join(root, "p.jsonl"), filepath.Join(root, "p0.jsonl")
+	dd(t, "catalog", "-sidecars", "-host", "pc", "-o", m, src)
+	if out := dd(t, "plan", "-o", p0, m); !strings.Contains(out, "3 left out (cataloged with -sidecars)") {
+		t.Fatalf("plan without -sidecars: %s", out)
+	}
+	if acts := loadPlan(t, p0); len(acts) != 1 || len(acts[0].Sidecars) != 0 {
+		t.Fatalf("plan without -sidecars: %+v", acts)
+	}
+	if out := dd(t, "plan", "-sidecars", "-o", p, m); !strings.Contains(out, "2 kept with their photo or video, 1 belong to none") {
+		t.Fatalf("plan -sidecars: %s", out)
+	}
+	if out := dd(t, "apply", p); !strings.Contains(out, "SIDECAR\tpc:"+filepath.Join(src, "IMG_20120102_030405.AAE")) {
+		t.Fatalf("dry run: %s", out)
+	}
+	cmd := exec.Command(bin, "apply", "-execute", "-allow-unstamped", "-target", G, p)
+	cmd.Env = append(os.Environ(), "ONEFOLD_NO_EXTERNAL=1")
+	if b, err := cmd.CombinedOutput(); err != nil || !strings.Contains(string(b), "sidecars written next to their golden file: 2") {
+		t.Fatalf("apply: %v\n%s", err, b)
+	}
+	acts := loadPlan(t, p)
+	dir := filepath.Join(G, filepath.FromSlash(path.Dir(acts[0].CanonRel)))
+	stem := strings.TrimSuffix(acts[0].CanonName, path.Ext(acts[0].CanonName))
+	for _, f := range []string{stem + ".AAE", acts[0].CanonName + ".json"} {
+		if _, err := os.Stat(filepath.Join(dir, f)); err != nil {
+			t.Errorf("%s not next to the golden file: %v", f, err)
+		}
 	}
 }

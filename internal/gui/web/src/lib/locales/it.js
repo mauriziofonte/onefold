@@ -139,6 +139,8 @@ export default {
   'naming.preview': 'Anteprima dal vivo su file delle tue cartelle',
   'naming.previewEmpty': 'Scegli una cartella per vedere esempi reali.',
   'filters.title': 'Filtri',
+  'filters.sidecars': 'Tieni i sidecar con la loro foto o video',
+  'filters.sidecars.ex': 'i file .AAE, .xmp, .THM, i .json di Google Takeout e il video di una Live Photo prendono il nuovo nome della foto e non vengono mai deduplicati da soli',
   'filters.maxSize': 'Dimensione massima',
   'filters.exclude': 'Escludi i percorsi che contengono (separati da virgola)',
   'safety.title': 'Sicurezza',

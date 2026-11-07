@@ -161,6 +161,56 @@ func applyWith(a plan.Action, target string, batch *ExifBatch, s Silver, clone b
 	return Result{Dst: dst, Unsilvered: unsilvered, Cloned: cloned}, nil
 }
 
+// applySidecars publishes the action's sidecars next to its golden file
+// (plan.Sidecar.Rel): a byte copy (a clone where allowed) under a temp name
+// with the source's mtime, then RenameNoReplace; link = hard links, as the
+// golden file. An existing name is skipped, never replaced (idempotent).
+// Returns the destinations written; every failure is in err, the others go on.
+func applySidecars(a plan.Action, target string, link, clone bool) (written []string, err error) {
+	var errs []error
+	for _, sc := range a.Sidecars {
+		dst := filepath.Join(target, filepath.FromSlash(sc.Rel))
+		if _, e := os.Lstat(dst); e == nil {
+			continue
+		}
+		if e := os.MkdirAll(filepath.Dir(dst), 0o755); e != nil {
+			errs = append(errs, e)
+			continue
+		}
+		if link {
+			switch e := fsx.LinkNoReplace(sc.Path, dst); {
+			case e == nil:
+				written = append(written, dst)
+			case !errors.Is(e, fsx.ErrExists):
+				errs = append(errs, fmt.Errorf("sidecar %s: %w", sc.Path, e))
+			}
+			continue
+		}
+		fi, e := os.Stat(sc.Path)
+		if e != nil {
+			errs = append(errs, fmt.Errorf("sidecar %s: %w", sc.Path, e))
+			continue
+		}
+		tmp := fsx.TempFor(dst, false)
+		if _, e := copyFile(sc.Path, tmp, clone); e != nil {
+			os.Remove(tmp)
+			errs = append(errs, fmt.Errorf("sidecar %s: %w", sc.Path, e))
+			continue
+		}
+		_ = os.Chtimes(tmp, fi.ModTime(), fi.ModTime())
+		switch e := fsx.RenameNoReplace(tmp, dst); {
+		case e == nil:
+			written = append(written, dst)
+		case errors.Is(e, fsx.ErrExists):
+			os.Remove(tmp)
+		default:
+			os.Remove(tmp)
+			errs = append(errs, fmt.Errorf("sidecar %s: %w", sc.Path, e))
+		}
+	}
+	return written, errors.Join(errs...)
+}
+
 // LinkOriginal materializes a as a hard link: target/<canonRel> becomes a
 // second name of the source file, the original bytes, with no copy, no
 // silvering and the mtime left as it is (a hard link shares it with the

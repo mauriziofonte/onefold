@@ -43,6 +43,9 @@
         <span><span>{t('crule.' + r.name)}</span><span class="block text-xs text-slate-400">{t('crule.' + r.name + '.ex')}</span></span>
       </label>
     {/each}
+    <label class="chk col-span-2 items-start"><input class="mt-1" type="checkbox" bind:checked={f.sidecars} data-testid="filter-sidecars" />
+      <span><span>{t('filters.sidecars')}</span><span class="block text-xs text-slate-400">{t('filters.sidecars.ex')}</span></span>
+    </label>
     <label><span class="lbl">{t('filters.maxSize')}</span><input class="input mt-1" bind:value={f.maxSize} /></label>
     <label class="col-span-2"><span class="lbl">{t('filters.exclude')}</span><input class="input mt-1" bind:value={f.exclude} placeholder="Backup old, .trash" /></label>
     <div class="col-span-2 border-t border-slate-100 pt-2"><ExclusionsBox paths={f.excludePaths || []} globs={f.excludeGlobs || []} onchange={exclusions} /></div>

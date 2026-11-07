@@ -13,7 +13,7 @@ const KEY = 'onefold.settings.v1';
 // filters of a mode: size cap, exclusions and the skip rules by name
 // (catalog.Rules; a missing rule is on).
 // excludePaths / excludeGlobs: the user's exclusions.
-const filters = () => ({ maxSize: '50G', exclude: '', rules: {}, excludePaths: [], excludeGlobs: [] });
+const filters = () => ({ maxSize: '50G', exclude: '', rules: {}, excludePaths: [], excludeGlobs: [], sidecars: false });
 
 // naming of merge/rearrange: file families, per family a preset
 // valid for it, a stem mode (norm, clean, raw, prefix) and the folder level

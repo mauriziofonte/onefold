@@ -418,6 +418,7 @@ func cmdPlan(args []string) {
 	artist := fs.String("artist", "", "owner stamped as Artist/Copyright on photo/video copies (default: `onefold config` artist, none if unset; \""+config.None+"\" = none)")
 	reportp := fs.String("report", "", "write a report (.md = Markdown, else JSON)")
 	extensive := fs.Bool("extensive", false, "report: all duplicate groups/mismatches + full golden file list")
+	sidecars := fs.Bool("sidecars", false, "keep the files that belong to a photo or video with it: .AAE, .xmp, .THM, Google Takeout .json (catalog -sidecars) and the video of a Live Photo are copied next to its golden file under its name")
 	_ = fs.Parse(args)
 	if fs.NArg() < 1 {
 		fmt.Fprintln(os.Stderr, "plan: at least one <manifest.jsonl> required")
@@ -428,7 +429,7 @@ func cmdPlan(args []string) {
 	}
 	cfg := loadConfig()
 	opts := plan.Options{VerifyFull: *verify, Layout: *layout, FixExt: *fixExt, VideoTier: *videoTier, VideoTolerance: *videoTol, FilenameSeq: *filenameSeq, SelfContained: *selfContained,
-		Artist: config.Override(*artist, cfg.Artist)}
+		Artist: config.Override(*artist, cfg.Artist), Sidecars: *sidecars}
 	recs, err := plan.LoadManifests(fs.Args())
 	if err != nil {
 		fatal(1, err)
@@ -464,6 +465,12 @@ func cmdPlan(args []string) {
 	fmt.Printf("dropped:       exact-dupe %d | lower-res/LQ %d | smaller-variant %d\n", r.ExactDupes, r.LowerRes, r.SmallerVar)
 	fmt.Printf("reclaimable:   %s\n", report.HumanBytes(r.ReclaimBytes))
 	fmt.Printf("hash-only assets (photos w/o subsec + timeless + generic): %d\n", r.HashOnly)
+	if r.SidecarCount > 0 || r.SidecarsAlone > 0 {
+		fmt.Printf("sidecars:      %d kept with their photo or video, %d belong to none here (left out)\n", r.SidecarCount, r.SidecarsAlone)
+	}
+	if r.SidecarsLeftOut > 0 {
+		fmt.Printf("sidecars:      %d left out (cataloged with -sidecars): plan -sidecars keeps them with their photos\n", r.SidecarsLeftOut)
+	}
 	if *verify {
 		fmt.Printf("verify-full:   %d groups checked, %d split (content differed), %d unreadable members kept\n",
 			r.VerifiedGroups, r.VerifySplits, r.VerifyUnreadable)
@@ -545,6 +552,10 @@ func cmdApply(args []string) {
 			reclaim += d.Size
 			nDrops++
 		}
+		for _, sc := range a.Sidecars {
+			fmt.Printf("  SIDECAR\t%s:%s\t-> %s\t%s\n", a.SrcHost, sc.Path, sc.Rel, report.HumanBytes(sc.Size))
+			toCopy += sc.Size
+		}
 		toCopy += a.SrcSize
 		byHost[a.SrcHost] += a.SrcSize
 		top := a.CanonRel
@@ -603,6 +614,9 @@ func cmdApplyExecute(acts []plan.Action, target, onlyHost string, heartbeat time
 	st := materialize.ApplyAll(sel, target, materialize.RunOptions{Workers: workers, Progress: rep, Silver: silver, Link: link, Clone: clone})
 	rep.Finish()
 	fmt.Printf("  written %d, already present %d, failed %d\n", st.Written, st.Skipped, st.Failed)
+	if st.Sidecars > 0 {
+		fmt.Printf("  sidecars written next to their golden file: %d\n", st.Sidecars)
+	}
 	if clone {
 		fmt.Printf("  cloned %d (the rest copied: another volume or a file system without clones)\n", st.Cloned)
 	}
