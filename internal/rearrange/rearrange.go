@@ -565,6 +565,56 @@ func writeJournal(root string, res *Result) (string, error) {
 	return p, f.Close()
 }
 
+// readJournal parses a journal: its header, the moves and the deletions.
+// Lines that are not JSON are skipped, as before. A journal is refused when
+// it has no header or when any of its paths would name something outside
+// the root (absolute, a volume, ".." or the root itself): a resume acts on
+// every path it reads, so an edited journal must not reach other folders.
+func readJournal(r io.Reader) (hdr header, moves []Move, dels []entry, err error) {
+	sc := bufio.NewScanner(r)
+	sc.Buffer(make([]byte, 0, 64<<10), 16<<20)
+	n := 0
+	for sc.Scan() {
+		n++
+		var e entry
+		if json.Unmarshal(sc.Bytes(), &e) != nil {
+			continue
+		}
+		var paths []string
+		switch e.Op {
+		case "header":
+			var h header
+			if json.Unmarshal(sc.Bytes(), &h) == nil {
+				hdr = h
+			}
+		case "move":
+			moves = append(moves, e.Move)
+			paths = []string{e.Src, e.Tmp, e.Dst}
+		case "delete":
+			dels = append(dels, e)
+			paths = []string{e.Src, e.Keeper}
+		}
+		for _, p := range paths {
+			if !inRoot(p) {
+				return header{}, nil, nil, fmt.Errorf("journal line %d: %q is not a path inside the root", n, p)
+			}
+		}
+	}
+	if err := sc.Err(); err != nil {
+		return header{}, nil, nil, err
+	}
+	if hdr.Root == "" {
+		return header{}, nil, nil, errors.New("journal has no header")
+	}
+	return hdr, moves, dels, nil
+}
+
+// inRoot reports whether rel (slash-separated) names an entry below the root.
+func inRoot(rel string) bool {
+	p := filepath.FromSlash(rel)
+	return rel != "" && filepath.IsLocal(p) && filepath.Clean(p) != "."
+}
+
 func abs(root, rel string) string { return filepath.Join(root, filepath.FromSlash(rel)) }
 
 func exists(p string) bool { _, err := os.Lstat(p); return err == nil }
@@ -791,30 +841,11 @@ func RecoverWith(journal string, undo bool, o RecoverOptions) (RecoverResult, er
 		return out, err
 	}
 	defer f.Close()
-	sc := bufio.NewScanner(f)
-	sc.Buffer(make([]byte, 0, 64<<10), 16<<20)
-	var root string
-	var hdr header
-	var moves []Move
-	var dels []entry
-	for sc.Scan() {
-		var e entry
-		if json.Unmarshal(sc.Bytes(), &e) != nil {
-			continue
-		}
-		switch e.Op {
-		case "header":
-			json.Unmarshal(sc.Bytes(), &hdr)
-			root = hdr.Root
-		case "move":
-			moves = append(moves, e.Move)
-		case "delete":
-			dels = append(dels, e)
-		}
+	hdr, moves, dels, err := readJournal(f)
+	if err != nil {
+		return out, err
 	}
-	if root == "" {
-		return out, errors.New("journal has no header")
-	}
+	root := hdr.Root
 	out.Root = root
 	if hdr.Blocks > 0 {
 		prev := sparsehash.MaxBlocks

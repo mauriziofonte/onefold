@@ -42,20 +42,6 @@ func TestParseISO6709(t *testing.T) {
 	}
 }
 
-// box is an ISO-BMFF box.
-func box(typ string, body ...[]byte) []byte {
-	n := 8
-	for _, b := range body {
-		n += len(b)
-	}
-	out := binary.BigEndian.AppendUint32(nil, uint32(n))
-	out = append(out, typ...)
-	for _, b := range body {
-		out = append(out, b...)
-	}
-	return out
-}
-
 // The place of a photo (EXIF GPS) and of a video (QuickTime ©xyz, read by
 // the pure-Go reader) is kept only with Options.Places.
 func TestPlaces(t *testing.T) {

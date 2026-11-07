@@ -244,10 +244,13 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 ├── scripts/                fixture generators, workflow check, demo GIFs
 ├── assets/brand/           logo, icon, wordmark, social preview
 ├── assets/demo/            README demo GIFs
-├── .github/                CI and release workflows
+├── packaging/              nfpm config, Linux menu entry, the owner's steps for package managers and signing
+├── .github/                CI, release, Scorecard and ClusterFuzzLite workflows
+├── .clusterfuzzlite/       the fuzzing build (Dockerfile, build.sh listing every target)
 ├── Makefile, go.mod, go.sum
 ├── README.md, LLMS.md, ARCHITECTURE.md, AGENTS.md
 ├── CONTRIBUTING.md, CONTRIBUTORS.md, CLA.md, CODE_OF_CONDUCT.md, SECURITY.md
+├── TRANSLATING.md, .weblate  how the GUI is translated (Weblate)
 └── LICENSE, LICENSING.md, TRADEMARKS.md
 ```
 
@@ -397,7 +400,8 @@ Direct dependencies and what they are for:
 - `.github/workflows/ci.yml` (push to `main`, pull requests, called by the release, weekly on Mondays, by hand): matrix Ubuntu, Windows, macOS arm64 (`macos-15`) and macOS Intel (`macos-15-intel`), all four required; macOS installs exiftool, ffmpeg and poppler from Homebrew; Linux installs exiftool, ffmpeg, poppler, p7zip, antiword from apt; Windows installs the pinned tools with `go run ./cmd/onefold tools install all`, which also proves the download pins. Steps: gofmt (Linux), `go vet` for linux, windows and darwin, `go test -count=1 ./...`, then `TestE2E` again with `-v`: the job fails unless it PASSED (a skip is not a pass). On every OS the Recycle Bin / Trash tests run the same way (`ONEFOLD_TEST_TRASH=1`; a skip fails the job). Separate jobs: `race` (`go test -race` on Ubuntu with cgo, coverage of every package uploaded as the `coverage` artifact: `coverage.out`, a per-function `coverage.txt`, `coverage.html`), `lint` (staticcheck v0.8.2 for each target GOOS; suppressions are inline `//lint:ignore` with the reason), `vulncheck` (govulncheck, fails on any reachable advisory).
 - `.github/workflows/release.yml` (tag `v<VERSION>` on a commit of `main`, section 5.4): runs CI, then `make release` (nfpm pinned), checks that no tracked file changed, verifies checksums, versions (`go version -m`, `onefold version`, the Info.plist and the binary of each app zip) and notices, installs the `.deb` and lists the `.rpm` and `.apk`, then builds everything again from a second clone in another folder and fails unless `SHA256SUMS` is identical. A `sign` job sends the Windows exe to SignPath and checks the signature with `osslsigncode`, only when the repository has the SignPath variables (skipped otherwise; a failed signing stops the release). The publish job puts the signed exe in place, writes a CycloneDX SBOM per binary (`cyclonedx-gomod bin`, pinned), the final `SHA256SUMS`, the Homebrew, Scoop and winget manifests (`internal/pack`, kept as the `package-manifests` artifact for the owner to submit: `packaging/README.md`), attests the build provenance of every asset (`actions/attest-build-provenance`) and publishes the GitHub release with the binaries, app zips, packages, SBOMs, `LICENSE`, `THIRD_PARTY_NOTICES.txt` and `SHA256SUMS`.
 - `.github/workflows/scorecard.yml` (push to `main`, weekly, changes to branch protection): OpenSSF Scorecard; the results go to code scanning and to scorecard.dev, which serves the README badge (it shows a score once the first run on `main` has published). The job keeps to what scorecard.dev accepts for publishing: no top-level env or defaults, only checkout, the Scorecard action, upload-artifact and upload-sarif.
-- Actions are pinned by commit; `.github/dependabot.yml` keeps the pins and the Go modules current through weekly pull requests. Workflows run only on github.com (`if: github.server_url == 'https://github.com'`), so mirrors on other forges stay quiet.
+- `.github/workflows/cflite_pr.yml` (pull requests that change Go code or fixtures) and `cflite_batch.yml` (Sundays, by hand): ClusterFuzzLite builds every native fuzz target as a libFuzzer binary (`.clusterfuzzlite/`, section 27.1.2) and fuzzes them, 10 minutes in all on a pull request and an hour weekly; the batch run's corpus is kept as an artifact and seeds the next runs. A crash fails the job and its input is an artifact.
+- Actions are pinned by commit; `.github/dependabot.yml` keeps the pins, the Go modules and the digest of the fuzzing image current through weekly pull requests. Workflows run only on github.com (`if: github.server_url == 'https://github.com'`), so mirrors on other forges stay quiet.
 
 ### 5.4 Versions and releasing
 
@@ -508,7 +512,7 @@ One JSON object per line after the header (`plan.Action`):
 | `subSecNs`, `durationSec`, `width`, `height` | the winner's metadata; written when the plan is self-contained (CLI and GUI default), omitted when zero |
 | `sidecars` | `plan -sidecars`: the files that belong to the winner (`path`, `size`, `rel` = their path in the golden tree, under the winner's canonical name), written by `apply` next to it (section 13.9); omitted when none |
 
-`plan.Read` is strict: blank lines are ignored, any other unreadable line fails the whole read (a plan applied with lines missing would silently leave assets out), the header must name the current zone.
+`plan.Read` is strict: blank lines are ignored, any other unreadable line fails the whole read (a plan applied with lines missing would silently leave assets out), the header must name the current zone, and every `canonRel` and sidecar `rel` must be a relative path inside the target (not absolute, no volume, no `..`): `apply` creates what a plan names, so an edited plan cannot write outside the target.
 
 ### 6.4 Golden index entry
 
@@ -1423,7 +1427,7 @@ The journal and the content check before each file are the same as for a deletio
 | verify | every duplicate group read in full |
 | keeper | per confirmed group: already at its target, a clean name, oldest mtime, shorter path |
 | targets | `naming.Resolve` (presets or templates; golden tree presets refused) -> `naming.Assign` (taken = every path that is not an item) |
-| journal | `<root>/.onefold/rearrange-<ts>.jsonl`: header (root, naming, hash parameters, keepEmptyDirs), deletes (path, keeper, content hash), moves (src, tmp, dst, size, hash); fsync'ed before any change; nothing to do -> no journal |
+| journal | `<root>/.onefold/rearrange-<ts>.jsonl`: header (root, naming, hash parameters, keepEmptyDirs), deletes (path, keeper, content hash), moves (src, tmp, dst, size, hash); fsync'ed before any change; nothing to do -> no journal. `-resume` and `-undo` refuse a journal with any path that is not inside the root (absolute, a volume, `..`), before touching anything |
 | deletes | `-dupes delete` (default): duplicate and keeper re-read in full right before `os.Remove`; any mismatch -> not deleted, reported. `-dupes report` keeps them (they are rearranged like the rest) |
 | moves | pass 1: `src -> <dst>.<id>.onefold-mv` (no-replace); pass 2: temp -> dst (no-replace); a failed pass 2 goes back to src when possible. Two passes make swaps and cycles (A->B, B->A) safe |
 | folders | parents of moved or deleted files removed deepest first when empty (`-keep-empty-dirs` keeps them) |
@@ -1891,20 +1895,20 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 | Package | Tests |
 |---|---|
 | `kinds` | registry loading, presets, sniff, frozen media kinds and canonical aliases, every category in exactly one stats family, `TestChokePoint` (no extension knowledge outside `kinds`) |
-| `meta` | per-format extraction, the real-file corpus (`TestCorpus`), parity with and without tools, photo formats with sub-seconds, the JPEG date fallback, RAR5 listing (native == unrar), EBML/FLV parity with ffprobe, exiftool readers == one-shot, zone resolution |
+| `meta` | per-format extraction, the real-file corpus (`TestCorpus`), parity with and without tools, photo formats with sub-seconds, the JPEG date fallback, RAR5 listing (native == unrar), EBML/FLV parity with ffprobe, exiftool readers == one-shot, zone resolution, the JPEG marker walk == imagemeta's on every fixture and their damaged variants (`TestScanJPEGMatchesImagemeta`); fuzz targets of every native reader (section 27.1.2) |
 | `sparsehash` | determinism, small files, size sensitivity, whole-read == seek |
 | `catalog` | default scope, rules and reasons, exclusions, sizes and limits, hosts, reuse, sources untouched, whole-read equivalence, regime scopes |
-| `plan` | winner orders, distinct content never dropped, collisions, layouts, extension fixes, video tiers, verify-full, unreadable members, strict reader, `TestMediaSynthRegression`, `TestGenericPlanRegression`, self-contained actions, video tolerance, filename counters |
+| `plan` | winner orders, distinct content never dropped, collisions, layouts, extension fixes, video tiers, verify-full, unreadable members, strict reader, destinations inside the target (`FuzzReadPlan`), `TestMediaSynthRegression`, `TestGenericPlanRegression`, self-contained actions, video tolerance, filename counters |
 | `naming`, `names` | grammar, stems, presets, `Assign`, families and stem modes, marker grammar, sanitize |
 | `golden` | match against a golden built from room A of the synthetic corpus, upgrades, joins with manifests, strict loading, byte keys, video tolerance; `BenchmarkLoad` |
 | `materialize` | generic copies, stale temps, missing tools, photo stamping on every photo format, batch refusals, video silvering (UTC creation time, tags, streams, AVI, refused files), byte-copied media |
 | `merge` | dry run writes nothing, execute, overlaps, sparse collisions never lose data, blocked parents, no-replace rename, layouts, long paths, settled and excluded lists, re-plan == preview, pause/stop hooks, `-verify-uncached`, `-keep-dotfiles` |
-| `rearrange` | end to end, interrupted runs, duplicate re-verification, presets, stop then recover, refusals |
+| `rearrange` | end to end, interrupted runs, duplicate re-verification, presets, stop then recover, refusals, the journal reader and its root check (`TestJournalPathsStayInRoot`, `FuzzReadJournal`) |
 | `purge` | purge, refusals, output inside an input, report reading, journal required, Recycle Bin volume rules, path spellings, the Trash on macOS and Linux (`TestTrashItem`) |
 | `stats` | breakdowns and duplicates on a synthetic tree (`TestRun`), `off`/`fast`/`full` (`TestDupModes`), nested roots and hard links counted once, tree depth, the volume list, Linux `mountinfo` parsing |
 | `fsx`, `tools`, `statedir` | no-replace rename (the one-call primitive on each CI system), no-replace links, temp names, uncached reads, `Canonical` and the stored spelling on macOS; Homebrew lookup without `PATH`, on Windows a killed tool takes its children; the state dir of each OS |
 | `similar`, `reclaim`, `backup`, `seed` | review lists, scripts (the sh script is executed; on Windows the robocopy script is executed), audits |
-| `textexport` | extractors, sidecars, Office 97-2003 files saved by Microsoft Office, SST continuation, Word fields |
+| `textexport` | extractors, sidecars, Office 97-2003 files saved by Microsoft Office, SST continuation, Word fields; fuzz targets of the Word, Excel and PowerPoint streams, RTF and HTML (the text is valid UTF-8) |
 | `gui` | section 22.9; on Windows the WebView2 fallback |
 | `remote` | SFTP push against an in-process SSH/SFTP server, including size conflicts |
 | `winres` | `.syso` in sync, layout, logo pixels, version info |
@@ -1912,11 +1916,21 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 | `dedupe` | keep rules and `-keep-in`, links, clones (Btrfs, APFS), the Trash, refusals of a changed copy or an unflushed keeper, the script, `Resume` of a half-done replacement |
 | `schedule` | refused names, times and commands (anything that deletes), the systemd units, the launchd plist and the UTF-16 task XML of every system (built on any), Windows argument quoting read back, add, list, run (the recorded program in the recorded folder, exit code and log), remove leaving a file onefold did not write |
 | `power` | nested locks; Linux: a stand-in `systemd-inhibit` holds and releases the lock, a refused lock is reported, every thread gets the low I/O priority; macOS: the assertion is listed by `pmset -g assertions` and gone after release; Windows: execution state and background mode |
-| `cmd/onefold` | CLI end-to-end (`TestE2E` on a synthetic two-host corpus, `TestCorpusFlow`, merge, rearrange, desktop archive with purge, settings round trip, the golden delta flow with similar, reclaim, backup and seed, `apply -link`, `stats` with `-dups full`, `-json`, `-html`, `-mounts` and bad input, `plan -report` as Markdown, JSON and HTML, `dedupe` dry run, script, execute and exit codes, `schedule` add, run, list, log, remove and its refusals), `TestSourceHeaders`, `TestVersionFile` |
+| `cmd/onefold` | CLI end-to-end (`TestE2E` on a synthetic two-host corpus, `TestCorpusFlow`, merge, rearrange, desktop archive with purge, settings round trip, the golden delta flow with similar, reclaim, backup and seed, `apply -link`, `stats` with `-dups full`, `-json`, `-html`, `-mounts` and bad input, `plan -report` as Markdown, JSON and HTML, `dedupe` dry run, script, execute and exit codes, `schedule` add, run, list, log, remove and its refusals), `TestSourceHeaders`, `TestVersionFile`, `TestFuzzTargetsBuilt` |
 
 ### 27.1.1 Scale
 
 `cmd/scalebench` (not product) writes a synthetic tree of N tiny files (1,000 per folder, generic types of the default scope, a tenth of them duplicated, one modification time), runs a prebuilt binary on it (`stats -dups fast`, `stats -dups full`, `catalog -preset all`, a `merge` preview into an empty output, a `dedupe -action link` preview; no hash cache, its own state dir) and records each step's wall time and peak resident memory (`ru_maxrss`). `bench/scale.tsv` holds the budget of each step per size; a step over budget fails the run, `-` skips a step at a size. `.github/workflows/scale.yml` runs 1 million files every Sunday on `ubuntu-24.04` (4 CPUs, 16 GB) and 5 or 10 million by hand, on an ext4 image with inline data (millions of tiny files in a few GB); the result is the artifact `scale-<N>`. Measured at 1 million files (Linux, 4 CPUs): `stats` 14 s and 530 MiB, `stats -dups full` 15 s and 600 MiB, `catalog` 12 s and 27 MiB (records stream to the manifest), a `merge` preview 52 s and 2.3 GiB, a `dedupe` preview 26 s and 680 MiB. Merge, rearrange and plan keep every record in memory (a record is 400 bytes plus its strings): about 2.2 GiB per million files for a merge preview, so 10 million files need about 22 GB.
+
+### 27.1.2 Fuzzing
+
+Every reader of bytes a stranger may have written has a native Go fuzz target (`func FuzzX(f *testing.F)`): in `internal/meta` EXIF/TIFF, ISO-BMFF (HEIF, AVIF, MP4), Matroska, FLV, RIFF (WebP), RAR, 7z, zip (OOXML, ODF, EPUB), ISO 9660, OLE2, PDF, RTF and the JPEG marker walk; in `internal/textexport` the Word, Excel and PowerPoint 97-2003 streams, RTF and HTML; the manifest reader (`catalog`), the plan reader (`plan`) and the rearrange journal reader (`rearrange`). Only pure readers are fuzzed: never a function that moves or deletes files from what it reads (the journal target fuzzes the reader, not `Recover`). Each target checks that the reader returns without a panic, plus the invariant of its reader (valid UTF-8 text, paths inside the root or target, the same walk as imagemeta).
+
+- `go test ./...` runs the seeds and the inputs kept in `testdata/fuzz/FuzzX/` (each one a crash found and fixed); `go test -run '^$' -fuzz '^FuzzX$' -fuzztime 60s ./internal/<pkg>` fuzzes one target.
+- ClusterFuzzLite (section 5.3) builds them with `compile_native_go_fuzzer` from `.clusterfuzzlite/build.sh`, which lists every target (`TestFuzzTargetsBuilt` keeps the list complete). The builder turns the one file that holds the targets (`fuzz_test.go`, `journal_test.go` for rearrange) into a normal source with a testing shim, so that file compiles on its own: it uses no helper from the package's other test files and only the basic `testing.T`/`F` methods.
+- A crash from CI is an artifact of the run: the bytes libFuzzer saved are encoded for the shim; a `go test -fuzz` run of the same target usually finds the same input in seconds, written to `testdata/fuzz/FuzzX/` where `go test` replays it.
+
+`scanJPEG` (`internal/meta/jpegscan.go`) is imagemeta's JPEG marker walk with one difference, found by fuzzing: the original loops forever on a marker met outside any image (before the first start-of-image, or after an end-of-image that comes before the quantization tables); `scanJPEG` stops there with an error, and the photo falls back to its file name like any unreadable EXIF. `TestScanJPEGMatchesImagemeta` and `FuzzJPEG` check that the two walks return the same error and hand the readers the same bytes on every other input. Panics of imagemeta on damaged IFDs become errors (`decodeEXIF`, `decodePhoto`). Known and not fixed here (a dependency change): on some damaged IFDs imagemeta v0.3.1 fills a tag with bytes left in its pooled buffer by an earlier file.
 
 ### 27.2 Fixtures
 

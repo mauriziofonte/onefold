@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/mauriziofonte/onefold/internal/catalog"
 )
@@ -20,13 +21,22 @@ import (
 // a valid action fails the whole read: a plan applied with lines missing would
 // silently leave assets out of the golden tree. The plan must carry the header
 // with the canonical zone of this run: its times become file times.
+//
+// Every destination (canonRel, a sidecar's rel) must be a relative path
+// inside the target: apply creates what it names, so a plan edited to point
+// at "../x" or an absolute path is refused as a whole.
 func Read(path string) ([]Action, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	sc := bufio.NewScanner(f)
+	return read(f, path)
+}
+
+// read is Read on an open plan; path names it in the errors.
+func read(r io.Reader, path string) ([]Action, error) {
+	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
 	var acts []Action
 	zone := ""
@@ -50,6 +60,14 @@ func Read(path string) ([]Action, error) {
 			}
 			continue
 		}
+		if !inTarget(a.CanonRel) {
+			return nil, fmt.Errorf("%s: line %d: canonRel %q is not a path inside the target", path, n, a.CanonRel)
+		}
+		for _, s := range a.Sidecars {
+			if !inTarget(s.Rel) {
+				return nil, fmt.Errorf("%s: line %d: sidecar rel %q is not a path inside the target", path, n, s.Rel)
+			}
+		}
 		acts = append(acts, a)
 	}
 	if err := sc.Err(); err != nil {
@@ -62,6 +80,13 @@ func Read(path string) ([]Action, error) {
 		return nil, err
 	}
 	return acts, nil
+}
+
+// inTarget reports whether rel (slash-separated) names an entry below the
+// target: not absolute, no volume, no "..", not the target itself.
+func inTarget(rel string) bool {
+	p := filepath.FromSlash(rel)
+	return rel != "" && filepath.IsLocal(p) && filepath.Clean(p) != "."
 }
 
 // Write writes a plan: the header line (canonical zone), then one action per

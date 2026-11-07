@@ -65,6 +65,11 @@ func docText(p string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return docStreams(st)
+}
+
+// docStreams is docText on the streams of the file.
+func docStreams(st map[string][]byte) (string, error) {
 	wd := st["WordDocument"]
 	if len(wd) < 0x200 || binary.LittleEndian.Uint16(wd) != 0xA5EC {
 		return "", errNotOLE
@@ -209,7 +214,11 @@ func xlsText(p string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	wb := st["Workbook"]
+	return xlsStream(st["Workbook"])
+}
+
+// xlsStream is xlsText on the Workbook stream.
+func xlsStream(wb []byte) (string, error) {
 	if wb == nil {
 		return "", errNotOLE // "Book" = BIFF5, not read
 	}
@@ -341,10 +350,18 @@ func parseSST(body []byte, conts [][]byte) []string {
 		flags := hdr[2]
 		var runs, ext int
 		if flags&0x08 != 0 {
-			runs = int(binary.LittleEndian.Uint16(next(2)))
+			b := next(2)
+			if len(b) < 2 {
+				break
+			}
+			runs = int(binary.LittleEndian.Uint16(b))
 		}
 		if flags&0x04 != 0 {
-			ext = int(binary.LittleEndian.Uint32(next(4)))
+			b := next(4)
+			if len(b) < 4 {
+				break
+			}
+			ext = int(binary.LittleEndian.Uint32(b))
 		}
 		wide := flags&0x01 != 0
 		var rs []rune
@@ -353,6 +370,9 @@ func parseSST(body []byte, conts [][]byte) []string {
 				seg, pos = seg+1, 0
 				if seg >= len(segs) {
 					break
+				}
+				if len(segs[seg]) == 0 {
+					continue
 				}
 				wide = segs[seg][0]&0x01 != 0
 				pos = 1
@@ -445,7 +465,11 @@ func pptText(p string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	doc := st["PowerPoint Document"]
+	return pptStream(st["PowerPoint Document"])
+}
+
+// pptStream is pptText on the PowerPoint Document stream.
+func pptStream(doc []byte) (string, error) {
 	if doc == nil {
 		return "", errNotOLE
 	}

@@ -1,0 +1,53 @@
+# onefold
+# Author: Maurizio Fonte <fonte.maurizio@gmail.com>
+# Copyright (c) 2026 Maurizio Fonte
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# ClusterFuzzLite on pull requests: builds every native Go fuzz target
+# (.clusterfuzzlite/build.sh) as a libFuzzer binary and fuzzes them for ten
+# minutes in all, starting from the corpus of the weekly batch run. A crash
+# fails the job and its input is kept as an artifact. `go test ./...` runs
+# the seeds of the same targets on every OS (ci.yml).
+name: cflite-pr
+
+on:
+  pull_request:
+    paths:
+      - "**.go"
+      - go.mod
+      - go.sum
+      - "**/testdata/**"
+      - .clusterfuzzlite/**
+      - .github/workflows/cflite_pr.yml
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz:
+    name: fuzz (pull request)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read # the corpus of the batch run (an artifact of another run)
+    steps:
+      - name: Build fuzzers
+        uses: google/clusterfuzzlite/actions/build_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1
+        with:
+          language: go
+          sanitizer: address
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run fuzzers
+        uses: google/clusterfuzzlite/actions/run_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1
+        with:
+          language: go
+          sanitizer: address
+          mode: code-change
+          fuzz-seconds: 600
+          github-token: ${{ secrets.GITHUB_TOKEN }}

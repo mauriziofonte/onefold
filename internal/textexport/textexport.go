@@ -497,6 +497,18 @@ func rtfText(s string) string {
 			}
 		case c == '\r' || c == '\n':
 			i++
+		case c >= 0x80:
+			// RTF is 7-bit: an 8-bit byte is text in the document's ANSI
+			// code page (cp1252, as for \'hh), unless it starts valid UTF-8,
+			// which some writers emit.
+			r, n := utf8.DecodeRuneInString(s[i:])
+			if r == utf8.RuneError {
+				r, n = cp1252(c), 1
+			}
+			if skipDepth < 0 {
+				out.WriteRune(r)
+			}
+			i += n
 		default:
 			if skipDepth < 0 {
 				out.WriteByte(c)

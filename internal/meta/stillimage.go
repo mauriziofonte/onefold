@@ -9,8 +9,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"strings"
-
-	"github.com/evanoberholster/imagemeta"
 )
 
 // Pure-Go EXIF readers for the photo formats imagemeta does not cover:
@@ -21,7 +19,7 @@ import (
 // exifTIFF decodes a raw TIFF EXIF block (as stored by PNG eXIf, WebP EXIF,
 // HEIF Exif items) into m: capture time with sub-second, device.
 func exifTIFF(b []byte, m *Meta) error {
-	ex, err := imagemeta.Decode(bytes.NewReader(b))
+	ex, err := decodeEXIF(bytes.NewReader(b))
 	if err != nil {
 		return err
 	}

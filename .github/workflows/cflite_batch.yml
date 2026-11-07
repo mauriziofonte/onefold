@@ -1,0 +1,48 @@
+# onefold
+# Author: Maurizio Fonte <fonte.maurizio@gmail.com>
+# Copyright (c) 2026 Maurizio Fonte
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# ClusterFuzzLite batch fuzzing: every fuzz target for an hour in all, weekly.
+# The corpus grows from run to run (kept as an artifact of this workflow) and
+# the pull-request run starts from it. A crash fails the run and its input is
+# kept as an artifact: reproduce it with `go test -run 'FuzzX/<name>'` after
+# copying it into the package's testdata/fuzz/FuzzX folder.
+name: cflite-batch
+
+on:
+  schedule:
+    - cron: "17 3 * * 0" # Sundays 03:17 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  fuzz:
+    name: fuzz (batch)
+    if: github.repository == 'mauriziofonte/onefold'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      actions: read # the corpus of the previous run
+    steps:
+      - name: Build fuzzers
+        uses: google/clusterfuzzlite/actions/build_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1
+        with:
+          language: go
+          sanitizer: address
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run fuzzers
+        uses: google/clusterfuzzlite/actions/run_fuzzers@884713a6c30a92e5e8544c39945cd7cb630abcd1 # v1
+        with:
+          language: go
+          sanitizer: address
+          mode: batch
+          fuzz-seconds: 3600
+          github-token: ${{ secrets.GITHUB_TOKEN }}
