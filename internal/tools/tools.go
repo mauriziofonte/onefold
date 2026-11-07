@@ -7,7 +7,9 @@
 // ffprobe, ffmpeg, pdfinfo, pdftotext, antiword, 7z, unrar; on Linux
 // systemd-inhibit, the sleep lock of internal/power). Every caller has a
 // pure-Go fallback or degrades gracefully when a tool is missing, which is the
-// normal case on Windows.
+// normal case on Windows. The front ends of the system schedulers that
+// internal/schedule calls (systemctl, launchctl, schtasks) are resolved here
+// too, without being listed: missing, their commands are printed instead.
 //
 // Lookup order: PATH, the directory of the running executable, <exe dir>/tools,
 // ManagedDir (tools downloaded by `onefold tools install` or the GUI).

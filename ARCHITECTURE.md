@@ -131,6 +131,7 @@ The only files onefold writes are:
 | GUI | its state dir; and what the mode it runs writes |
 | `config set` | `<state dir>/config.json` |
 | `tools install` | `<state dir>/tools/` (Windows) |
+| `schedule add` | its record in `<state dir>/schedule/` and the definition the system scheduler reads: `~/.config/systemd/user/onefold-NAME.service` and `.timer` (Linux), `~/Library/LaunchAgents/io.github.mauriziofonte.onefold.NAME.plist` (macOS), `<state dir>/schedule/NAME.task.xml` (Windows); `schedule remove` deletes only those, and only when they carry onefold's marker; `schedule run` appends to `<state dir>/schedule/NAME.log` |
 
 Four operations delete or replace files in the folders they are given, each only when asked explicitly, each a dry run by default:
 
@@ -219,6 +220,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 │   ├── rearrange/          in-place rearrange with journal, resume, undo
 │   ├── purge/              verified deletion of merged sources, Recycle Bin and Trash
 │   ├── stats/              what folders and volumes hold, duplicates (read-only)
+│   ├── schedule/           commands on a timetable (systemd timer, launchd, Task Scheduler)
 │   ├── settings/           merge/rearrange settings schema (CLI, files, GUI)
 │   ├── config/             per-user configuration
 │   ├── runctl/             pause/stop gate
@@ -276,6 +278,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 | `internal/purge` | delete merged sources | `Plan`, `Run`, `ReadReport` |
 | `internal/stats` | what folders and volumes hold, duplicates included (read-only) | `Run`, `Mounts`, `VolumeOf` |
 | `internal/dedupe` | duplicate cleanup: Trash, hard links, clones or a script | `Plan`, `Run`, `Script`, `Resume` |
+| `internal/schedule` | commands on a timetable through the system scheduler (systemd timer, launchd, Task Scheduler) | `Add`, `List`, `Remove`, `Run`, `NativeFor` |
 | `internal/settings` | merge/rearrange settings | `Merge.Options`, `Rearrange.Options`, `Load`, `Args` |
 | `internal/config` | per-user config | `Load`, `SaveTo`, `Apply`, `Override` |
 | `internal/runctl` | pause/stop | `New`, `Gate.Wait` |
@@ -316,6 +319,7 @@ Leaves: `kinds`, `fsx`, `perf`, `report`, `runctl`, `statedir`, `testfix`, `winr
 | `purge` | fsx, kinds, merge, report, runctl, sparsehash |
 | `stats` | fsx, hashcache, htmlreport, kinds, report, runctl, sparsehash |
 | `dedupe` | fsx, hashcache, purge, runctl, sparsehash, statedir, stats |
+| `schedule` | fsx, statedir, tools |
 | `scan` | kinds, sparsehash |
 | `planreport` | catalog, htmlreport, kinds, plan, report |
 | `remote` | fsx |
@@ -1293,6 +1297,19 @@ The manifests also say what the tree held when it was copied, so the tree can be
 - `-resume JOURNAL` finishes what an interrupted run left: where an original still waits under its `.onefold-dd` name it is removed when the name holds the new file and both hold the content, or put back when the name is empty; anything else is reported and left. The GUI's Continue does the same before it re-plans.
 - `-list` prints `TRASH|LINK|CLONE|SCRIPT` and `LEFT` lines; `-json FILE` (`-`: standard output) writes the result. Exit codes: 0, 1 (a folder unreadable, a count mismatch, a copy that failed, a resume problem), 2 (usage).
 
+### 16.8 `schedule`: commands on a timetable
+
+`onefold schedule add -name NAME -every hourly|daily|weekly [-at HH:MM] [-day sun..sat] [-no-enable] -- COMMAND FLAGS...`, `schedule list [-json]`, `schedule log -name NAME [-n N]`, `schedule remove -name NAME`, and `schedule run [-state DIR] NAME`, which is what the system scheduler starts. `internal/schedule`.
+
+- A job: a name (1 to 40 of `a-z 0-9 -`), a timetable in local time (hourly: the minute of `-at`; weekly needs `-day`), the command, the folder `add` ran in (relative paths of the command), the `PATH` of that moment (a scheduler's own is shorter: Homebrew tools on macOS), the absolute path of the onefold that runs it and the state dir. Recorded in `<state dir>/schedule/NAME.json`.
+- Allowed commands: `catalog`, `stats`, `backup` (not `-restore` or `-resume`), `merge`, `apply`, `plan`, `golden-index`, `match`, `similar`, `export-text`, `push`: none deletes or replaces a file. `rearrange`, `purge-sources`, `dedupe` and the rest are refused (exit 2): a deletion needs a person reading its preview, and the typed counts (`-expect N`) of the others change from run to run anyway.
+- Native definitions (`NativeFor` builds those of any system, so the tests check all three everywhere):
+  - Linux: a user service `onefold-NAME.service` (`Type=oneshot`, `Nice=10`, `IOSchedulingClass=idle`; `%` and `$` of the paths escaped) and its timer (`OnCalendar`, `Persistent=true`: a run missed while the computer was off starts at boot) in `$XDG_CONFIG_HOME/systemd/user`; on with `systemctl --user daemon-reload` and `enable --now`. A user timer runs while the user is logged in, or always after `loginctl enable-linger`.
+  - macOS: a launchd agent `~/Library/LaunchAgents/io.github.mauriziofonte.onefold.NAME.plist` (`StartCalendarInterval`, `ProcessType` Background, `LowPriorityIO`, `Nice` 10; a run missed while asleep starts at the wake); on with `launchctl bootstrap gui/UID`, off with `bootout`.
+  - Windows: a task `onefold\NAME` (calendar trigger, `StartWhenAvailable`, no time limit, `IgnoreNew` for a run still going, the user's interactive token, least privilege) written as UTF-16 XML in `<state dir>/schedule/NAME.task.xml`; on with `schtasks /Create /XML`, off with `schtasks /Delete`. A console window shows while it works.
+- `add` refuses a name in use and never replaces a file (temp name and `fsx.RenameNoReplace`); it then runs the commands that turn the job on through `internal/tools` (the program found on `PATH`; `ONEFOLD_NO_EXTERNAL=1` or a missing program: nothing runs and the commands are printed; `-no-enable` prints them too). `remove` turns the job off the same way, deletes the native files only when they carry onefold's marker line (`written by onefold schedule`), and the record; the log stays.
+- `run` starts the recorded onefold with the command in the recorded folder, with `ONEFOLD_STATE_DIR` set to the job's state dir and the recorded `PATH`; its output, with a line at the start and one with the exit code and the time at the end, is appended to `NAME.log` (past 8 MiB the log becomes `NAME.log.old`); `NAME.last.json` keeps the start, the end and the exit code, which `list` shows. The exit code of `run` is the command's.
+
 ---
 
 ## 17. Merge
@@ -1764,6 +1781,7 @@ Go's `flag` package: `-x` and `--x` are equivalent; flags go before positional a
 | `config [list\|get\|set\|unset\|path]` | user configuration | config file |
 | `stats [flags] FOLDER\|MOUNT...`, `stats -mounts` | what folders and volumes hold, duplicates | `-json`, `-html` |
 | `dedupe -action A [flags] FOLDER...`, `dedupe -resume J` | clean up duplicate copies (section 16.7) | the copies (Trash, link, clone), `-script`, `-json`, journal |
+| `schedule add -name N -every E [-at T] [-day D] -- CMD...`, `schedule list\|log\|remove\|run` | a command on a timetable (section 16.8) | the system scheduler's definition, `<state dir>/schedule/` |
 | `doctor` | platform, zone, tools | - |
 | `tools [list\|install all\|ID...]` | pinned tool downloads (Windows) | state dir |
 | `gui [flags]` | the GUI | state dir |
@@ -1873,8 +1891,9 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 | `remote` | SFTP push against an in-process SSH/SFTP server, including size conflicts |
 | `winres` | `.syso` in sync, layout, logo pixels, version info |
 | `dedupe` | keep rules and `-keep-in`, links, clones (Btrfs, APFS), the Trash, refusals of a changed copy or an unflushed keeper, the script, `Resume` of a half-done replacement |
+| `schedule` | refused names, times and commands (anything that deletes), the systemd units, the launchd plist and the UTF-16 task XML of every system (built on any), Windows argument quoting read back, add, list, run (the recorded program in the recorded folder, exit code and log), remove leaving a file onefold did not write |
 | `power` | nested locks; Linux: a stand-in `systemd-inhibit` holds and releases the lock, a refused lock is reported, every thread gets the low I/O priority; macOS: the assertion is listed by `pmset -g assertions` and gone after release; Windows: execution state and background mode |
-| `cmd/onefold` | CLI end-to-end (`TestE2E` on a synthetic two-host corpus, `TestCorpusFlow`, merge, rearrange, desktop archive with purge, settings round trip, the golden delta flow with similar, reclaim, backup and seed, `apply -link`, `stats` with `-dups full`, `-json`, `-html`, `-mounts` and bad input, `plan -report` as Markdown, JSON and HTML, `dedupe` dry run, script, execute and exit codes), `TestSourceHeaders`, `TestVersionFile` |
+| `cmd/onefold` | CLI end-to-end (`TestE2E` on a synthetic two-host corpus, `TestCorpusFlow`, merge, rearrange, desktop archive with purge, settings round trip, the golden delta flow with similar, reclaim, backup and seed, `apply -link`, `stats` with `-dups full`, `-json`, `-html`, `-mounts` and bad input, `plan -report` as Markdown, JSON and HTML, `dedupe` dry run, script, execute and exit codes, `schedule` add, run, list, log, remove and its refusals), `TestSourceHeaders`, `TestVersionFile` |
 
 ### 27.1.1 Scale
 

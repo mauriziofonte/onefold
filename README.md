@@ -33,6 +33,7 @@ One static binary for Linux (amd64, arm64), macOS (Apple Silicon, Intel) and Win
 - [Statistics](#statistics)
 - [Photo and video archive](#photo-and-video-archive)
 - [Configuration](#configuration)
+- [Scheduled jobs](#scheduled-jobs)
 - [Optional tools](#optional-tools)
 - [How many files](#how-many-files)
 - [Windows notes](#windows-notes)
@@ -374,6 +375,25 @@ onefold config                            # what is set and where the file lives
 - `plan -artist`, `apply -signature` and `apply -lang` override the configuration for one run (`-` for none).
 - While a long command or a GUI job works the computer does not go to sleep on its own (the display may still turn off; a closed lid still sleeps). On Linux this needs systemd (`systemd-inhibit`); `onefold doctor` tells whether it works on your computer.
 - Turn `photo-date-fallback` on before the first index of an archive, not later: it changes the name of those photos, and an archive built without it would get them again under the new name.
+
+## Scheduled jobs
+
+A command can run on a timetable through the scheduler of your system: a systemd user timer on Linux, a launchd agent on macOS, a Task Scheduler task on Windows.
+
+```bash
+# every Sunday at 03:00, add what is new to the cold copy
+onefold schedule add -name cold -every weekly -day sun -at 03:00 -- backup -execute /golden /mnt/cold
+# every night, read the archive and the copy again against the recorded hashes
+onefold schedule add -name audit -every daily -at 04:30 -- backup -check -tree /golden /mnt/cold
+onefold schedule list            # the jobs, when they run, how the last run ended
+onefold schedule log -name cold  # the output of the last runs
+onefold schedule remove -name cold
+```
+
+- `add` writes the definition (`~/.config/systemd/user/onefold-NAME.service` and `.timer`, `~/Library/LaunchAgents/io.github.mauriziofonte.onefold.NAME.plist`, or a task XML in the state folder) and turns it on with `systemctl --user`, `launchctl` or `schtasks`; with `-no-enable`, or when that program is missing, it prints the commands instead. Nothing that exists is replaced.
+- Only commands that never delete or replace a file can be scheduled (`catalog`, `stats`, `backup` without `-restore`, `merge`, `apply`, `plan`, `golden-index`, `match`, `similar`, `export-text`, `push`): a deletion needs you to read its preview.
+- The job runs in the folder where you added it (relative paths keep working), with your `PATH` of that moment; its output goes to `<state folder>/schedule/NAME.log`.
+- A run missed while the computer was off or asleep starts when it is back. A systemd user timer runs while you are logged in (`loginctl enable-linger` lets it run always); on Windows a console window shows while the job works.
 
 ## Optional tools
 
