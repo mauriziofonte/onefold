@@ -130,9 +130,11 @@ jobs:
           state="$HOME/Library/Application Support/onefold"
           rm -f "$state/gui.json"
           open -g "$app"
-          for _ in $(seq 60); do [ -s "$state/gui.json" ] && break; sleep 1; done
+          started=
+          for _ in $(seq 60); do [ -s "$state/gui.json" ] && { started=1; break; }; sleep 1; done
+          # the GUI removes gui.json when it stops, so look before stopping it
           pkill -f 'onefold.app/Contents/MacOS/onefold' || true
-          test -s "$state/gui.json" || { echo "onefold.app did not start the GUI"; exit 1; }
+          [ -n "$started" ] || { echo "onefold.app did not start the GUI"; exit 1; }
 
       - name: the menu entry of the Linux packages is valid
         if: runner.os == 'Linux'
