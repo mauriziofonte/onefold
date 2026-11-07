@@ -42,3 +42,34 @@ func Dir() (string, error) {
 	}
 	return filepath.Join(h, ".local", "state", "onefold"), nil
 }
+
+// DirMode and FileMode are the permissions of what onefold keeps in its state
+// dir: runs and logs hold archive paths, the GUI lock holds the secret that
+// opens a session. Other local accounts get no access (on Windows the folder
+// under %LOCALAPPDATA% already inherits a per-user ACL; the modes there only
+// set the read-only bit, never on these).
+const (
+	DirMode  os.FileMode = 0o700
+	FileMode os.FileMode = 0o600
+)
+
+// Ensure creates dir (the state dir) with DirMode and removes the group and
+// other bits from an existing one, created by an older version with 0755:
+// with the root closed nothing below it is reachable by other accounts, so
+// older files inside keep their modes.
+func Ensure(dir string) error {
+	if err := os.MkdirAll(dir, DirMode); err != nil {
+		return err
+	}
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	fi, err := os.Stat(dir)
+	if err != nil {
+		return err
+	}
+	if p := fi.Mode().Perm(); p&0o077 != 0 {
+		return os.Chmod(dir, p&^0o077)
+	}
+	return nil
+}

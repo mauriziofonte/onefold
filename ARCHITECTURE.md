@@ -182,7 +182,7 @@ Every time in manifests and plans is a wall-clock string in the canonical zone o
 
 ### 3.9 Local-only GUI
 
-The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained through a random token link, refuses foreign `Host` headers (DNS rebinding) and cross-site writes.
+The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained through a one-time link, refuses foreign `Host` headers (DNS rebinding) and cross-site writes, and serves its pages under a strict content security policy. The state dir is readable by its owner only.
 
 ---
 
@@ -1400,20 +1400,21 @@ Rules: naming precedence `template` > `families` > `naming` (+`clean`) > `layout
 | `-keep` | browser mode: keep serving when no page is open (default: exit after 2 idle minutes with no job running) |
 | `-state DIR` | another state dir for the GUI |
 
-One instance per state dir: a second launch finds `gui.json` (pid + session URL), checks that the link answers and opens that instance.
+One instance per state dir: a second launch reads `gui.json` (pid, address and launch secret), asks that instance for a fresh one-time link (`POST /api/open-link` with the secret in `X-Onefold-Launch`) and opens it; no answer means a stale file, and this launch starts a new instance.
 
 On Windows, `onefold.exe` with no arguments opens the GUI when it was started by a double-click (the process is alone on its console, or its parent is `explorer.exe`): the console is freed and the window opens. The manifest asks for `consoleAllocationPolicy` `detached` (Windows 11 24H2 and later): Explorer then gives the exe no console at all, so no terminal window or Windows Terminal tab flashes before the GUI (the parent test decides); older Windows ignore it and show the console for a moment. From a terminal it prints the usage. Checked by hand on Windows 11 build 26300 with Windows Terminal and with the Windows Console Host as default terminal: double-click opens the GUI, a terminal gets the usage. Without the WebView2 runtime the window cannot be created and the default browser gets the URL (`TestWindowFallsBackToBrowser`).
 
 ### 22.2 Security
 
 - The server binds `127.0.0.1` only.
-- A 32-byte random token: `/?t=<token>` sets the `onefold_session` cookie (HttpOnly, SameSite=Strict) and redirects to `/`; any other request without the cookie gets 403.
+- The session secret (32 random bytes) only travels in the `onefold_session` cookie (HttpOnly, SameSite=Strict); any request without it gets 403. A page gets the cookie from a one-time link `/?c=<code>`: 16 random bytes, minted per launch, consumed by its first use and refused after 5 minutes (at most 32 outstanding), then a redirect to `/`. The link given to `xdg-open` or `open` is visible in the process list to other local accounts while that process runs: once the page used it, it opens nothing. The printed link works the same way; `onefold gui` again prints and opens a new one.
+- `gui.json` holds the launch secret (32 random bytes, another secret than the session one) that a second launch presents to get a fresh link; the file is written with mode 0600 in the 0700 state dir.
 - `Host` must be `127.0.0.1:<port>` or `localhost:<port>` (DNS rebinding); non-GET requests with a foreign `Origin` or a cross-site `Sec-Fetch-Site` get 403.
-- Headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`.
+- Headers on every answer: `Content-Security-Policy` (`default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`: scripts only from the embedded bundle, no inline or injected script, no eval, no connection to another origin; inline style attributes stay allowed, the components size bars through them), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`.
 
 ### 22.3 State dir
 
-`$ONEFOLD_STATE_DIR`, else `%LOCALAPPDATA%\onefold` (Windows), `~/Library/Application Support/onefold` (macOS), else `$XDG_STATE_HOME/onefold`, else `~/.local/state/onefold`; never a temporary folder, because a run must survive a reboot.
+`$ONEFOLD_STATE_DIR`, else `%LOCALAPPDATA%\onefold` (Windows), `~/Library/Application Support/onefold` (macOS), else `$XDG_STATE_HOME/onefold`, else `~/.local/state/onefold`; never a temporary folder, because a run must survive a reboot. Runs and logs hold archive paths and `gui.json` a secret, so the folder is private (`statedir.Ensure`): created with mode 0700, and an existing one (an older version made it 0755) loses its group and other bits at the GUI start; files are written with mode 0600. On Windows the folder under `%LOCALAPPDATA%` inherits the per-user ACL of the profile.
 
 | Path | Content |
 |---|---|
@@ -1422,7 +1423,7 @@ On Windows, `onefold.exe` with no arguments opens the GUI when it was started by
 | `jobs/<id>/log.jsonl` | the job log |
 | `jobs/<id>/cache.jsonl` | merge/rearrange state cache (previews write nothing into the trees) |
 | `golden/` | manifests and plans of the golden archive view |
-| `gui.json` | the running instance |
+| `gui.json` | the running instance: pid, address, launch secret (mode 0600) |
 | `webview2/` | the WebView2 profile (browser storage survives restarts) |
 | `recipes.json` | saved guided-setup answers |
 | `tools/` | downloaded external tools (section 24.3) |

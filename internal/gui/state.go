@@ -55,7 +55,7 @@ func (s *store) cachePath(id string) string {
 
 // writeJSON writes v atomically (temp + rename: these are our own files).
 func writeJSON(path string, v any) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), statedir.DirMode); err != nil {
 		return err
 	}
 	b, err := json.Marshal(v)
@@ -63,7 +63,7 @@ func writeJSON(path string, v any) error {
 		return err
 	}
 	tmp := path + fsx.TempSuffix
-	f, err := os.Create(tmp)
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, statedir.FileMode)
 	if err != nil {
 		return err
 	}
@@ -130,10 +130,10 @@ func (s *store) appendLog(id string, e LogEntry) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	p := filepath.Join(s.jobDir(id), logFile)
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(p), statedir.DirMode); err != nil {
 		return
 	}
-	f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
+	f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_APPEND, statedir.FileMode)
 	if err != nil {
 		return
 	}

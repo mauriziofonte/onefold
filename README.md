@@ -63,7 +63,7 @@ How it decides that two files are the same:
 - **Nothing is overwritten.** Every file is written under a temporary name, verified, and only then given its final name with a rename that refuses to replace an existing file.
 - **Run it again to finish.** Every command is idempotent: an interrupted run, a power cut, a closed laptop lid are fixed by running the same command again.
 - **Preview first.** Commands that copy, move or delete files (`merge`, `rearrange`, `purge-sources`, `apply`, `backup`) do nothing without `-execute`; the GUI always shows a preview and executes exactly what you reviewed.
-- **Local only.** The GUI listens on 127.0.0.1, behind a per-session link. Nothing leaves your computer unless you ask: `push` uploads to your own server, `onefold tools install` downloads the optional tools.
+- **Local only.** The GUI listens on 127.0.0.1, behind a one-time session link; its state folder is readable by you only. Nothing leaves your computer unless you ask: `push` uploads to your own server, `onefold tools install` downloads the optional tools.
 
 ## Install
 
@@ -112,7 +112,7 @@ onefold.exe --input D:\FILES --input E:\old-disk --input D:\TMP --output D:\FILE
 
 ## The GUI
 
-On Windows a window opens (the console closes); without the WebView2 runtime, the default browser opens instead. From a terminal, on any system: `onefold gui`.
+On Windows a window opens (the console closes); without the WebView2 runtime, the default browser opens instead. From a terminal, on any system: `onefold gui`. The link it prints opens a session once, within 5 minutes; run `onefold gui` again for a new link to the same running instance.
 
 The same merge recorded on the Windows and macOS machines of the CI (the window is the browser page; the paths are the runner's):
 

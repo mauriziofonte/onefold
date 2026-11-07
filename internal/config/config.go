@@ -98,7 +98,7 @@ func SaveTo(p string, c Config) error {
 	if err := c.Validate(); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(p), statedir.DirMode); err != nil {
 		return err
 	}
 	b, err := json.MarshalIndent(c, "", "  ")
@@ -106,7 +106,7 @@ func SaveTo(p string, c Config) error {
 		return err
 	}
 	tmp := p + fsx.TempSuffix
-	if err := os.WriteFile(tmp, append(b, '\n'), 0o644); err != nil {
+	if err := os.WriteFile(tmp, append(b, '\n'), statedir.FileMode); err != nil {
 		os.Remove(tmp)
 		return err
 	}

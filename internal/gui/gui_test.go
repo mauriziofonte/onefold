@@ -15,6 +15,7 @@ import (
 	"net/http/cookiejar"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -117,10 +118,52 @@ func TestGuard(t *testing.T) {
 		t.Fatalf("no cookie: %d", resp.StatusCode)
 	}
 	resp.Body.Close()
-	// wrong token
-	resp, _ = http.Get(base(s) + "/?t=nope")
+	// wrong code
+	resp, _ = http.Get(base(s) + "/?c=nope")
 	if resp.StatusCode != 403 {
-		t.Fatalf("bad token: %d", resp.StatusCode)
+		t.Fatalf("bad code: %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+	// a link works once: the code seen in a process list is spent
+	noRedirect := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	link := s.URL()
+	for i, want := range []int{303, 403} {
+		resp, _ = noRedirect.Get(link)
+		if resp.StatusCode != want {
+			t.Fatalf("link use %d: %d, want %d", i+1, resp.StatusCode, want)
+		}
+		resp.Body.Close()
+	}
+	// a fresh link only for the launch secret, only by POST
+	for _, c := range []struct {
+		method, secret string
+		want           int
+	}{{"POST", "", 403}, {"POST", "nope", 403}, {"GET", s.LaunchSecret(), 403}, {"POST", s.LaunchSecret(), 200}} {
+		req, _ := http.NewRequest(c.method, base(s)+OpenLinkPath, nil)
+		if c.secret != "" {
+			req.Header.Set(launchHeader, c.secret)
+		}
+		resp, _ = http.DefaultClient.Do(req)
+		var v struct{ URL string }
+		json.NewDecoder(resp.Body).Decode(&v)
+		resp.Body.Close()
+		if resp.StatusCode != c.want {
+			t.Fatalf("open-link %s %q: %d, want %d", c.method, c.secret, resp.StatusCode, c.want)
+		}
+		if c.want == 200 {
+			if resp, _ = noRedirect.Get(v.URL); resp.StatusCode != 303 {
+				t.Fatalf("fresh link %q: %d", v.URL, resp.StatusCode)
+			}
+			resp.Body.Close()
+		}
+	}
+	// an expired link is refused
+	s.codesMu.Lock()
+	expired := "00112233445566778899aabbccddeeff"
+	s.codes[expired] = time.Now().Add(-time.Second)
+	s.codesMu.Unlock()
+	if resp, _ = noRedirect.Get(base(s) + "/?c=" + expired); resp.StatusCode != 403 {
+		t.Fatalf("expired link: %d", resp.StatusCode)
 	}
 	resp.Body.Close()
 	// foreign Host header (DNS rebinding)
@@ -149,12 +192,48 @@ func TestGuard(t *testing.T) {
 	if resp.StatusCode != 200 || info["lang"] != "it" || info["version"] != "test" {
 		t.Fatalf("info: %d %v", resp.StatusCode, info)
 	}
-	// static page
+	// static page, under a content policy that refuses foreign and inline scripts
 	resp, _ = c.Get(base(s) + "/")
 	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if !strings.Contains(string(body), "onefold") {
 		t.Fatalf("static: %s", body)
+	}
+	csp := resp.Header.Get("Content-Security-Policy")
+	for _, d := range []string{"default-src 'self'", "script-src 'self';", "connect-src 'self'", "frame-ancestors 'none'"} {
+		if !strings.Contains(csp, d) {
+			t.Errorf("Content-Security-Policy %q lacks %q", csp, d)
+		}
+	}
+	script, _, _ := strings.Cut(strings.SplitN(csp, "script-src", 2)[1], ";")
+	if strings.Contains(csp, "unsafe-eval") || strings.Contains(script, "unsafe") {
+		t.Errorf("Content-Security-Policy allows script evaluation: %q", csp)
+	}
+}
+
+// The state dir and what the GUI writes there are private to their owner.
+func TestStatePrivate(t *testing.T) {
+	dir := filepath.Join(testfix.TempDir(t), "state")
+	s, err := New(Options{Port: -1, StateDir: dir, Version: "test", Static: fstest.MapFS{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.ln.Close()
+	if err := writeJSON(filepath.Join(dir, "jobs", "x", "job.json"), map[string]int{"a": 1}); err != nil {
+		t.Fatal(err)
+	}
+	s.mgr.st.appendLog("x", LogEntry{Msg: "hello"})
+	if runtime.GOOS == "windows" {
+		return // per-user ACL of %LOCALAPPDATA%
+	}
+	for _, p := range []string{dir, filepath.Join(dir, "jobs"), filepath.Join(dir, "jobs", "x", "job.json"), filepath.Join(dir, "jobs", "x", logFile)} {
+		fi, err := os.Stat(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if fi.Mode().Perm()&0o077 != 0 {
+			t.Errorf("%s: mode %o, readable by other accounts", p, fi.Mode().Perm())
+		}
 	}
 }
 

@@ -26,6 +26,7 @@ import (
 	"github.com/bodgit/sevenzip"
 
 	"github.com/mauriziofonte/onefold/internal/fsx"
+	"github.com/mauriziofonte/onefold/internal/statedir"
 )
 
 // Phases reported by Progress.
@@ -101,7 +102,7 @@ func (in *Installer) Install(ctx context.Context, p Package) error {
 
 func (in *Installer) install(ctx context.Context, p Package) error {
 	dl := filepath.Join(in.Dir, ".download")
-	if err := os.MkdirAll(dl, 0o755); err != nil {
+	if err := os.MkdirAll(dl, statedir.DirMode); err != nil {
 		return err
 	}
 	part := filepath.Join(dl, p.ID+"-"+p.Version+fsx.TempSuffix) // kept across runs: resumed
@@ -195,7 +196,7 @@ func (in *Installer) fetch(ctx context.Context, p Package, part string, have int
 	default:
 		return have, fmt.Errorf("%s: %s: HTTP %s", p.Name, p.URL, resp.Status)
 	}
-	f, err := os.OpenFile(part, flags, 0o644)
+	f, err := os.OpenFile(part, flags, statedir.FileMode)
 	if err != nil {
 		return have, err
 	}
@@ -312,7 +313,7 @@ func mapMember(m File, name string) (string, bool) {
 }
 
 func writeMember(e member, dst string) error {
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), statedir.DirMode); err != nil {
 		return err
 	}
 	rc, err := e.open()
@@ -320,7 +321,7 @@ func writeMember(e member, dst string) error {
 		return fmt.Errorf("%s: %w", e.name, err)
 	}
 	defer rc.Close()
-	f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0o755)
+	f, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0o700)
 	if err != nil {
 		return err
 	}
@@ -380,7 +381,7 @@ func (in *Installer) record(p Package, files []string) error {
 		return err
 	}
 	tmp := filepath.Join(in.Dir, manifestName+fsx.TempSuffix)
-	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+	if err := os.WriteFile(tmp, b, statedir.FileMode); err != nil {
 		return err
 	}
 	return os.Rename(tmp, filepath.Join(in.Dir, manifestName))

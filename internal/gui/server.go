@@ -26,6 +26,7 @@ import (
 
 	"github.com/mauriziofonte/onefold/internal/config"
 	"github.com/mauriziofonte/onefold/internal/report"
+	"github.com/mauriziofonte/onefold/internal/statedir"
 	"github.com/mauriziofonte/onefold/internal/tools"
 )
 
@@ -38,6 +39,30 @@ var Logf = func(format string, a ...any) {}
 const DefaultPort = 47115
 
 const cookieName = "onefold_session"
+
+// Session access. The session secret (Server.token) only travels in the
+// HttpOnly cookie. A page gets the cookie by loading a one-time link
+// /?c=<code>: each launch mints a code, valid once and for linkTTL, so the
+// link handed to the browser opener (`xdg-open`, `open`: its arguments are
+// visible to every local account in the process list while it runs) is
+// worthless once the page has used it. A second `onefold gui` asks the running
+// instance for a fresh link with the launch secret it reads from gui.json, a
+// file only its owner can read (statedir.FileMode).
+const (
+	linkTTL      = 5 * time.Minute
+	maxCodes     = 32 // outstanding links; the oldest is dropped beyond
+	launchHeader = "X-Onefold-Launch"
+	// OpenLinkPath answers POST with {"url": "<a fresh one-time link>"} to a
+	// request carrying the launch secret in launchHeader.
+	OpenLinkPath = "/api/open-link"
+)
+
+// contentPolicy: scripts, styles, data and frames only from the page's own
+// origin. Inline style attributes stay allowed (the components set widths and
+// colors through them; they cannot run code); inline and injected scripts,
+// eval, plug-ins, foreign connections and framing are refused.
+const contentPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
+	"font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 
 // Options configure a Server.
 type Options struct {
@@ -55,7 +80,10 @@ type Options struct {
 // Server is the GUI backend.
 type Server struct {
 	opts    Options
-	token   string
+	token   string // session secret: the cookie value, never in a URL
+	launch  string // launch secret (gui.json): asks for a fresh link
+	codesMu sync.Mutex
+	codes   map[string]time.Time // one-time link codes -> expiry
 	ln      net.Listener
 	srv     *http.Server
 	mgr     *Manager
@@ -100,7 +128,7 @@ func New(o Options) (*Server, error) {
 		}
 		o.StateDir = d
 	}
-	if err := os.MkdirAll(o.StateDir, 0o755); err != nil {
+	if err := statedir.Ensure(o.StateDir); err != nil {
 		return nil, err
 	}
 	var ln net.Listener
@@ -123,15 +151,16 @@ func New(o Options) (*Server, error) {
 		Logf("gui: listen: %v", err)
 		return nil, err
 	}
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
+	token, launch := randomHex(32), randomHex(32)
+	if token == "" || launch == "" {
 		ln.Close()
-		return nil, err
+		return nil, errors.New("gui: no random source for the session secret")
 	}
 	st := &store{dir: o.StateDir}
 	h := newHub()
 	Logf("gui: state %s", o.StateDir)
-	s := &Server{opts: o, token: hex.EncodeToString(b), ln: ln, hub: h, mgr: newManager(st, h), stopped: make(chan struct{}), opened: make(chan struct{})}
+	s := &Server{opts: o, token: token, launch: launch, codes: map[string]time.Time{}, ln: ln, hub: h, mgr: newManager(st, h),
+		stopped: make(chan struct{}), opened: make(chan struct{})}
 	s.mgr.cfgPath, s.mgr.version = o.ConfigPath, o.Version
 	s.mgr.applyConfig()
 	static := o.Static
@@ -150,8 +179,60 @@ func New(o Options) (*Server, error) {
 // Addr is host:port of the listener.
 func (s *Server) Addr() string { return s.ln.Addr().String() }
 
-// URL opens a session: the token in it is exchanged for a cookie.
-func (s *Server) URL() string { return "http://" + s.Addr() + "/?t=" + s.token }
+// randomHex is n random bytes in hex ("" when the system has no randomness).
+func randomHex(n int) string {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(b)
+}
+
+// URL mints a one-time link that opens a session: its code is exchanged for
+// the session cookie once, within linkTTL.
+func (s *Server) URL() string { return "http://" + s.Addr() + "/?c=" + s.newCode() }
+
+// LaunchSecret is what a second launch presents (launchHeader) to get a fresh
+// link from this instance; it is stored in gui.json, readable by its owner only.
+func (s *Server) LaunchSecret() string { return s.launch }
+
+func (s *Server) newCode() string {
+	c := randomHex(16)
+	now := time.Now()
+	s.codesMu.Lock()
+	defer s.codesMu.Unlock()
+	var oldest string
+	for k, exp := range s.codes {
+		if !now.Before(exp) {
+			delete(s.codes, k)
+		} else if oldest == "" || exp.Before(s.codes[oldest]) {
+			oldest = k
+		}
+	}
+	if len(s.codes) >= maxCodes {
+		delete(s.codes, oldest)
+	}
+	if c != "" {
+		s.codes[c] = now.Add(linkTTL)
+	}
+	return c
+}
+
+// useCode consumes a link code: true once per minted code, before it expires.
+func (s *Server) useCode(c string) bool {
+	if c == "" {
+		return false
+	}
+	s.codesMu.Lock()
+	defer s.codesMu.Unlock()
+	for k, exp := range s.codes {
+		if subtle.ConstantTimeCompare([]byte(k), []byte(c)) == 1 {
+			delete(s.codes, k)
+			return time.Now().Before(exp)
+		}
+	}
+	return false
+}
 
 // Opened is closed once a page has loaded the session link: the window keeps
 // retrying its first navigation until then.
@@ -226,9 +307,23 @@ func (s *Server) guardInner(next http.Handler) http.Handler {
 				return
 			}
 		}
-		if t := r.URL.Query().Get("t"); t != "" && r.URL.Path == "/" {
-			if subtle.ConstantTimeCompare([]byte(t), []byte(s.token)) != 1 {
-				http.Error(w, "invalid session link", http.StatusForbidden)
+		w.Header().Set("Content-Security-Policy", contentPolicy)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		if r.URL.Path == OpenLinkPath {
+			if r.Method != http.MethodPost || subtle.ConstantTimeCompare([]byte(r.Header.Get(launchHeader)), []byte(s.launch)) != 1 {
+				http.Error(w, "forbidden", http.StatusForbidden)
+				return
+			}
+			writeJSONResp(w, 200, map[string]string{"url": s.URL()})
+			return
+		}
+		if c := r.URL.Query().Get("c"); c != "" && r.URL.Path == "/" {
+			if !s.useCode(c) {
+				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+				w.WriteHeader(http.StatusForbidden)
+				fmt.Fprintln(w, "onefold: this link was already used or has expired. Run `onefold gui` again: it opens a new one.")
 				return
 			}
 			http.SetCookie(w, &http.Cookie{Name: cookieName, Value: s.token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
@@ -240,12 +335,9 @@ func (s *Server) guardInner(next http.Handler) http.Handler {
 		if err != nil || subtle.ConstantTimeCompare([]byte(c.Value), []byte(s.token)) != 1 {
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			w.WriteHeader(http.StatusForbidden)
-			fmt.Fprintln(w, "onefold: open the link printed by `onefold gui` (this session is bound to it).")
+			fmt.Fprintln(w, "onefold: open the link printed by `onefold gui`, or run it again for a new one (this session is bound to it).")
 			return
 		}
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("X-Frame-Options", "DENY")
-		w.Header().Set("Referrer-Policy", "no-referrer")
 		next.ServeHTTP(w, r)
 	})
 }
