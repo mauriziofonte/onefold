@@ -307,6 +307,10 @@ func cmdCatalog(args []string) {
 	secs := sum.Elapsed.Seconds()
 	fmt.Printf("\nmanifest:     %s\n", *outp)
 	fmt.Printf("assets:       %d (photos %d, videos %d)   skipped %d, errors %d\n", sum.Assets, sum.Photos, sum.Videos, sum.Skipped, sum.Errors)
+	if sum.OnlineOnly > 0 {
+		fmt.Printf("online-only:  %d files, %s in the cloud, not read (they would be downloaded; -keep online-only reads them)\n",
+			sum.OnlineOnly, report.HumanBytes(sum.OnlineOnlyBytes))
+	}
 	if sum.Limited > 0 || sum.Reused > 0 {
 		fmt.Printf("limited:      %d   reused: %d\n", sum.Limited, sum.Reused)
 	}

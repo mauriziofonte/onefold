@@ -29,6 +29,7 @@ const (
 	RuleTransient  = "transient"
 	RuleShortcuts  = "shortcuts"
 	RuleBig        = "big"
+	RuleOnlineOnly = "online-only"
 )
 
 // Reasons of exclusions that are not switchable rules.
@@ -62,6 +63,7 @@ var Rules = []Rule{
 	{RuleTransient, "skip incomplete downloads, temp and lock files (tmp, crdownload, part, Office ~$ owner files...)"},
 	{RuleShortcuts, "skip shortcuts (lnk, url, website, webloc, desktop...)"},
 	{RuleBig, "skip files larger than " + DefaultMaxSize + " (unless -max-size is given)"},
+	{RuleOnlineOnly, "skip cloud files whose content is not on this computer (OneDrive Files On-Demand, iCloud Drive, Dropbox online-only: reading them downloads them); on Windows and macOS, also with -no-sweep"},
 }
 
 // KnownRule reports whether name is a skip rule.
@@ -183,6 +185,7 @@ func (o Options) Unfiltered() Options {
 	o.KeepDotDirs, o.KeepJunk = true, true
 	o.SkipSystemDirs, o.SkipCloudDirs, o.SkipDevDirs = false, false, false
 	o.SkipSystemExt, o.SkipUnknownExt, o.SkipNoExt, o.SkipTransient, o.SkipShortcuts = false, false, false, false, false
+	o.SkipOnlineOnly = false
 	o.MinSize, o.MaxSize, o.Limit = 0, 0, 0
 	o.OnSkip = nil
 	return o

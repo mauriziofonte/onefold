@@ -6,6 +6,7 @@
 package stats
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -206,5 +207,32 @@ func TestMounts(t *testing.T) {
 	v := VolumeOf(testfix.TempDir(t))
 	if v.Mount == "" || v.Total <= 0 {
 		t.Fatalf("volume of a temp dir: %+v", v)
+	}
+}
+
+// A file that is only in the cloud is counted apart and never read for
+// duplicates (reading would download it), unless ReadOnlineOnly.
+func TestOnlineOnlyNotRead(t *testing.T) {
+	root := testfix.TempDir(t)
+	mt := time.Date(2020, 1, 2, 3, 4, 5, 0, time.Local)
+	put(t, root, "a/copy.bin", "same bytes in both", mt)
+	cloud := put(t, root, "b/copy.bin", "same bytes in both", mt)
+	if err := testfix.SetOffline(cloud); errors.Is(err, testfix.ErrNoOffline) {
+		t.Skip("no settable online-only marker here: fsx tests cover the flag")
+	} else if err != nil {
+		t.Fatal(err)
+	}
+	r, err := Run(Options{Roots: []string{root}, Dups: DupsFull})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Files != 2 || r.OnlineOnly.Files != 1 || r.OnlineOnly.Bytes != 18 {
+		t.Fatalf("files %d, online-only %+v", r.Files, r.OnlineOnly)
+	}
+	if r.Dups.Candidates != 0 || r.Dups.Groups != 0 {
+		t.Fatalf("an online-only file was read: candidates %d groups %d", r.Dups.Candidates, r.Dups.Groups)
+	}
+	if r, err = Run(Options{Roots: []string{root}, Dups: DupsFull, ReadOnlineOnly: true}); err != nil || r.Dups.Groups != 1 {
+		t.Fatalf("ReadOnlineOnly: %v, groups %d", err, r.Dups.Groups)
 	}
 }

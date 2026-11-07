@@ -71,6 +71,8 @@ func (f Filters) RuleOn(name string) bool {
 		return !f.KeepDotDirs
 	case RuleJunk:
 		return !f.KeepJunk
+	case RuleOnlineOnly:
+		return true // reading downloads: only an explicit -keep online-only does
 	}
 	if f.NoSweep {
 		return false
@@ -124,6 +126,7 @@ func (f Filters) Options(defPreset string) (Options, error) {
 	o.SkipSystemDirs, o.SkipCloudDirs, o.SkipDevDirs = f.RuleOn(RuleSystemDirs), f.RuleOn(RuleCloudDirs), f.RuleOn(RuleDevDirs)
 	o.SkipSystemExt, o.SkipUnknownExt, o.SkipNoExt = f.RuleOn(RuleSystemExt), f.RuleOn(RuleUnknownExt), f.RuleOn(RuleNoExt)
 	o.SkipTransient, o.SkipShortcuts = f.RuleOn(RuleTransient), f.RuleOn(RuleShortcuts)
+	o.SkipOnlineOnly = f.RuleOn(RuleOnlineOnly)
 	maxSize := f.MaxSize
 	if maxSize == "" && f.RuleOn(RuleBig) {
 		maxSize = DefaultMaxSize

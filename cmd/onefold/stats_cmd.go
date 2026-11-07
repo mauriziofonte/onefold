@@ -31,6 +31,7 @@ func cmdStats(args []string) {
 	depth := fs.Int("depth", 6, "folder levels kept in the tree (JSON) below each folder")
 	top := fs.Int("top", 10, "rows printed per section (the JSON keeps more)")
 	jsonOut := fs.String("json", "", "write the whole result as JSON to FILE (- = standard output, no tables)")
+	readOnline := fs.Bool("read-online-only", false, "duplicates: also read cloud files that are not on this computer (OneDrive, iCloud, Dropbox placeholders), which downloads them")
 	workers := fs.Int("j", 0, "workers (0 = NumCPU)")
 	heartbeat := fs.Duration("heartbeat", report.DefaultHeartbeat, "progress log interval when output is not a terminal")
 	fs.Usage = func() {
@@ -51,7 +52,7 @@ func cmdStats(args []string) {
 		fatal(2, fmt.Errorf("-dup-min: %w", err))
 	}
 	o := stats.Options{Roots: fs.Args(), Workers: *workers, OneVolume: *oneVol, Dups: *dups, DupMin: dm, Depth: *depth,
-		Top: max(100, *top)}
+		Top: max(100, *top), ReadOnlineOnly: *readOnline}
 	o.ProgressFor = func(phase string) (stats.Progress, func()) {
 		label, unit := "stats scan", report.Items
 		if phase == "dups" {
@@ -171,6 +172,10 @@ func printStats(w io.Writer, r *stats.Result, top int) {
 		fmt.Fprintf(w, "   extra hard links %s (counted once)", thousands(r.HardLinks.Files))
 	}
 	fmt.Fprintf(w, "   unreadable %s\n", thousands(r.Errors))
+	if r.OnlineOnly.Files > 0 {
+		fmt.Fprintf(w, "only in the cloud: %s files, %s (counted, not on this disk, not read for duplicates)\n",
+			thousands(r.OnlineOnly.Files), report.HumanBytes(r.OnlineOnly.Bytes))
+	}
 	if len(r.OtherVolumes) > 0 {
 		fmt.Fprintf(w, "other volumes not entered: %s\n", strings.Join(r.OtherVolumes, ", "))
 	}

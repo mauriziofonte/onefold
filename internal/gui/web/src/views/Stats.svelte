@@ -195,7 +195,7 @@
     <!-- headline numbers -->
     <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7" data-testid="stats-kpis">
       <Stat label={t('stats.filesK')} value={num(res.files)} sub={t('stats.dirsN', { n: num(res.dirs) })} />
-      <Stat label={t('common.size')} value={bytes(res.bytes)} sub={res.allocated ? t('stats.onDisk', { size: bytes(res.allocated) }) : ''} />
+      <Stat label={t('common.size')} value={bytes(res.bytes)} sub={[res.allocated ? t('stats.onDisk', { size: bytes(res.allocated) }) : '', res.onlineOnly?.files ? t('stats.cloudOnly', { size: bytes(res.onlineOnly.bytes) }) : ''].filter(Boolean).join(' · ')} testid="stats-size" />
       <Stat label={t('stats.wasted')} value={d ? bytes(d.wasted) : '–'} sub={d ? t('stats.wastedSub', { share: wastedShare, n: num(d.extra) }) : t('stats.dups.off')} tone={d?.wasted ? 'text-amber-600' : ''} testid="stats-wasted" />
       <Stat label={t('stats.types')} value={num((res.exts?.length || 0) + (res.unknown?.length || 0))} sub={res.unknown?.length ? t('stats.unknownN', { n: num(res.unknown.length) }) : ''} />
       <Stat label={t('stats.empty')} value={num(res.empty)} sub={res.junk?.files ? t('stats.junkN', { n: num(res.junk.files) }) : ''} />

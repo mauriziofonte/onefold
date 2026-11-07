@@ -229,7 +229,7 @@ func mergeSummary(r *merge.Result) map[string]any {
 		"alreadyPresent": r.AlreadyPresent, "inputDupes": r.InputDupes, "toCopy": len(r.Copies), "copyBytes": r.CopyBytes,
 		"renamed": r.Renamed, "blocked": len(r.Blocked), "outputDupGroups": r.OutputDupGroups, "outputDupFiles": r.OutputDupFiles,
 		"verifyGroups": r.Verify.Groups, "verifySplits": r.Verify.Splits, "verifyUnreadable": r.Verify.Unreadable,
-		"skippedByFilters": r.SkippedByRules, "emptyInputs": r.EmptyInputs, "excluded": len(r.Excluded),
+		"skippedByFilters": r.SkippedByRules, "emptyInputs": r.EmptyInputs, "onlineOnly": r.OnlineOnly, "excluded": len(r.Excluded),
 		"excludedBy": excludedBy(excludedItems(r.Excluded)), "rooms": r.Rooms, "packages": len(r.Packages),
 	}
 }
