@@ -483,7 +483,7 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 			dm.bytes += size
 			mu.Unlock()
 			key := ""
-			if o.Cache != nil {
+			if o.Cache != nil && (o.WholeMax <= 0 || size > o.WholeMax) { // smaller files are read whole: never cached
 				key = hashcache.KeyOf(path, info)
 			}
 			jobs <- job{room: room, path: path, key: key, size: size, mtime: info.ModTime().UnixNano()}

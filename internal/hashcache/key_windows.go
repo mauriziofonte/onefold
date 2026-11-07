@@ -9,23 +9,73 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
-	"syscall"
+	"strings"
+	"sync"
+	"unsafe"
 
-	"github.com/mauriziofonte/onefold/internal/names"
+	"golang.org/x/sys/windows"
+
+	"github.com/mauriziofonte/onefold/internal/fsx"
 )
 
-// keyOf: the directory listing has no file ID (reading it would open every
-// file), so the folded absolute path, size, creation and last-write times.
-// A file rewritten in place moves its last-write time; one replaced by a
-// new file gets a new creation time.
+// keyOf: volume serial and file ID, size, last-write and change times, as
+// the Unix key. The directory listing carries neither the ID nor the change
+// time, so the file is opened for its attributes only (no read access: no
+// antivirus scan, nothing locked). The change time moves on every write and
+// attribute change and is not set by the tools that restore a last-write
+// time. FAT and exFAT keep no change time: their files are not cached.
 func keyOf(path string, fi fs.FileInfo) string {
-	d, ok := fi.Sys().(*syscall.Win32FileAttributeData)
-	if !ok {
-		return ""
-	}
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return ""
 	}
-	return fmt.Sprintf("w:%s:%d:%d:%d", names.FoldKey(abs), fi.Size(), d.CreationTime.Nanoseconds(), d.LastWriteTime.Nanoseconds())
+	p, err := windows.UTF16PtrFromString(fsx.LongPath(abs))
+	if err != nil {
+		return ""
+	}
+	h, err := windows.CreateFile(p, windows.FILE_READ_ATTRIBUTES,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE, nil,
+		windows.OPEN_EXISTING, windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT, 0)
+	if err != nil {
+		return ""
+	}
+	defer windows.CloseHandle(h)
+	var bi struct {
+		CreationTime, LastAccessTime, LastWriteTime, ChangeTime int64
+		FileAttributes                                          uint32
+		_                                                       uint32
+	}
+	if windows.GetFileInformationByHandleEx(h, windows.FileBasicInfo, (*byte)(unsafe.Pointer(&bi)), uint32(unsafe.Sizeof(bi))) != nil {
+		return ""
+	}
+	var id struct {
+		VolumeSerialNumber uint64
+		FileID             [16]byte
+	}
+	if windows.GetFileInformationByHandleEx(h, windows.FileIdInfo, (*byte)(unsafe.Pointer(&id)), uint32(unsafe.Sizeof(id))) != nil {
+		return "" // FAT, exFAT and older file systems
+	}
+	if !changeTimed(h, id.VolumeSerialNumber) {
+		return ""
+	}
+	return fmt.Sprintf("w:%x:%x:%d:%d:%d", id.VolumeSerialNumber, id.FileID, fi.Size(), bi.LastWriteTime, bi.ChangeTime)
+}
+
+// volumes: serial -> whether its file system keeps a change time.
+var volumes sync.Map
+
+func changeTimed(h windows.Handle, serial uint64) bool {
+	if v, ok := volumes.Load(serial); ok {
+		return v.(bool)
+	}
+	var fsName [windows.MAX_PATH + 1]uint16
+	ok := false
+	if windows.GetVolumeInformationByHandle(h, nil, 0, nil, nil, nil, &fsName[0], uint32(len(fsName))) == nil {
+		switch strings.ToUpper(windows.UTF16ToString(fsName[:])) {
+		case "NTFS", "REFS":
+			ok = true
+		}
+	}
+	volumes.Store(serial, ok)
+	return ok
 }

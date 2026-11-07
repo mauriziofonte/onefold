@@ -52,10 +52,6 @@ func (s *scan) duplicates() (*Dups, error) {
 	seen := map[inodeKey]bool{}
 	for _, root := range s.o.Roots {
 		err := s.walkRoot(root, seen, false, nopProgress{}, func(path string, size int64, fi fs.FileInfo, _ fileSys) {
-			key := ""
-			if s.o.Cache != nil {
-				key = hashcache.KeyOf(path, fi)
-			}
 			if size < s.o.DupMin || (!s.o.ReadOnlineOnly && fsx.OnlineOnly(fi)) {
 				return
 			}
@@ -64,6 +60,10 @@ func (s *scan) duplicates() (*Dups, error) {
 			s.mu.Unlock()
 			if n < 2 {
 				return
+			}
+			key := ""
+			if s.o.Cache != nil {
+				key = hashcache.KeyOf(path, fi) // before the read: a later change never hides behind it
 			}
 			mu.Lock()
 			cands = append(cands, cand{path: path, key: key, size: size})
