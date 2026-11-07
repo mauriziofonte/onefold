@@ -1,0 +1,74 @@
+# onefold
+# Author: Maurizio Fonte <fonte.maurizio@gmail.com>
+# Copyright (c) 2026 Maurizio Fonte
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Scale: onefold on a synthetic tree of a million files every week (5 or
+# 10 million by hand), each step's wall time and peak memory checked against
+# bench/scale.tsv; the job fails when one goes over budget. The tree lives
+# on an ext4 image with inline data, so millions of tiny files fit in a few
+# GB. The result JSON is kept as the artifact `scale-<files>`.
+name: scale
+
+on:
+  schedule:
+    - cron: "41 3 * * 0" # Sundays 03:41 UTC
+  workflow_dispatch:
+    inputs:
+      files:
+        description: files in the synthetic tree
+        type: choice
+        options: ["1000000", "5000000", "10000000"]
+        default: "1000000"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scale-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  scale:
+    if: github.server_url == 'https://github.com'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    env:
+      CGO_ENABLED: "0"
+      FILES: ${{ inputs.files || '1000000' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3"
+          cache: false
+
+      - name: build
+        run: |
+          go build -trimpath -o "$RUNNER_TEMP/onefold" ./cmd/onefold
+          go build -o "$RUNNER_TEMP/scalebench" ./cmd/scalebench
+
+      - name: ext4 image with an inode per file
+        run: |
+          size=$(( FILES / 1000000 * 700 + 1500 ))M
+          truncate -s "$size" "$RUNNER_TEMP/scale.img"
+          mkfs.ext4 -q -F -O inline_data -N $(( FILES + FILES / 10 + 100000 )) -m 0 "$RUNNER_TEMP/scale.img"
+          sudo mkdir -p /mnt/scale
+          sudo mount -o loop,noatime "$RUNNER_TEMP/scale.img" /mnt/scale
+          sudo chown "$(id -u):$(id -g)" /mnt/scale
+          df -h /mnt/scale; df -i /mnt/scale; free -g; nproc
+
+      - name: measure
+        run: |
+          "$RUNNER_TEMP/scalebench" -files "$FILES" -dir /mnt/scale -work "$RUNNER_TEMP/scale-work" \
+            -bin "$RUNNER_TEMP/onefold" -o "scale-$FILES.json"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: scale-${{ env.FILES }}
+          path: scale-${{ env.FILES }}.json
+          if-no-files-found: ignore

@@ -1,0 +1,25 @@
+# Budgets of the synthetic scale benchmark (cmd/scalebench, workflow scale.yml):
+# step, files in the tree, max wall seconds, max peak resident MiB.
+# Measured on Linux, 4 CPUs, ext4 with inline data, tiny files (a tenth of
+# them duplicated), cold page cache not forced, no hash cache:
+#   1M: stats 14 s 530 MiB, stats-full 15 s 560 MiB, catalog 11 s 27 MiB,
+#       merge-preview 47 s 2.2 GiB, dedupe-preview 24 s 600 MiB.
+# Budgets give about 2x the time and 1.5x the memory. 5M and 10M are scaled
+# from 1M until a run measures them; merge holds every record in memory
+# (about 2.2 GiB per million files), so at 10M it needs more than the 16 GB
+# of a standard runner: "-" skips it there.
+stats	1000000	30	800
+stats-full	1000000	35	850
+catalog	1000000	30	128
+merge-preview	1000000	100	3300
+dedupe-preview	1000000	50	900
+stats	5000000	170	4000
+stats-full	5000000	190	4200
+catalog	5000000	170	256
+merge-preview	5000000	550	14000
+dedupe-preview	5000000	280	4500
+stats	10000000	350	8000
+stats-full	10000000	400	8400
+catalog	10000000	350	512
+merge-preview	10000000	-	-
+dedupe-preview	10000000	560	9000

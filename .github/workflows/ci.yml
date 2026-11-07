@@ -126,10 +126,11 @@ jobs:
             sudo chown "$(id -u):$(id -g)" /mnt/onefold-btrfs
             export ONEFOLD_CLONE_DIR=/mnt/onefold-btrfs
           fi
-          go test -count=1 -run 'Clone' -v ./internal/fsx ./internal/merge ./internal/materialize | tee clone.log
+          go test -count=1 -run 'Clone' -v ./internal/fsx ./internal/merge ./internal/materialize ./internal/dedupe | tee clone.log
           if grep -q -- '--- SKIP' clone.log; then echo "a clone test was skipped"; exit 1; fi
           if grep -q 'byte-copy fallback' clone.log; then echo "a clone test fell back to byte copies"; exit 1; fi
           grep -q -- '--- PASS: TestMergeClone' clone.log
+          grep -q -- '--- PASS: TestExecuteClone' clone.log
 
   race:
     name: race detector and coverage
