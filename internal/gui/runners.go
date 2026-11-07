@@ -178,6 +178,12 @@ func validateParams(kind string, raw json.RawMessage) error {
 			return err
 		}
 		return absAll("plan/target", p.Plan, p.Target)
+	case "dedupe":
+		var p DedupeParams
+		if err := json.Unmarshal(raw, &p); err != nil {
+			return err
+		}
+		return p.validate()
 	case "stats":
 		var p StatsParams
 		if err := json.Unmarshal(raw, &p); err != nil {

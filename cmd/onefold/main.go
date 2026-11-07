@@ -115,6 +115,8 @@ func main() {
 		cmdExportText(os.Args[2:])
 	case "stats":
 		cmdStats(os.Args[2:])
+	case "dedupe":
+		cmdDedupe(os.Args[2:])
 	case "version", "--version", "-version", "-V":
 		fmt.Println(versionLine())
 	case "-h", "--help", "help":
@@ -180,6 +182,8 @@ usage:
   onefold push --host H --user U [--key K] <local> <remote>   SFTP upload (idempotent; ssh-agent without --key)
   onefold stats [flags] <folder|volume>... what a disk holds: families, extensions, years, folders, duplicates (read-only)
   onefold stats -mounts                    list the volumes
+  onefold dedupe -action trash|link|clone|script [-execute -expect N] <folder>...   clean up duplicate copies: one stays
+  onefold dedupe -resume JOURNAL           finish or undo an interrupted dedupe
   onefold hash <file> | index <dir> | version
 
 catalog: -o FILE  -j N  -blocks N  -preset media|all|common|image|audio|video|document|archive (CSV, default media)
@@ -200,6 +204,7 @@ merge:   -input (repeat) -output -execute -naming N (or -layout) -list -report F
 rearrange: -execute -naming N | -name ... -settings FILE -dupes delete|report -keep-empty-dirs -no-cache -move-j N -list -report FILE
 purge-sources: -from MERGE-REPORT -list -execute -expect N (the dry run's count) -trash (Recycle Bin on Windows local fixed drives, Trash on macOS and Linux) -j N
 stats:   -dups off|fast|full  -dup-min SIZE  -one-volume=false  -depth N  -top N  -json FILE|-  -j N
+dedupe:  -keep oldest|newest|shortest|first  -keep-in DIR  -script FILE  -ps  -min-size SIZE  -list  -json FILE|-  -j N
 all:     -perf (telemetry table)  -perf-out FILE.json
 
 Run 'onefold <command> -h' for per-command flag help.

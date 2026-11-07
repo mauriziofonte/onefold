@@ -63,3 +63,12 @@ func checkTrash(paths []string) error {
 	}
 	return nil
 }
+
+// MoveToTrash sends one file to the Recycle Bin (Windows) or the Trash
+// (macOS, Linux), as purge -trash does; CheckTrash first refuses paths on
+// volumes without one. Used by the duplicate cleanup.
+func MoveToTrash(p string) error { return moveToTrash(p) }
+
+// CheckTrash refuses the Trash for paths on a volume without one (network
+// shares, removable drives on Windows).
+func CheckTrash(paths []string) error { return checkTrash(paths) }

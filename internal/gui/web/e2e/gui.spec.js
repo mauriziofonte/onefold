@@ -345,6 +345,30 @@ test('GUI end to end', async ({ browser }) => {
     expect(count(join(root, 'STATS'))).toBe(9); // read-only
   });
 
+  await test.step('statistics: clean up the duplicates with hard links, typed count', async () => {
+    await page.getByTestId('nav-stats').click();
+    await expect(page.getByTestId('dedupe')).toBeVisible();
+    await page.getByTestId('dedupe-keep').selectOption('first');
+    await page.getByTestId('dedupe-action-link').check();
+    await page.getByTestId('dedupe-preview').click();
+    await expect(page.getByTestId('jobbar-status')).toHaveText('preview ready', { timeout: 60 * 1000 });
+    await expect(page.getByTestId('dedupe-items')).toContainText('4');
+    await shot(page, '18c-stats-cleanup');
+    expect(count(join(root, 'STATS'))).toBe(9); // the preview touches nothing
+    await page.getByTestId('dedupe-execute').click();
+    await page.getByTestId('confirm-count').fill('4');
+    await page.getByTestId('confirm-reviewed').check();
+    await page.getByTestId('confirm-go').click();
+    await expect(page.getByTestId('jobbar-status')).toHaveText('done', { timeout: 60 * 1000 });
+    await expect(page.getByTestId('dedupe-executed')).toContainText('Replaced by hard links');
+    for (let i = 0; i < 4; i++) {
+      const a = lstatSync(join(root, 'STATS', 'a', `note${i}.txt`));
+      const b = lstatSync(join(root, 'STATS', 'b', `copy${i}.txt`));
+      expect(b.ino).toBe(a.ino); // one file, both names
+    }
+    expect(count(join(root, 'STATS'))).toBe(9); // every name stays
+  });
+
   await test.step('guided setup: golden scope locked, real preview on the sample', async () => {
     await page.getByTestId('nav-wizard').click();
     await page.getByTestId('goal-golden').click();
