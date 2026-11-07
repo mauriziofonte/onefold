@@ -44,6 +44,7 @@ func cmdMerge(args []string) {
 	trust := fs.Bool("trust-sparse", false, "skip the full-content confirmation of duplicates (faster, NOT recommended)")
 	noVerify := fs.Bool("no-verify-copy", false, "do not re-read each copy to verify it")
 	noFsync := fs.Bool("no-fsync", false, "do not fsync each copy before publishing it")
+	clone := fs.Bool("clone", false, "make each copy a clone of its source where the file system allows it (same volume on APFS, Btrfs, XFS...): instant, no extra space; elsewhere a normal copy")
 	verifyUncached := fs.Bool("verify-uncached", false, "re-read each copy from the disk, not from the OS cache (slower: proves the media, not only the write path)")
 	noCache := fs.Bool("no-cache", false, "do not use/write <output>/.onefold/merge-cache.jsonl")
 	keepDotfiles := fs.Bool("keep-dotfiles", false, "also merge files whose name starts with '.' and 0-byte files (one empty file per name)")
@@ -96,6 +97,9 @@ func cmdMerge(args []string) {
 	}
 	if set["no-cache"] {
 		m.NoCache = *noCache
+	}
+	if set["clone"] {
+		m.Clone = *clone
 	}
 	if set["copy-j"] {
 		m.Workers = *workers
@@ -165,6 +169,9 @@ func cmdMerge(args []string) {
 		fmt.Printf("copied:            %d files, %s   stale temps removed: %d\n", res.Copied, report.HumanBytes(res.CopiedBytes), res.StaleTemps)
 		for _, f := range res.Failed {
 			fmt.Printf("  FAILED %s\n", f)
+		}
+		if *clone {
+			fmt.Printf("cloned:            %d of the copies (no extra space; the rest were copied: another volume or a file system without clones)\n", res.Cloned)
 		}
 		if res.CachedVerify > 0 {
 			fmt.Printf("verified through the OS cache: %d (the output's file system refused uncached reads)\n", res.CachedVerify)

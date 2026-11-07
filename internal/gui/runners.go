@@ -231,6 +231,7 @@ func mergeSummary(r *merge.Result) map[string]any {
 		"verifyGroups": r.Verify.Groups, "verifySplits": r.Verify.Splits, "verifyUnreadable": r.Verify.Unreadable,
 		"skippedByFilters": r.SkippedByRules, "emptyInputs": r.EmptyInputs, "onlineOnly": r.OnlineOnly, "excluded": len(r.Excluded),
 		"excludedBy": excludedBy(excludedItems(r.Excluded)), "rooms": r.Rooms, "packages": len(r.Packages),
+		"cloned": r.Cloned,
 	}
 }
 

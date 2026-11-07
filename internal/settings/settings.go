@@ -122,6 +122,7 @@ type Merge struct {
 	NoFsync        bool            `json:"noFsync,omitempty"`
 	VerifyUncached bool            `json:"verifyUncached,omitempty"`
 	NoCache        bool            `json:"noCache,omitempty"`
+	Clone          bool            `json:"clone,omitempty"`   // clones where the file system allows (merge.Options.Clone)
 	Workers        int             `json:"workers,omitempty"` // catalog and copy workers, 0 = NumCPU
 	Naming
 }
@@ -144,7 +145,7 @@ func (m Merge) Options(allowMixed bool) (merge.Options, error) {
 		return merge.Options{}, err
 	}
 	return merge.Options{Inputs: m.Inputs, Output: m.Output, Catalog: co, Naming: spec, TrustSparse: m.TrustSparse,
-		NoVerifyCopy: m.NoVerifyCopy, NoFsync: m.NoFsync, VerifyUncached: m.VerifyUncached, NoCache: m.NoCache, Workers: m.Workers}, nil
+		NoVerifyCopy: m.NoVerifyCopy, NoFsync: m.NoFsync, VerifyUncached: m.VerifyUncached, NoCache: m.NoCache, Clone: m.Clone, Workers: m.Workers}, nil
 }
 
 // Rearrange mirrors `onefold rearrange`.
@@ -229,7 +230,7 @@ func (m Merge) Args() []string {
 		on   bool
 		name string
 	}{{m.TrustSparse, "-trust-sparse"}, {m.NoVerifyCopy, "-no-verify-copy"}, {m.NoFsync, "-no-fsync"}, {m.VerifyUncached, "-verify-uncached"}, {m.NoCache, "-no-cache"},
-		{m.Filters.KeepDotfiles, "-keep-dotfiles"}}
+		{m.Clone, "-clone"}, {m.Filters.KeepDotfiles, "-keep-dotfiles"}}
 	for _, f := range flags {
 		if f.on {
 			a = append(a, f.name)

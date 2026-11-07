@@ -66,9 +66,14 @@ type Options struct {
 	// where the OS refuses it (counted in Result.CachedVerify). Needs fsync.
 	VerifyUncached bool
 	NoCache        bool // do not read/write <output>/.onefold/merge-cache.jsonl
-	Workers        int  // copy/verify workers (0 = NumCPU)
-	Heartbeat      time.Duration
-	Log            io.Writer // progress/messages (stderr)
+	// Clone makes each copy a clone of its source where the file system
+	// allows it (fsx.Clone: same volume, APFS, Btrfs, XFS...): instant, no
+	// extra space; elsewhere a byte copy. The clone is hashed and checked
+	// against the cataloged content like a copy.
+	Clone     bool
+	Workers   int // copy/verify workers (0 = NumCPU)
+	Heartbeat time.Duration
+	Log       io.Writer // progress/messages (stderr)
 
 	// Gate pauses or stops the run between units of work (GUI); nil = never.
 	Gate *runctl.Gate
@@ -149,6 +154,7 @@ type Result struct {
 	Packages     []catalog.Package `json:"packages,omitempty"`
 	present      []Settle          // input files already in the output (decide)
 	CachedVerify int               `json:"cachedVerify,omitempty"` // -verify-uncached copies verified through the cache (OS refused an uncached read)
+	Cloned       int               `json:"cloned,omitempty"`       // copies made as clones (-clone): no extra space
 }
 
 // Settle pairs an input file with the output file holding its content.
@@ -608,8 +614,11 @@ func parseCopyDelay(v string) time.Duration {
 }
 
 func execute(o Options, res *Result, out string) []catalog.Record {
-	cached0 := cachedVerify.Load()
-	defer func() { res.CachedVerify = int(cachedVerify.Load() - cached0) }()
+	cached0, cloned0 := cachedVerify.Load(), clonedCopies.Load()
+	defer func() {
+		res.CachedVerify = int(cachedVerify.Load() - cached0)
+		res.Cloned = int(clonedCopies.Load() - cloned0)
+	}()
 	var total int64
 	for _, c := range res.Copies {
 		total += c.Size
@@ -711,6 +720,21 @@ func copyOne(c Copy, dst string, buf []byte, o Options) (content string, err err
 		return "", errChanged
 	}
 	tmp := dst + "." + strconv.FormatInt(rand.Int63(), 36) + fsx.TempSuffix
+	if o.Clone {
+		switch sum, cerr := cloneOne(c, tmp, buf, o, sfi.ModTime()); {
+		case cerr == nil:
+			tr := perf.Start()
+			if err = fsx.RenameNoReplace(tmp, dst); err != nil {
+				os.Remove(tmp)
+				return "", err
+			}
+			perf.End("rename", tr, 0)
+			clonedCopies.Add(1)
+			return sum, nil
+		case !errors.Is(cerr, fsx.ErrNoClone):
+			return "", cerr
+		}
+	}
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
 		return "", err
@@ -772,6 +796,45 @@ func copyOne(c Copy, dst string, buf []byte, o Options) (content string, err err
 	return sum, nil
 }
 
+// cloneOne makes tmp a clone of the source and proves it like a copy: its
+// size and content hash must be the cataloged ones (the clone's bytes are
+// the source's at the time of the clone, so this also catches a source
+// changed since the catalog). fsx.ErrNoClone: nothing made, copy instead.
+func cloneOne(c Copy, tmp string, buf []byte, o Options, mt time.Time) (sum string, err error) {
+	tc := perf.Start()
+	if err := fsx.Clone(c.SrcPath, tmp); err != nil {
+		return "", err
+	}
+	perf.End("clone", tc, c.Size)
+	defer func() {
+		if err != nil {
+			os.Remove(tmp)
+		}
+	}()
+	fi, err := os.Stat(tmp)
+	if err != nil {
+		return "", err
+	}
+	if fi.Size() != c.Size {
+		return "", errChanged
+	}
+	tv := perf.Start()
+	if sum, err = hashFile(tmp, buf); err != nil {
+		return "", err
+	}
+	perf.End("verify-copy", tv, c.Size)
+	if (c.Src.Full && sum != c.Src.Hash && !strings.Contains(c.Src.Hash, "-")) || (c.Src.ContentHash != "" && sum != c.Src.ContentHash) {
+		return "", errors.New("source content differs from the cataloged hash")
+	}
+	if !o.NoFsync {
+		if err = fsx.SyncFile(tmp); err != nil {
+			return "", err
+		}
+	}
+	_ = os.Chtimes(tmp, mt, mt)
+	return sum, nil
+}
+
 // verifyHash hashes a written copy, from the device when uncached (only
 // after an fsync: dirty pages would still come from the cache).
 func verifyHash(p string, buf []byte, uncached bool) (string, error) {
@@ -805,8 +868,9 @@ func verifyHash(p string, buf []byte, uncached bool) (string, error) {
 // The pool holds pointers so that Put does not allocate a slice header.
 var alignedBufs = sync.Pool{New: func() any { b := fsx.AlignedBuffer(4 << 20); return &b }}
 
-// cachedVerify counts the verifications that fell back to the cache.
-var cachedVerify atomic.Int64
+// cachedVerify counts the verifications that fell back to the cache;
+// clonedCopies the copies made as clones.
+var cachedVerify, clonedCopies atomic.Int64
 
 func hashFile(p string, buf []byte) (string, error) {
 	f, err := os.Open(p)

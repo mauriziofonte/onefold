@@ -1054,6 +1054,8 @@ The CLI refuses preset `media` and the `library*` presets in merge and rearrange
 4. Set the temp's mtime to the canonical capture time (the plan time parsed in the canonical zone).
 5. Publish with `fsx.RenameNoReplace`; a destination that appeared meanwhile -> temp removed, skipped.
 
+With `apply -execute -clone` (`RunOptions.Clone`) each byte copy above (photo before stamping, RAW, MPEG-PS, everything else) starts as a clone of the source (`fsx.Clone`), then is flushed; exiftool then stamps the clone, which leaves the source as it is (copy on write). `cloned` counts them; where no clone is possible, the byte copy runs. Videos are remuxed by ffmpeg, never cloned. `-clone` and `-link` exclude each other.
+
 A photo exiftool refuses, or a video ffmpeg cannot remux (exotic codec, truncated file), is published as a faithful byte copy and counted `unsilvered` with the reason. A later run skips it because it exists, so it stays unsilvered.
 
 External processes run bounded: killed with their children (a Windows job object, because the pinned exiftool is a launcher that starts Perl) after 30 minutes plus 1 second per 4 MiB of the file.
@@ -1166,7 +1168,7 @@ The script is POSIX sh (`rm -- '...'`, `set -e`) or PowerShell (`Remove-Item -Li
 
 - same relative paths; only regular files; the tree's own `.onefold` folder and onefold temp files are skipped;
 - the copy only grows: a file present with the same size is kept (its source content hash is recorded), a different file under the same path is a conflict, never replaced;
-- every copy uses the merge copy routine (`merge.CopyVerified`: temp, hash while writing, fsync, read back and compare, source mtime, no-replace rename);
+- every copy uses the merge copy routine (`merge.CopyVerified`: temp, hash while writing, fsync, read back and compare, source mtime, no-replace rename), always a byte copy: never a clone (a clone shares the source's blocks, so one bad sector would hit both);
 - each executed run writes `DST/.onefold/backup-<ts>.jsonl` with `{rel, size, content}` per copied or present file.
 
 `onefold backup -check DST` reads every file of the copy again and compares it with the manifests of every run (a later entry wins): `ok`, `changed` (bit rot or an edit), `missing`, `unreadable`; files without an entry are listed as untracked. Exit 1 when anything changed, went missing or was unreadable.
@@ -1241,6 +1243,8 @@ The second run over the same folders reuses the cache and takes seconds.
 
 Any failure removes the temp; the file counts as failed. Exit 1 when `missing after run` (failed + blocked + not started) is above 0.
 
+With `-clone` (`Options.Clone`, GUI: Safety, "Clone instead of copying") steps 3 to 7 become: the temp is made a clone of the source (`fsx.Clone`, section 24.1: instant, no extra space, on one volume of APFS, Btrfs, XFS with reflink, bcachefs); its size and its full content hash, read from the clone, must be the cataloged ones; fsync (`-no-fsync` skips). Then steps 8 and 9 as above. Where no clone is possible (another volume, ext4, NTFS, exFAT, network shares, Windows in general: ReFS block cloning is not implemented) the byte copy runs; `cloned` in the result counts the clones. A clone is a separate file (writing or deleting the source never touches it) but shares the device blocks with the source until either changes: the same bad sector damages both, which is why `backup` never clones.
+
 ### 17.3 Options
 
 | Option | Effect |
@@ -1254,6 +1258,7 @@ Any failure removes the temp; the file counts as failed. Exit 1 when `missing af
 | `-keep-dotfiles` | also merge dotfiles and 0-byte files; an empty file is identified by its name (`empty\|<folded name>`), so each distinct empty-file name exists once in O and a second merge copies nothing |
 | `-trust-sparse`, `-no-verify-copy`, `-no-fsync`, `-no-cache` | safety switches; the defaults are the safest |
 | `-verify-uncached` | read-back from the device (17.2) |
+| `-clone` | clones instead of byte copies where the file system allows (17.2) |
 | `-copy-j N` | copy workers |
 | catalog filter flags | section 11.2, default `-preset all` |
 
@@ -1531,6 +1536,7 @@ Units are bytes (apply, push, merge copies, verify) or items (catalog, rearrange
 - `RenameNoReplace(src, dst)`: Linux `renameat2(..., RENAME_NOREPLACE)`; macOS `renamex_np(..., RENAME_EXCL)` (APFS, HFS+); Windows `MoveFileEx` without `MOVEFILE_REPLACE_EXISTING`, with `MOVEFILE_WRITE_THROUGH` and the `\\?\` prefix for long paths; where the platform call is unsupported (some filesystems, other OSes) a hard link then removal of the source, and as the last resort a stat-then-rename (not atomic: only where neither primitive exists). An existing destination returns `fsx.ErrExists`. Cross-volume renames fail (rearrange relies on it). `TestRenameNoReplaceNative` proves the one-call primitive on each CI system.
 - Temp names: `TempSuffix = ".onefold-tmp"`, `TempFor(dst, keepExt)`, `IsTemp(name)` (section 6.6).
 - `OpenUncached(path)` and `AlignedBuffer(n)`: reads that bypass the OS cache (merge `-verify-uncached`).
+- `Clone(src, dst)`: `dst` (must not exist) becomes a clone of `src`, sharing its blocks until either is written: macOS `clonefile(CLONE_NOFOLLOW|CLONE_NOOWNERCOPY)` (APFS; the mode is then set to 0644 like a copy; extended attributes come with the clone), Linux `ioctl(FICLONE)` (Btrfs, XFS with reflink, bcachefs, OCFS2...). `ErrNoClone` (wrapped, `dst` absent) on another volume or a file system without shared extents; on Windows always (ReFS and Dev Drive block cloning, `FSCTL_DUPLICATE_EXTENTS_TO_FILE`, is not implemented: no test system has one). `TestClone` runs on APFS (macOS CI) and on a Btrfs image (Linux CI, `ONEFOLD_CLONE_DIR`).
 - `OnlineOnly(fi)`: the content of the file is not on this computer, reading it would download it. Windows: `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`, `FILE_ATTRIBUTE_RECALL_ON_OPEN` or `FILE_ATTRIBUTE_OFFLINE` in the attributes of the listing (`Win32FileAttributeData`); macOS: `SF_DATALESS` in `st_flags`; elsewhere false (no standard marker). Tests: synthetic stat data for each flag, and on Windows a real file with `FILE_ATTRIBUTE_OFFLINE` (the one such attribute a program may set, `testfix.SetOffline`) through catalog and stats.
 - `SyncFile(path)`, `SyncDir(dir)`, `Durable(path, seen)`, `DirSet`: flush a file (fsync; `F_FULLFSYNC` on macOS; `FlushFileBuffers` on Windows, which needs write access: a read-only copy cannot be flushed and returns its error) and the folder naming it (fsync of the directory; a no-op on Windows, where every rename is `MOVEFILE_WRITE_THROUGH` and NTFS journals directory changes; `EINVAL`/`ENOTSUP` from file systems that cannot flush a directory count as done). `DirSet` collects the folders of a run and flushes each once; a folder gone by then is skipped.
 - `LinkNoReplace(src, dst)`: a hard link that refuses an existing name (`os.Link`), `ErrCrossVolume` across volumes (`apply -link`, section 14.5).
@@ -1717,6 +1723,7 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 | `LOCALAPPDATA`, `XDG_STATE_HOME` | state dir defaults |
 | `ONEFOLD_BIN` | tests: the binary to test (cross-compiled Windows exe) |
 | `ONEFOLD_TEST_COPY_DELAY` | tests: a delay before each merge copy |
+| `ONEFOLD_CLONE_DIR` | tests: a folder on a file system that clones (Btrfs, XFS); the clone tests use it instead of falling back to byte copies (macOS: the temp dir, APFS). CI mounts a Btrfs image there on Linux and fails if a clone test skips |
 | `ONEFOLD_TEST_TRASH=1` | tests: allow the Recycle Bin (Windows) and Trash (macOS; Linux uses a Trash in a temporary `XDG_DATA_HOME`) tests; CI sets it, and fails if they skip |
 | `E2E_ROOT`, `DEMO_ROOT` | GUI tests and demo: scratch folders |
 
