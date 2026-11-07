@@ -280,6 +280,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 | `internal/tools` | external tools | `Path`, `Command`, `Output`, `StartTree` |
 | `internal/tooldl` | pinned downloads | `Catalog`, `Installer.Install` |
 | `internal/statedir` | state dir location | `Dir` |
+| `internal/power` | sleep lock and low priority of long runs | `KeepAwake`, `SetLowPriority`, `Problem` |
 | `internal/winres` | exe resources | `Build`, `BuildVersion` |
 | `internal/gui` | GUI server and jobs | `New`, `Server.Serve`, `OpenWindow` |
 | `internal/testfix` | test fixtures | `Zip`, `Docx`, `PDF`, `RAR5`... |
@@ -294,6 +295,7 @@ Leaves: `kinds`, `fsx`, `perf`, `report`, `runctl`, `statedir`, `testfix`, `winr
 | `sparsehash` | perf |
 | `hashcache` | names, sparsehash, statedir |
 | `tools` | perf, statedir |
+| `power` | tools |
 | `tooldl` | fsx |
 | `meta` | kinds, perf, tools |
 | `catalog` | fsx, hashcache, kinds, meta, names, perf, runctl, sparsehash |
@@ -1412,6 +1414,8 @@ Rules: naming precedence `template` > `families` > `naming` (+`clean`) > `layout
 | `date-order` | `dateOrder` | `dmy` or `mdy` for ambiguous `XX-XX-YYYY` file-name dates | not used |
 | `names-language` | `namesLanguage` | month names in names: `en`, `it` | `en` |
 | `photo-date-fallback` | `photoDateFallback` | a JPEG without `DateTimeOriginal` takes EXIF `CreateDate`, else `ModifyDate` | off |
+| `keep-awake` | `noKeepAwake` (inverted) | a sleep lock while a long command or a GUI job works (section 24.6) | on |
+| `low-priority` | `lowPriority` | commands and GUI jobs with low disk and CPU priority (section 24.6) | off |
 | `diag-log` | `diagLog` | Windows: append launch and GUI diagnostics to `onefold-gui.log` next to the exe | off |
 
 - `onefold config` lists every key, its value and its effect, and the file path; `get`, `set`, `unset`, `path`.
@@ -1611,6 +1615,20 @@ Install: download into `<state dir>/tools/.download/<id>-<version>.onefold-tmp` 
 ### 24.5 `runctl`
 
 `runctl.Gate`: `Pause`, `Resume`, `Stop` (final), `Wait` (blocks while paused, returns false once stopped), `State`. Every method of a nil gate is a no-op and `Wait` returns true, so the CLI passes nil and never pauses. Engine consumers call `Wait` before each unit of work: catalog per file, verification per full read, merge per copy, rearrange per delete and pass-1 move, recovery, apply per action, purge per candidate, similar per photo, reclaim per drop, backup per file. Work already started always completes, so a pause or stop never leaves a half-written file. With N workers up to N units finish after a pause.
+
+### 24.6 `power`: sleep lock and priority
+
+A catalog or a copy of hours must not stop at the first idle sleep. `power.KeepAwake(why)` takes a lock until its release (nested holders share one); every lock also ends with the process, however it ends. Long commands (`merge`, `rearrange`, `purge-sources`, `catalog`, `plan`, `golden-index`, `match`, `similar`, `reclaim`, `backup`, `seed`, `apply`, `export-text`, `push`, `stats`, `dedupe`) take it at start unless `keep-awake` is off; the GUI takes it for the life of each job.
+
+| OS | Sleep lock | Low priority (`low-priority` on) |
+|---|---|---|
+| Windows | `SetThreadExecutionState(ES_CONTINUOUS \| ES_SYSTEM_REQUIRED)` on a goroutine locked to its thread (the state belongs to a thread) | `SetPriorityClass(PROCESS_MODE_BACKGROUND_BEGIN)`: low I/O, memory and CPU priority; off ends it |
+| macOS | `IOPMAssertionCreateWithName(PreventUserIdleSystemSleep)` named "onefold is working on your files" (IOKit and CoreFoundation through purego, loaded on first use) | `setiopolicy_np(IOPOL_TYPE_DISK, IOPOL_SCOPE_PROCESS, IOPOL_THROTTLE)` and nice 10; off restores the disk policy |
+| Linux | `systemd-inhibit --what=sleep --mode=block cat`, an optional tool (section 24.2): `cat` reads a pipe onefold holds, so the lock ends when the pipe closes | `ioprio_set` best effort level 7 and nice 10 on every thread of `/proc/self/task` (both are per thread; later threads inherit them); off restores level 4 |
+
+- Only idle sleep is held off: the display may turn off, and a closed lid or a sleep the user asks for still sleeps.
+- Best effort: without the lock (Linux without systemd or logind, a session without the right, `ONEFOLD_NO_EXTERNAL=1`) the run goes on. Linux learns a refusal after the start, when `systemd-inhibit` exits early: `power.Problem()` says why, and `onefold doctor` takes the lock for a moment and prints whether it holds.
+- Raising a nice value back needs privileges: `low-priority` off restores the disk priority, the CPU priority stays lowered until the process ends (a GUI restart).
 
 ---
 

@@ -54,10 +54,15 @@ type Config struct {
 	// PhotoDateFallback: a JPEG without DateTimeOriginal takes its EXIF
 	// CreateDate, else ModifyDate (off = file name, then file time).
 	PhotoDateFallback bool `json:"photoDateFallback,omitempty"`
+	// NoKeepAwake lets the computer sleep on idle during a long run (off =
+	// a sleep lock is held while a command or a GUI job works).
+	NoKeepAwake bool `json:"noKeepAwake,omitempty"`
+	// LowPriority runs commands and GUI jobs with low I/O and CPU priority.
+	LowPriority bool `json:"lowPriority,omitempty"`
 }
 
 // Keys are the names `onefold config` accepts, in display order.
-var Keys = []string{"artist", "signature", "language", "timezone", "date-order", "names-language", "photo-date-fallback", "diag-log"}
+var Keys = []string{"artist", "signature", "language", "timezone", "date-order", "names-language", "photo-date-fallback", "keep-awake", "low-priority", "diag-log"}
 
 // Path is <state dir>/config.json.
 func Path() (string, error) {
@@ -216,6 +221,10 @@ func (c Config) Get(key string) (string, error) {
 		return onOff(c.DiagLog), nil
 	case "photo-date-fallback":
 		return onOff(c.PhotoDateFallback), nil
+	case "keep-awake":
+		return onOff(!c.NoKeepAwake), nil
+	case "low-priority":
+		return onOff(c.LowPriority), nil
 	}
 	return "", unknownKey(key)
 }
@@ -236,19 +245,26 @@ func (c *Config) Set(key, value string) error {
 		n.DateOrder = strings.ToLower(strings.TrimSpace(value))
 	case "names-language":
 		n.NamesLanguage = strings.ToLower(strings.TrimSpace(value))
-	case "diag-log", "photo-date-fallback":
+	case "diag-log", "photo-date-fallback", "keep-awake", "low-priority":
 		var on bool
-		switch strings.ToLower(strings.TrimSpace(value)) {
-		case "on", "true", "1", "yes":
+		switch v := strings.ToLower(strings.TrimSpace(value)); {
+		case v == "on" || v == "true" || v == "1" || v == "yes":
 			on = true
-		case "off", "false", "0", "no", "":
+		case v == "" && key == "keep-awake":
+			on = true // unset: the default
+		case v == "off" || v == "false" || v == "0" || v == "no" || v == "":
 		default:
 			return fmt.Errorf("%s: use on or off", key)
 		}
-		if key == "diag-log" {
+		switch key {
+		case "diag-log":
 			n.DiagLog = on
-		} else {
+		case "photo-date-fallback":
 			n.PhotoDateFallback = on
+		case "keep-awake":
+			n.NoKeepAwake = !on
+		case "low-priority":
+			n.LowPriority = on
 		}
 	default:
 		return unknownKey(key)

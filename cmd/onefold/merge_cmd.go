@@ -7,12 +7,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/mauriziofonte/onefold/internal/catalog"
 	"github.com/mauriziofonte/onefold/internal/config"
@@ -23,6 +25,7 @@ import (
 	"github.com/mauriziofonte/onefold/internal/naming"
 	"github.com/mauriziofonte/onefold/internal/perf"
 	"github.com/mauriziofonte/onefold/internal/plan"
+	"github.com/mauriziofonte/onefold/internal/power"
 	"github.com/mauriziofonte/onefold/internal/report"
 	"github.com/mauriziofonte/onefold/internal/settings"
 	"github.com/mauriziofonte/onefold/internal/tools"
@@ -271,6 +274,23 @@ func toolsSummary() string {
 	return strings.Join(have, ",")
 }
 
+// keepAwakeCheck takes the sleep lock for a moment: does it hold here?
+func keepAwakeCheck(c config.Config) string {
+	if c.NoKeepAwake {
+		return "off (onefold config set keep-awake on)"
+	}
+	release, err := power.KeepAwake(power.Reason)
+	if err == nil {
+		time.Sleep(500 * time.Millisecond) // Linux: systemd-inhibit says no only after it starts
+		release()
+		err = errors.New(power.Problem())
+	}
+	if err.Error() != "" {
+		return "NOT available: " + err.Error()
+	}
+	return "works: the computer does not sleep on idle during a long run"
+}
+
 // cmdDoctor prints platform, workers and external tool availability.
 func cmdDoctor() {
 	fmt.Printf("%s  NumCPU=%d\n", versionLine(), runtime.NumCPU())
@@ -283,6 +303,7 @@ func cmdDoctor() {
 	} else {
 		fmt.Printf("time zone: %s (from %s)\n", l, src)
 	}
+	fmt.Printf("keep awake: %s\n", keepAwakeCheck(c))
 	if tools.Disabled() {
 		fmt.Println("external tools: DISABLED (ONEFOLD_NO_EXTERNAL=1)")
 	}

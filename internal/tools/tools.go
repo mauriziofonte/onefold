@@ -4,7 +4,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package tools is the registry of OPTIONAL external programs (exiftool,
-// ffprobe, ffmpeg, pdfinfo, pdftotext, antiword, 7z, unrar). Every caller has a
+// ffprobe, ffmpeg, pdfinfo, pdftotext, antiword, 7z, unrar; on Linux
+// systemd-inhibit, the sleep lock of internal/power). Every caller has a
 // pure-Go fallback or degrades gracefully when a tool is missing, which is the
 // normal case on Windows.
 //
