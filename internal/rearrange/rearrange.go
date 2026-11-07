@@ -613,12 +613,15 @@ func doMoves(root string, res *Result, workers int, tick func(), gate *runctl.Ga
 		ok1[i] = true
 	})
 	moved := map[string]string{}
+	var dirs fsx.DirSet // folders whose entries changed: flushed once each at the end
 	run(workers, len(res.Moves), func(i int) {
 		defer tick()
 		if !ok1[i] {
 			return
 		}
 		m := res.Moves[i]
+		dirs.Add(abs(root, m.Src))
+		dirs.Add(abs(root, m.Dst))
 		t := perf.Start()
 		if err := fsx.RenameNoReplace(abs(root, m.Tmp), abs(root, m.Dst)); err != nil {
 			// put it back where it was (its source is free: nobody targets a
@@ -636,6 +639,12 @@ func doMoves(root string, res *Result, workers int, tick func(), gate *runctl.Ga
 		moved[m.Src] = m.Dst
 		mu.Unlock()
 	})
+	// A rename lives in its folders' entries: without this flush a power cut
+	// could undo some of them after the journal already says they ran. The
+	// journal's resume still repairs that, but a finished run is final here.
+	if err := dirs.SyncAll(); err != nil {
+		res.Failed = append(res.Failed, "flushing the moved folders to disk: "+err.Error())
+	}
 	return moved
 }
 
@@ -875,7 +884,10 @@ func RecoverWith(journal string, undo bool, o RecoverOptions) (RecoverResult, er
 			tick()
 		}
 	}
+	var dirs fsx.DirSet
 	for _, st := range steps {
+		dirs.Add(abs(root, st.m.Src))
+		dirs.Add(abs(root, st.m.Dst))
 		if err := os.MkdirAll(filepath.Dir(st.want), 0o755); err != nil {
 			fail("move "+st.m.Src, err)
 			tick()
@@ -888,6 +900,9 @@ func RecoverWith(journal string, undo bool, o RecoverOptions) (RecoverResult, er
 		}
 		out.Moved++
 		tick()
+	}
+	if err := dirs.SyncAll(); err != nil {
+		fail("flush the moved folders", err)
 	}
 
 	// 3. folders emptied by the run (forward, completed, unless the run kept them)

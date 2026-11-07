@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/mauriziofonte/onefold/internal/catalog"
+	"github.com/mauriziofonte/onefold/internal/fsx"
 	"github.com/mauriziofonte/onefold/internal/merge"
 	"github.com/mauriziofonte/onefold/internal/sparsehash"
 	"github.com/mauriziofonte/onefold/internal/testfix"
@@ -349,5 +350,24 @@ func TestPurgeSpellings(t *testing.T) {
 	}
 	if fi, err := os.Stat(O); err != nil || !fi.IsDir() {
 		t.Fatalf("the output was removed: %v", err)
+	}
+}
+
+// A copy in the output that cannot be flushed to disk keeps its source: the
+// deletion would otherwise outlive the copy across a power cut.
+func TestPurgeNeedsDurableCopy(t *testing.T) {
+	root := testfix.TempDir(t)
+	A, O, r := mergeDesktop(t, root)
+	defer func(f func(string, *fsx.DirSet) error) { durable = f }(durable)
+	durable = func(string, *fsx.DirSet) error { return errors.New("injected flush failure") }
+	res, err := Run(Options{Items: r.Settled, Output: O, Rooms: r.Rooms[1:], Execute: true, Expect: -1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Deleted != 0 || len(res.Failed) != len(res.Candidates) {
+		t.Fatalf("deleted %d failed %d of %d", res.Deleted, len(res.Failed), len(res.Candidates))
+	}
+	if !strings.Contains(res.Failed[0], "flushed") || !exists(filepath.Join(A, "old copy.txt")) {
+		t.Fatalf("failed %v", res.Failed)
 	}
 }

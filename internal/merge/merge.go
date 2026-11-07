@@ -614,6 +614,7 @@ func execute(o Options, res *Result, out string) []catalog.Record {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	var copied []catalog.Record
+	var dirs fsx.DirSet // output folders that gained a file: flushed at the end
 	for w := 0; w < o.Workers; w++ {
 		wg.Add(1)
 		go func() {
@@ -643,6 +644,7 @@ func execute(o Options, res *Result, out string) []catalog.Record {
 					nr := c.Src
 					nr.Path, nr.Room, nr.Host, nr.ContentHash = dst, out, "output", content
 					copied = append(copied, nr)
+					dirs.Add(dst)
 					rep.Item(c.Size, time.Since(t0))
 				}
 				mu.Unlock()
@@ -658,6 +660,14 @@ func execute(o Options, res *Result, out string) []catalog.Record {
 	}
 	close(jobs)
 	wg.Wait()
+	// Each copy's bytes were flushed before its rename; the renames themselves
+	// live in the folders' entries, flushed once per folder here (not per
+	// file: thousands of small files share a few folders).
+	if !o.NoFsync {
+		if err := dirs.SyncAll(); err != nil {
+			rep.Event(fmt.Sprintf("WARN flushing the output folders: %v", err))
+		}
+	}
 	rep.Finish()
 	res.Copied = len(copied)
 	sort.Strings(res.Failed)

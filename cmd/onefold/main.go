@@ -22,6 +22,7 @@ import (
 
 	"github.com/mauriziofonte/onefold/internal/catalog"
 	"github.com/mauriziofonte/onefold/internal/config"
+	"github.com/mauriziofonte/onefold/internal/fsx"
 	"github.com/mauriziofonte/onefold/internal/materialize"
 	"github.com/mauriziofonte/onefold/internal/meta"
 	"github.com/mauriziofonte/onefold/internal/plan"
@@ -603,6 +604,7 @@ func cmdExportText(args []string) {
 		mu                            sync.Mutex
 		wrote, skipped, empty, failed int
 		wg                            sync.WaitGroup
+		dirs                          fsx.DirSet
 	)
 	jobs := make(chan plan.Action)
 	for w := 0; w < n; w++ {
@@ -620,6 +622,7 @@ func cmdExportText(args []string) {
 					skipped++
 				default:
 					wrote++
+					dirs.Add(r.Dst)
 					if r.Empty {
 						empty++
 					}
@@ -633,6 +636,10 @@ func cmdExportText(args []string) {
 	}
 	close(jobs)
 	wg.Wait()
+	if err := dirs.SyncAll(); err != nil {
+		failed++
+		fmt.Fprintf(os.Stderr, "ERR flushing the target folders to disk: %v\n", err)
+	}
 	meta.CloseExifReaders() // exiftool readers do not exit with onefold
 	fmt.Printf("export-text: %d eligible, %d written (%d without extractable text), %d skipped (exist), %d errors\n",
 		len(todo), wrote, empty, skipped, failed)
