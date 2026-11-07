@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mauriziofonte/onefold/internal/fsx"
+	"github.com/mauriziofonte/onefold/internal/hashcache"
 	"github.com/mauriziofonte/onefold/internal/kinds"
 	"github.com/mauriziofonte/onefold/internal/runctl"
 	"github.com/mauriziofonte/onefold/internal/sparsehash"
@@ -27,6 +28,7 @@ const (
 
 type cand struct {
 	path string
+	key  string // hashcache identity ("" = not cached)
 	size int64
 	hash string
 }
@@ -50,6 +52,10 @@ func (s *scan) duplicates() (*Dups, error) {
 	seen := map[inodeKey]bool{}
 	for _, root := range s.o.Roots {
 		err := s.walkRoot(root, seen, false, nopProgress{}, func(path string, size int64, fi fs.FileInfo, _ fileSys) {
+			key := ""
+			if s.o.Cache != nil {
+				key = hashcache.KeyOf(path, fi)
+			}
 			if size < s.o.DupMin || (!s.o.ReadOnlineOnly && fsx.OnlineOnly(fi)) {
 				return
 			}
@@ -60,7 +66,7 @@ func (s *scan) duplicates() (*Dups, error) {
 				return
 			}
 			mu.Lock()
-			cands = append(cands, cand{path: path, size: size})
+			cands = append(cands, cand{path: path, key: key, size: size})
 			mu.Unlock()
 		})
 		if err != nil {
@@ -84,9 +90,17 @@ func (s *scan) duplicates() (*Dups, error) {
 	prog.TotalKnown()
 
 	// sample digest of every candidate
+	hits0 := s.o.Cache.Hits()
 	errs := s.hashAll(cands, prog, func(c *cand) error {
+		if h, _, ok := s.o.Cache.Sparse(c.key, 0, 0); ok {
+			c.hash = h
+			return nil
+		}
 		r, err := sparsehash.HashFile(c.path, 0, 0)
 		c.hash = r.Hex
+		if err == nil {
+			s.o.Cache.PutSparse(c.key, 0, 0, r)
+		}
 		return err
 	})
 	d.Errors += errs
@@ -101,8 +115,15 @@ func (s *scan) duplicates() (*Dups, error) {
 			members = append(members, g...)
 		}
 		errs := s.hashAll(members, nopProgress{}, func(c *cand) error {
+			if h, ok := s.o.Cache.Full(c.key); ok {
+				c.hash = h
+				return nil
+			}
 			h, err := sparsehash.FullFile(c.path)
 			c.hash = h
+			if err == nil {
+				s.o.Cache.PutFull(c.key, h)
+			}
 			return err
 		})
 		d.Errors += errs
@@ -113,6 +134,7 @@ func (s *scan) duplicates() (*Dups, error) {
 		verified = true
 	}
 	summarize(d, groups, verified, s.o.Top)
+	d.Cached = s.o.Cache.Hits() - hits0
 	return d, nil
 }
 

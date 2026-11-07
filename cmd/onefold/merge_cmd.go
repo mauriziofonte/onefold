@@ -16,6 +16,7 @@ import (
 
 	"github.com/mauriziofonte/onefold/internal/catalog"
 	"github.com/mauriziofonte/onefold/internal/config"
+	"github.com/mauriziofonte/onefold/internal/hashcache"
 	"github.com/mauriziofonte/onefold/internal/kinds"
 	"github.com/mauriziofonte/onefold/internal/merge"
 	"github.com/mauriziofonte/onefold/internal/meta"
@@ -127,7 +128,9 @@ func cmdMerge(args []string) {
 	perf.Meta("catalogWorkers", o.Catalog.Workers)
 	perf.Meta("copyWorkers", o.Workers)
 	perf.Meta("tools", toolsSummary())
+	o.Catalog.Cache = hashcache.Open()
 	res, err := merge.Run(o)
+	o.Catalog.Cache.Close()
 	if err != nil {
 		printPerf()
 		fatal(1, err)

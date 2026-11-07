@@ -42,6 +42,7 @@ onefold is a single static Go binary that deduplicates photo/video archives and 
 | `internal/stats` | `stats` and the GUI Statistics view: files and bytes per family (`kinds.Family`), category, extension, year, size band, folder tree, largest files; duplicates (sampled or full content) with wasted space and folder pairs; volume list. Read-only |
 | `internal/materialize`, `internal/textexport`, `internal/remote` | golden copy + metadata stamping; text sidecars; pure-Go SFTP push |
 | `internal/sparsehash`, `internal/scan` | XXH128 sparse/full digests; `index` throughput probe |
+| `internal/hashcache` | digests of unchanged files across runs (`<state dir>/hashes.tsv`): sampled digests for catalog, both for stats reports; never for verification or before a deletion |
 | `internal/report`, `internal/planreport`, `internal/perf` | progress output (stdout = results, stderr = progress); plan report; `-perf` telemetry |
 | `internal/gui` | local GUI: HTTP server on 127.0.0.1 (one-time link -> session cookie, CSP), job manager with runs persisted in the per-user state dir, guided setup (quick scan + real preview on a sample, recipes), WebView2 window on Windows / browser elsewhere |
 | `internal/gui/web` | Svelte 5 + Vite frontend (English/Italian); `dist/` is committed and embedded, so Go builds never need Node; `TestWebDistInSync` fails when it is stale |

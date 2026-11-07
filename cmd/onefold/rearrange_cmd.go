@@ -12,6 +12,7 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/mauriziofonte/onefold/internal/hashcache"
 	"github.com/mauriziofonte/onefold/internal/rearrange"
 	"github.com/mauriziofonte/onefold/internal/report"
 	"github.com/mauriziofonte/onefold/internal/settings"
@@ -111,7 +112,9 @@ func cmdRearrange(args []string) {
 	}
 	cf.hash(&o.Catalog)
 	o.Execute, o.Log, o.Heartbeat = *execute, report.Writer, *heartbeat
+	o.Catalog.Cache = hashcache.Open()
 	res, err := rearrange.Run(o)
+	o.Catalog.Cache.Close()
 	if err != nil {
 		printPerf()
 		fatal(1, err)

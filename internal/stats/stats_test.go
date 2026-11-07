@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mauriziofonte/onefold/internal/hashcache"
 	"github.com/mauriziofonte/onefold/internal/kinds"
 	"github.com/mauriziofonte/onefold/internal/testfix"
 )
@@ -234,5 +235,40 @@ func TestOnlineOnlyNotRead(t *testing.T) {
 	}
 	if r, err = Run(Options{Roots: []string{root}, Dups: DupsFull, ReadOnlineOnly: true}); err != nil || r.Dups.Groups != 1 {
 		t.Fatalf("ReadOnlineOnly: %v, groups %d", err, r.Dups.Groups)
+	}
+}
+
+// With the hash cache a second measurement reads no candidate again and
+// finds the same duplicates; a changed file is read again.
+func TestDupsHashCache(t *testing.T) {
+	root := testfix.TempDir(t)
+	mt := time.Date(2020, 1, 2, 3, 4, 5, 0, time.Local)
+	put(t, root, "a/x.bin", "same bytes", mt)
+	put(t, root, "b/x.bin", "same bytes", mt)
+	other := put(t, root, "c/y.bin", "else bytes", mt)
+	cache, err := hashcache.OpenAt(filepath.Join(t.TempDir(), hashcache.FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cache.Close()
+	// run 1: the whole-content digests of the 2 copies are their sampled ones
+	// (small files are read whole); run 2: 3 sampled + 2 whole-content digests
+	for i, wantCached := range []int64{2, 5} {
+		r, err := Run(Options{Roots: []string{root}, Dups: DupsFull, Cache: cache})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.Dups.Groups != 1 || r.Dups.Extra != 1 || r.Dups.Cached != wantCached {
+			t.Fatalf("run %d: groups %d extra %d cached %d (want %d)", i, r.Dups.Groups, r.Dups.Extra, r.Dups.Cached, wantCached)
+		}
+	}
+	time.Sleep(20 * time.Millisecond)
+	put(t, root, "c/y.bin", "same bytes", mt) // now a third copy, same size and mtime
+	r, err := Run(Options{Roots: []string{root}, Dups: DupsFull, Cache: cache})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Dups.Extra != 2 {
+		t.Fatalf("a changed file was served from the cache: extra %d (%s)", r.Dups.Extra, other)
 	}
 }

@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mauriziofonte/onefold/internal/hashcache"
 	"github.com/mauriziofonte/onefold/internal/kinds"
 	"github.com/mauriziofonte/onefold/internal/testfix"
 )
@@ -353,4 +354,42 @@ func TestOnlineOnlyRule(t *testing.T) {
 	}
 	recs, _ = run(t, []string{room}, o)
 	eq(t, rels(room, recs), []string{"cloud.txt", "here.txt"})
+}
+
+// The hash cache: a second catalog of unchanged files takes the sampled
+// digests of large files from it and gives the same records; a digest that
+// read a whole file is never served from it.
+func TestHashCache(t *testing.T) {
+	room := testfix.TempDir(t)
+	big := make([]byte, 1<<20)
+	for i := range big {
+		big[i] = byte(i % 251) // NUL bytes: binary, sampled, not read whole
+	}
+	if err := testfix.File(filepath.Join(room, "big.bin"), string(big), t0); err != nil {
+		t.Fatal(err)
+	}
+	if err := testfix.File(filepath.Join(room, "notes.txt"), strings.Repeat("text line\n", 4000), t0); err != nil {
+		t.Fatal(err)
+	}
+	cache, err := hashcache.OpenAt(filepath.Join(t.TempDir(), hashcache.FileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	o, err := Filters{NoSweep: true}.Options("all")
+	if err != nil {
+		t.Fatal(err)
+	}
+	o.WholeMax, o.Cache = 1<<10, cache
+	first, _ := run(t, []string{room}, o)
+	if cache.Hits() != 0 {
+		t.Fatalf("hits on the first run: %d", cache.Hits())
+	}
+	second, _ := run(t, []string{room}, o)
+	if canon(first) != canon(second) {
+		t.Fatalf("records differ with the cache:\n%s\n%s", canon(first), canon(second))
+	}
+	if cache.Hits() != 1 { // big.bin only: notes.txt was read whole (a text file)
+		t.Fatalf("cache hits %d, want 1", cache.Hits())
+	}
+	cache.Close()
 }
