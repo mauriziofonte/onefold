@@ -7,7 +7,10 @@
 
 <script>
   // A donut chart of slices {key, value, color, label}; a click selects a slice.
-  let { slices = [], selected = '', onselect = () => {}, center = '', sub = '', size = 220 } = $props();
+  import ChartTable from './ChartTable.svelte';
+  import { t } from '../../lib/i18n.svelte.js';
+
+  let { slices = [], selected = '', onselect = () => {}, center = '', sub = '', size = 220, name = '' } = $props();
   let hover = $state('');
 
   const total = $derived(slices.reduce((s, x) => s + x.value, 0));
@@ -31,10 +34,11 @@
     return out;
   });
   const shown = $derived(slices.find((s) => s.key === (hover || selected)));
+  const summary = $derived([sub, center, ...slices.filter((s) => s.value).slice(0, 3).map((s) => `${s.label} ${s.share}`)].filter(Boolean).join(', '));
 </script>
 
 <div class="relative" style="width:{size}px;height:{size}px">
-  <svg viewBox="-1.08 -1.08 2.16 2.16" width={size} height={size} role="img">
+  <svg viewBox="-1.08 -1.08 2.16 2.16" width={size} height={size} role="group" aria-label={summary}>
     {#each arcs as s (s.key)}
       <path
         d={s.d}
@@ -64,3 +68,4 @@
     {/if}
   </div>
 </div>
+<ChartTable head={[name || t('chart.col.name'), t('chart.col.value'), t('chart.col.share')]} rows={slices.filter((s) => s.value).map((s) => [s.label, s.text, s.share])} testid="donut-table" />

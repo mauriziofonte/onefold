@@ -36,6 +36,7 @@ export const defaults = () => ({
   logFilter: 'all',
   pickerLast: '',
   notice: '', // a one-time notice key (settings migrated)
+  notify: false, // a system notification when a job ends (lib/notify.js)
   wizard: wizardDefaults(),
   merge: {
     inputs: [], output: '', ...namingCfg(), filters: filters(),

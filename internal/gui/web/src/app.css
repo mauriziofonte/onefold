@@ -19,6 +19,79 @@
   --color-brand-700: #0c5f59;
   --color-brand-800: #0b4d48;
   --color-brand-900: #0a3f3b;
+  /* the two lighter text grays, darker than Tailwind's so that hints and
+     muted text reach 4.5:1 on white and on the light grays (WCAG AA) */
+  --color-slate-400: #5d6e87;
+  --color-slate-500: #526379;
+}
+
+/*
+ * Dark, from the system setting (prefers-color-scheme): the scales turn around
+ * their middle, so a light tint (50-300: page, hover, borders, soft badges)
+ * becomes a dark one and a text shade (400-900) a light one. "white" is the
+ * surface of cards and inputs, and stays the text on a solid accent, which is
+ * light here. Every value is derived from the brand teal and the slate grays,
+ * and each text pair the GUI uses keeps the WCAG AA contrast (4.5:1), checked
+ * by axe-core in the end-to-end test.
+ */
+:root {
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-white: #121b2c;
+    --color-slate-50: #0b1220;
+    --color-slate-100: #1b2638;
+    --color-slate-200: #27344a;
+    --color-slate-300: #36445c;
+    --color-slate-400: #8794a8;
+    --color-slate-500: #9ba7b9;
+    --color-slate-600: #b3becd;
+    --color-slate-700: #c9d2de;
+    --color-slate-800: #e1e7ef;
+    --color-slate-900: #f1f5f9;
+    --color-slate-950: #f8fafc;
+    --color-brand-50: #0c2b29;
+    --color-brand-100: #0f3a36;
+    --color-brand-200: #155249;
+    --color-brand-300: #1d6e64;
+    --color-brand-400: #3c9a8d;
+    --color-brand-500: #4fae9f;
+    --color-brand-600: #67c0b2;
+    --color-brand-700: #8fd3c7;
+    --color-brand-800: #b4e3db;
+    --color-brand-900: #d9f2ee;
+    --color-amber-50: #2b1f0a;
+    --color-amber-100: #3b2a0c;
+    --color-amber-200: #5e4413;
+    --color-amber-300: #80601a;
+    --color-amber-400: #e5a823;
+    --color-amber-500: #f2b84b;
+    --color-amber-600: #f6c560;
+    --color-amber-700: #f8cf72;
+    --color-amber-800: #fadb8f;
+    --color-amber-900: #fde9b8;
+    --color-rose-50: #2e1118;
+    --color-rose-100: #3f1621;
+    --color-rose-200: #6a2234;
+    --color-rose-300: #8d2f46;
+    --color-rose-400: #e8677e;
+    --color-rose-500: #f07a8f;
+    --color-rose-600: #f58a9c;
+    --color-rose-700: #f8a3b1;
+    --color-rose-800: #fbc0c9;
+    --color-rose-900: #fddbe0;
+    --color-emerald-50: #0b2b21;
+    --color-emerald-100: #0e3a2c;
+    --color-emerald-200: #165a44;
+    --color-emerald-300: #1e7a5c;
+    --color-emerald-400: #34c08f;
+    --color-emerald-500: #3fcf9c;
+    --color-emerald-600: #5fdcaf;
+    --color-emerald-700: #7fe3bf;
+    --color-emerald-800: #a8eed4;
+    --color-emerald-900: #d0f7e8;
+  }
 }
 
 @utility nav-btn {
@@ -165,4 +238,4 @@
 .indeterminate { animation: indet 1.4s ease-in-out infinite; }
 @keyframes indet { 0% { margin-left: -30%; } 100% { margin-left: 100%; } }
 .scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: var(--color-slate-300); border-radius: 4px; }

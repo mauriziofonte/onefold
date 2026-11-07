@@ -6,9 +6,19 @@
 -->
 
 <script>
-  import { Settings, Save, ScrollText, Info, Clock } from '@lucide/svelte';
+  import { Settings, Save, ScrollText, Info, Clock, Bell } from '@lucide/svelte';
   import { store, saveConfig, flash } from '../lib/store.svelte.js';
+  import { settings, save as saveSettings } from '../lib/settings.svelte.js';
   import { t } from '../lib/i18n.svelte.js';
+  import { ask, permission } from '../lib/notify.js';
+
+  // notifications belong to this browser (its permission), not to the config file
+  let perm = $state(permission());
+  async function toggleNotify(on) {
+    if (on) perm = await ask();
+    settings.notify = on && perm === 'granted';
+    saveSettings();
+  }
 
   // the form follows the saved config; Save writes it back (validated by the server)
   let form = $state({ artist: '', signature: '', language: '', timezone: '', dateOrder: '', namesLanguage: '', photoDateFallback: false, keepAwake: true, lowPriority: false, diagLog: false });
@@ -86,6 +96,11 @@
       </div>
       <p class="hint flex items-start gap-1.5"><Info size={14} class="mt-0.5 shrink-0" />{t('config.where', { path: c.path })}</p>
     </form>
+    <div class="card space-y-2" data-testid="config-notify">
+      <div class="card-h"><Bell size={16} />{t('config.notify')}</div>
+      <label class="chk"><input type="checkbox" checked={settings.notify} disabled={perm === 'unsupported'} onchange={(e) => toggleNotify(e.currentTarget.checked)} data-testid="config-notify-on" />{t('config.notifyLabel')}</label>
+      <p class="hint">{perm === 'unsupported' ? t('config.notifyUnsupported') : perm === 'denied' ? t('config.notifyDenied') : t('config.notifyHint')}</p>
+    </div>
     <div class="card space-y-1 text-sm text-slate-600">
       <div class="card-h"><Info size={16} />{t('config.about')}</div>
       <p>onefold {store.info?.version} · {t('config.license')}</p>

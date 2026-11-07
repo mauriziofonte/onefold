@@ -11,7 +11,7 @@
   import { onMount } from 'svelte';
   import { store, init, jobsSorted } from './lib/store.svelte.js';
   import { settings, save } from './lib/settings.svelte.js';
-  import { t, setLang, lang, LANGS } from './lib/i18n.svelte.js';
+  import { t, setLang, lang, LANGS, LANG_NAMES } from './lib/i18n.svelte.js';
   import { api } from './lib/api.js';
   import JobBar from './components/JobBar.svelte';
   import LogDrawer from './components/LogDrawer.svelte';
@@ -107,10 +107,10 @@
       </div>
     {/if}
     <div class="ml-auto flex items-center gap-3">
-      {#if ready && !store.connected}<span class="flex items-center gap-1 text-xs text-amber-600"><WifiOff size={14} />{t('header.offline')}</span>{/if}
+      {#if ready && !store.connected}<span class="flex items-center gap-1 text-xs text-amber-700"><WifiOff size={14} />{t('header.offline')}</span>{/if}
       <div class="flex overflow-hidden rounded-lg border border-slate-300 text-xs" role="group" aria-label={t('header.lang')} data-testid="lang-switch">
         {#each LANGS as l (l)}
-          <button class="px-2 py-1 {lang.current === l ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}" onclick={() => chooseLang(l)}>{l.toUpperCase()}</button>
+          <button class="px-2 py-1 {lang.current === l ? 'bg-slate-800 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}" title={LANG_NAMES[l]} aria-pressed={lang.current === l} lang={l} onclick={() => chooseLang(l)}>{l.slice(0, 2).toUpperCase()}</button>
         {/each}
       </div>
     </div>
@@ -134,7 +134,7 @@
       <div class="mt-auto rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs leading-relaxed text-slate-500">{@html t('nav.note')}</div>
     </nav>
 
-    <main class="scroll-thin flex-1 overflow-auto p-6">
+    <main class="scroll-thin flex-1 overflow-auto p-6" tabindex="0">
       {#if error}
         <div class="banner border-rose-200 bg-rose-50 text-rose-800"><CircleAlert size={16} />{error}</div>
       {:else if ready}
@@ -147,7 +147,7 @@
         {#if settings.notice}
           <div class="banner mx-auto mb-4 max-w-6xl border-brand-200 bg-brand-50 text-brand-800" data-testid="notice">
             <Info size={16} class="shrink-0" /><span class="flex-1">{t(settings.notice)}</span>
-            <button class="icon-btn" onclick={() => (settings.notice = '')}><X size={14} /></button>
+            <button class="icon-btn" title={t('job.dismiss')} onclick={() => (settings.notice = '')}><X size={14} /></button>
           </div>
         {/if}
         {#if settings.view === 'wizard'}<Wizard {presets} />
@@ -169,7 +169,7 @@
   {#if store.toast}
     <div class="fixed right-4 bottom-14 z-40 flex max-w-lg items-start gap-2 rounded-lg border bg-white p-3 text-sm shadow-lg {store.toastOk ? 'border-emerald-200 text-emerald-700' : 'border-rose-200 text-rose-700'}" data-testid="toast">
       {#if store.toastOk}<CircleCheck size={16} class="mt-0.5 shrink-0" />{:else}<CircleAlert size={16} class="mt-0.5 shrink-0" />{/if}<span class="flex-1">{store.toast}</span>
-      <button class="icon-btn" onclick={() => (store.toast = '')}><X size={14} /></button>
+      <button class="icon-btn" title={t('job.dismiss')} onclick={() => (store.toast = '')}><X size={14} /></button>
     </div>
   {/if}
 </div>

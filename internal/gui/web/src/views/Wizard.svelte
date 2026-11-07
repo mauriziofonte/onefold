@@ -310,7 +310,7 @@
                 <div class="flex flex-wrap gap-1.5">
                   {#each f.chips as p, i (p)}
                     <button class="rounded-lg border px-2.5 py-1 text-sm {w.choice[f.key] === p ? 'border-brand-600 bg-brand-50 font-medium text-brand-700' : 'border-slate-200 hover:border-brand-200'}" onclick={() => (w.choice[f.key] = p)}>
-                      {t('preset.' + p)}{#if i === 0}<span class="ml-1 text-[10px] text-emerald-600">{t('wizard.recommended')}</span>{/if}
+                      {t('preset.' + p)}{#if i === 0}<span class="ml-1 text-[10px] text-emerald-700">{t('wizard.recommended')}</span>{/if}
                     </button>
                   {/each}
                   <select class="rounded-lg border border-slate-200 px-2 py-1 text-sm" value="" onchange={(e) => { if (e.currentTarget.value) w.choice[f.key] = e.currentTarget.value; }}>
@@ -378,7 +378,7 @@
           {/if}
           <div>
             <span class="lbl">{t('wizard.sum.cli')}</span>
-            <pre class="mt-1 rounded-lg bg-slate-900 p-3 font-mono text-xs break-all whitespace-pre-wrap text-slate-100" data-testid="wizard-cli">{cli}</pre>
+            <pre class="mt-1 rounded-lg bg-slate-900 p-3 font-mono text-xs break-all whitespace-pre-wrap text-slate-100 dark:bg-black/50 dark:text-slate-800" data-testid="wizard-cli">{cli}</pre>
             <button class="btn-ghost btn-sm mt-1" onclick={copyCli}><Copy size={12} />{t('wizard.copy')}</button>
           </div>
           <div>

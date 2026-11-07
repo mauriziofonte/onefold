@@ -3,11 +3,16 @@
 // Copyright (c) 2026 Maurizio Fonte
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import en from './locales/en.js';
-import it from './locales/it.js';
+// The strings of every language, one JSON file each; en.json is the source
+// and the fallback of a missing key.
+import en from './locales/en.json';
+import it from './locales/it.json';
 
 const dicts = { en, it };
 export const LANGS = ['en', 'it'];
+
+// the language names in the switch, each in its own language
+export const LANG_NAMES = { en: 'English', it: 'Italiano' };
 
 // lang.current is reactive: components re-render when the language changes.
 export const lang = $state({ current: 'en' });

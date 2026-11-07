@@ -103,12 +103,12 @@
       <button class="flex items-center gap-1 px-2 py-1 {view.view !== 'tree' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600'}" onclick={() => (view.view = 'list')} data-testid="view-list"><List size={12} />{t('plan.viewList')}</button>
       <button class="flex items-center gap-1 px-2 py-1 {view.view === 'tree' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600'}" onclick={() => (view.view = 'tree')} data-testid="view-tree"><FolderTree size={12} />{t('plan.viewTree')}</button>
     </div>
-    <select class="input w-auto py-1 text-xs" bind:value={ext} onchange={() => (offset = 0)} data-testid="ext-filter">
+    <select class="input w-auto py-1 text-xs" bind:value={ext} onchange={() => (offset = 0)} aria-label={t('plan.allExt')} data-testid="ext-filter">
       <option value="">{t('plan.allExt')}</option>
       {#each exts as [e, n] (e)}<option value={e}>{e ? '.' + e : t('plan.noExt')} ({num(n)})</option>{/each}
     </select>
     {#if view.view !== 'tree'}
-      <select class="input w-auto py-1 text-xs" bind:value={view.sort} onchange={() => (offset = 0)} data-testid="sort">
+      <select class="input w-auto py-1 text-xs" bind:value={view.sort} onchange={() => (offset = 0)} aria-label={t('plan.sortPlan')} data-testid="sort">
         <option value="">{t('plan.sortPlan')}</option>
         <option value="src">{t('plan.sortSrc')}</option>
         <option value="dst">{t('plan.sortDst')}</option>

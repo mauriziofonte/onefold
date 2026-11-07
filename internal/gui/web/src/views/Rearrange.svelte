@@ -102,8 +102,8 @@
   </div>
 
   <div class="flex gap-1 border-b border-slate-200" role="tablist" data-testid="mode-tabs">
-    <button class="tab flex items-center gap-1.5" class:tab-on={cfg.tab !== 'plan'} onclick={() => (cfg.tab = 'settings')} data-testid="tab-settings"><SlidersHorizontal size={14} />{t('plan.tabSettings')}</button>
-    <button class="tab flex items-center gap-1.5" class:tab-on={cfg.tab === 'plan'} onclick={() => (cfg.tab = 'plan')} data-testid="tab-plan"><ListChecks size={14} />{t('plan.tabPlan')}{#if hasPreview}<span class="tab-n">{num(s.moves || 0)}</span>{/if}</button>
+    <button class="tab flex items-center gap-1.5" class:tab-on={cfg.tab !== 'plan'} role="tab" aria-selected={cfg.tab !== 'plan'} onclick={() => (cfg.tab = 'settings')} data-testid="tab-settings"><SlidersHorizontal size={14} />{t('plan.tabSettings')}</button>
+    <button class="tab flex items-center gap-1.5" class:tab-on={cfg.tab === 'plan'} role="tab" aria-selected={cfg.tab === 'plan'} onclick={() => (cfg.tab = 'plan')} data-testid="tab-plan"><ListChecks size={14} />{t('plan.tabPlan')}{#if hasPreview}<span class="tab-n">{num(s.moves || 0)}</span>{/if}</button>
   </div>
 
   {#if cfg.tab !== 'plan'}

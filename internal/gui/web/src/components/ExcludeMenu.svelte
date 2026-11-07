@@ -27,16 +27,16 @@
   <button class="icon-btn" title={t('plan.exclude')} onclick={() => (open = !open)} data-testid="row-exclude"><Ban size={14} /></button>
   {#if open}
     <div class="absolute right-0 z-20 mt-1 w-96 max-w-[70vw] rounded-lg border border-slate-200 bg-white p-1 text-left text-xs shadow-lg" role="menu">
-      <button class="block w-full rounded px-2 py-1.5 text-left hover:bg-slate-100" onclick={() => pick({ path })} data-testid="exclude-file">{t('plan.excludeFile')}</button>
+      <button role="menuitem" class="block w-full rounded px-2 py-1.5 text-left hover:bg-slate-100" onclick={() => pick({ path })} data-testid="exclude-file">{t('plan.excludeFile')}</button>
       {#each folders as d (d)}
-        <button class="block w-full rounded px-2 py-1.5 text-left hover:bg-slate-100" onclick={() => pick({ path: d })} data-testid="exclude-folder">
+        <button role="menuitem" class="block w-full rounded px-2 py-1.5 text-left hover:bg-slate-100" onclick={() => pick({ path: d })} data-testid="exclude-folder">
           {t('plan.excludeFolder')} <span class="font-mono text-slate-600">{relTo(d, room) || d}</span>
         </button>
       {/each}
       {#if content}
-        <button class="block w-full rounded border-t border-slate-100 px-2 py-1.5 text-left hover:bg-slate-100" onclick={() => pick({ contentOf: path })} data-testid="exclude-content">{t('plan.excludeContent')}</button>
+        <button role="menuitem" class="block w-full rounded border-t border-slate-100 px-2 py-1.5 text-left hover:bg-slate-100" onclick={() => pick({ contentOf: path })} data-testid="exclude-content">{t('plan.excludeContent')}</button>
       {/if}
-      <button class="block w-full rounded px-2 py-1.5 text-left text-slate-400 hover:bg-slate-100" onclick={() => (open = false)}>{t('common.cancel')}</button>
+      <button role="menuitem" class="block w-full rounded px-2 py-1.5 text-left text-slate-400 hover:bg-slate-100" onclick={() => (open = false)}>{t('common.cancel')}</button>
     </div>
   {/if}
 </div>
