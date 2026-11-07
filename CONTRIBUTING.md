@@ -12,6 +12,10 @@ Everything here assumes you have read the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 Never attach personal photos, documents or full file listings. Describe the files, or rename paths in log excerpts.
 
+## Translating
+
+The GUI's texts are one JSON file per language. [TRANSLATING.md](TRANSLATING.md) explains what a translation must keep and how to add a language.
+
 ## Contributing code
 
 ### Before you start

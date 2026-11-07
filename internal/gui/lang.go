@@ -11,8 +11,12 @@ import (
 	"strings"
 )
 
-// PreferredLang picks the UI language from an Accept-Language header: Italian
-// when the most preferred language is Italian, English otherwise.
+// Langs are the languages of the GUI (internal/gui/web/src/lib/locales).
+var Langs = []string{"en", "it", "es", "fr", "de", "pt-BR"}
+
+// PreferredLang picks the UI language from an Accept-Language header: the
+// most preferred one the GUI has (any Portuguese: the Brazilian translation),
+// English otherwise.
 func PreferredLang(header string) string {
 	type tag struct {
 		lang string
@@ -40,8 +44,19 @@ func PreferredLang(header string) string {
 		return "en"
 	}
 	sort.SliceStable(tags, func(a, b int) bool { return tags[a].q > tags[b].q })
-	if primary, _, _ := strings.Cut(tags[0].lang, "-"); primary == "it" {
-		return "it"
+	for _, t := range tags {
+		if t.q <= 0 {
+			break
+		}
+		primary, _, _ := strings.Cut(t.lang, "-")
+		if primary == "pt" {
+			return "pt-BR"
+		}
+		for _, l := range Langs {
+			if l == primary {
+				return l
+			}
+		}
 	}
 	return "en"
 }

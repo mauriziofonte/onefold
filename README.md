@@ -133,7 +133,7 @@ The same merge recorded on the Windows and macOS machines of the CI (the window 
 - **Plan review**: after a preview the Plan tab lists every file (or groups them by folder, with counts and sizes), sorted and filtered by extension. Leave out a file, a folder or a pattern such as `*.data` from there: the plan updates at once, without scanning the disks again. Folders that look like driver or installer packages are pointed out, with a button to leave them all out.
 - **After a merge**, "Purge the sources" deletes from the input folders the files that are now in the output (with a preview, the typed count, and the Recycle Bin or Trash as an option).
 - **Long runs**: progress is always visible at the top, errors and warnings in the log panel at the bottom. Pause, resume or stop at any time. Runs are saved: one cut by a stop or by switching the computer off is listed under Runs and resumes where it was.
-- **English and Italian** (switch at the top right; the default follows the browser language). Folders and options are remembered.
+- **Six languages**: English, Italian, Spanish, French, German and Brazilian Portuguese (switch at the top right; the default follows the browser language). Folders and options are remembered. [TRANSLATING.md](TRANSLATING.md) says how to add or improve one.
 - **Config page**: the owner, comment and video language written into photo and video copies, the time zone, how dates in file names are read, and on Windows a switch for the diagnostic log.
 
 ## Merge folders
