@@ -127,15 +127,17 @@ The only files onefold writes are:
 | `golden-index -o`, `match -o/-report`, `similar -o`, `reclaim -o/-script`, `seed -o/-list`, `stats -json`, `dedupe -script/-json` | the named files |
 | `dedupe -execute -expect N` | the extra copies inside its folders (to the Trash, or replaced by a hard link or a clone of the copy that stays), plus its journal in `<state dir>/dedupe/` |
 | `backup -execute SRC DST` | new files in DST, plus `DST/.onefold/` |
+| `backup -restore -execute -expect N -tree G DST` | the damaged or missing files of G or DST (from the other side), the replaced ones kept in `<side>/.onefold/damaged/`, plus its journal in `<state dir>/restore/` |
 | GUI | its state dir; and what the mode it runs writes |
 | `config set` | `<state dir>/config.json` |
 | `tools install` | `<state dir>/tools/` (Windows) |
 
-Three operations delete or replace files in the folders they are given, each only when asked explicitly, each a dry run by default:
+Four operations delete or replace files in the folders they are given, each only when asked explicitly, each a dry run by default:
 
 - `rearrange -execute` renames files inside its root and deletes duplicates confirmed on their full content (keeper and duplicate re-read right before the deletion). Every run writes an fsync'ed journal first; moves can be undone.
 - `purge-sources -execute -expect N` deletes the input files of an executed merge whose copy in the output is read again in full and found equal right before, after the user typed the number of files the preview listed. It is journaled. With `-trash` the files go to the Recycle Bin (Windows) or the Trash (macOS, Linux).
 - `dedupe -execute -expect N` acts on the extra copies of groups of identical files (section 16.7): each is read again in full with the copy that stays and both must hold the group's content right before; it goes to the Recycle Bin / Trash, or is replaced by a hard link or a clone of the copy that stays (the name keeps the same bytes; a replacement steps the original aside and removes it only after the new file holds the name). Nothing is deleted for good; the run is journaled and the typed count is the one of the dry run. `-action script` deletes nothing: it writes a script the user may run.
+- `backup -restore -execute -expect N` puts back the files of a tree or of its backup copy that no longer hold the content the backup recorded (section 16.3), from the other side. Right before each repair the healthy file is read again in full and must still hold the recorded content, and the damaged one is read again (a file that reads as recorded is left alone). The healthy bytes are copied next to the name and read back first; the damaged file steps aside into `<side>/.onefold/damaged/<run>/<path>` and is never deleted. Journaled in `<state dir>/restore/`, `-resume` finishes an interrupted run; the typed count is the one of the dry run.
 
 `reclaim` never deletes: it writes a script the user may run.
 
@@ -145,7 +147,7 @@ Three operations delete or replace files in the folders they are given, each onl
 - `apply` and `export-text` skip a destination that exists (silvering changes the size, so the test is existence, not size). Running them again finishes an interrupted run.
 - `merge` never moves, renames, overwrites or deletes an existing output file; it deletes only its own `*.onefold-tmp` leftovers.
 - `push` never overwrites a remote file: same size = skipped (resume), different size = conflict (listed, exit 1).
-- `backup` never replaces a file of the copy: another file under the same path is a conflict.
+- `backup` never replaces a file of the copy: another file under the same path is a conflict. Only `backup -restore` replaces, and only a file proven damaged against the recorded hash (section 3.1).
 - Published names are durable: a file's bytes are flushed before its rename, and at the end of a run every folder that gained or lost a name is flushed once (`fsx.DirSet`): `merge` (unless `-no-fsync`), `apply`, `export-text`, `backup` (before its manifest) and `rearrange` (after its moves, and after a resume or undo). A deletion that relies on another copy flushes that copy and its folder first (`purge-sources`, section 18.2).
 
 ### 3.3 Duplicates are proven, not guessed
@@ -263,7 +265,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 | `internal/textexport` | text sidecars | `Export`, `Extract` |
 | `internal/similar` | look-alike review lists | `Find`, `FindDocs`, `DHash` |
 | `internal/reclaim` | verified drops, deletion script | `Check`, `Script` |
-| `internal/backup` | cold copy and audit | `Run`, `Check` |
+| `internal/backup` | cold copy, audit, tree health and restore | `Run`, `Check`, `Compare`, `Restore`, `ResumeRestore` |
 | `internal/seed` | rsync/robocopy scripts | `Collect`, `Rsync`, `Robocopy` |
 | `internal/remote` | SFTP push | `Dial`, `Client.UploadTree` |
 | `internal/merge` | merge engine | `Run`, `CopyVerified`, `WriteCache` |
@@ -317,7 +319,7 @@ Leaves: `kinds`, `fsx`, `perf`, `report`, `runctl`, `statedir`, `testfix`, `winr
 | `textexport` | fsx, kinds, meta, plan, tools |
 | `similar` | kinds, meta, plan, runctl, textexport, tools |
 | `reclaim` | plan, runctl, sparsehash |
-| `backup` | fsx, merge, runctl, sparsehash |
+| `backup` | fsx, merge, runctl, sparsehash, statedir |
 | `seed` | plan |
 | `config` | fsx, meta, naming, statedir |
 | `gui` | almost everything above |
@@ -534,6 +536,7 @@ Timestamps in these names are `yyyyMMdd-HHmmss.nnnnnnnnn`.
 | `merge -report FILE` | JSON of `merge.Result`; after an execute it includes `settled` (input of `purge-sources`) |
 | `plan -report FILE` | `.md` = Markdown, else JSON: totals, by kind/category/extension/year, duplicate groups, document near-duplicates, extension mismatches, golden file list with `-extensive` |
 | `match -report FILE` | JSON: dupes, upgrades, counts |
+| `backup -check -tree -o FILE`, `backup -restore -o FILE` | JSON: manifests, tree and copy audits, repairs (rel, to, why, size, content, aside, error), lost, moved; a restore adds done, healthy, failed, journal |
 | `similar -o FILE` | JSON: hashed, rawPreviews, viaFfmpeg, skipped, noFfmpeg, flat, failed, pairs, docGroups |
 | `reclaim -o FILE`, `-script FILE` | JSON: safe, review, skipped; the sh or PowerShell script |
 | `seed -o FILE`, `-list FILE` | the sh or cmd script; the rsync file list |
@@ -1221,6 +1224,12 @@ The script is POSIX sh (`rm -- '...'`, `set -e`) or PowerShell (`Remove-Item -Li
 
 `onefold backup -check DST` reads every file of the copy again and compares it with the manifests of every run (a later entry wins): `ok`, `changed` (bit rot or an edit), `missing`, `unreadable`; files without an entry are listed as untracked. Exit 1 when anything changed, went missing or was unreadable.
 
+The manifests also say what the tree held when it was copied, so the tree can be checked with them: the golden tree only grows, so a golden file that no longer reads as recorded is damaged (or was edited by hand).
+
+- `onefold backup -check -tree G [-o FILE] DST` (`backup.Compare`) reads the tree and the copy again against the manifests of the copy. A file damaged (`changed`, `missing`, `unreadable`) on one side and healthy on the other is a repair; damaged on both sides it is `lost`; missing under its name while the same content sits under a path the manifests do not name on the same side (same size, then the same full hash) it was `moved` after the backup and is not repaired. The tree's files that no backup recorded are counted ("not in any backup yet"). Exit 1 unless both sides are clean.
+- `onefold backup -restore -tree G [-execute -expect N] [-o FILE] DST` (`backup.Restore`) runs the repairs: dry run by default; the execute needs the typed count of the dry run, writes its journal (`<state dir>/restore/restore-<ts>.jsonl`, fsync'ed) before the first change, and for each file, in order: the healthy side is read again in full (it must hold the recorded content, else NOT touched); the damaged side is read again (if it reads as recorded now it is left alone and counted `healthy`); the healthy bytes are copied next to the name (`merge.CopyVerified` to a onefold temp name, read back, fsync); a missing name gains the file with a no-replace rename; a damaged file is journaled, steps aside into `<side>/.onefold/damaged/<run>/<path>` (same volume, a no-replace rename), and the verified copy takes the name. The damaged bytes are never deleted: the summary says where they are, and the person deletes them. The `.onefold` folder is skipped by `backup` runs, by `-check`, and by catalogs (a dot folder).
+- `onefold backup -restore -resume JOURNAL` (`backup.ResumeRestore`) finishes an interrupted run: a name that holds the recorded content is finished; an empty name takes the staged copy when it reads as recorded, or else gets the damaged file back; a name still holding the damaged file is reported (run the restore again). `TestCompareAndRestore` and `TestResumeRestore` pin each case.
+
 ### 16.4 `seed`: bulk first copy
 
 `onefold seed -from STAGING -to DEST -o SCRIPT [-format rsync|robocopy] [-list FILE] PLAN` writes the script that copies a materialized staging tree to its destination over a fast link; onefold runs neither tool:
@@ -1723,6 +1732,7 @@ Go's `flag` package: `-x` and `--x` are equivalent; flags go before positional a
 | `similar [flags] PLAN` | look-alike photos, same-text documents | `-o` |
 | `reclaim -target G [flags] PLAN` | verified drops, deletion script | `-o`, `-script` |
 | `backup [-execute] SRC DST`, `backup -check DST` | cold copy and audit | DST |
+| `backup -check -tree G DST`, `backup -restore -tree G [-execute -expect N] DST`, `backup -restore -resume J` | health of the tree and the copy against the recorded hashes; restore of each side from the other | G and DST (restore), the journal |
 | `seed -from S -to D -o F [flags] PLAN` | rsync/robocopy script | F, list |
 | `push [flags] LOCAL REMOTE` | SFTP upload | remote |
 | `merge [flags]` (or `--input .. --output ..`) | fold inputs into an output | output |
@@ -1898,7 +1908,7 @@ Run the suite with `TZ=America/New_York go test ./...` and `TZ=UTC go test ./...
 
 **Change a frozen rule (media scope, naming, winners, golden presets).** Do not change the default. Add an option whose default keeps the pinned tests green (as `-video-tolerance`, `-filename-seq`, `photo-date-fallback` do), document the effect on existing archives, and test both settings.
 
-**Delete something.** Only the existing deleters may delete (rearrange duplicates, purge, onefold's own temps), and always after re-reading the bytes that justify it, journaled, behind a dry run and an explicit confirmation. New deletion paths need the same treatment and an explicit design decision; prefer writing a script for the user (as `reclaim` does).
+**Delete something.** Only the existing deleters may delete or replace (rearrange duplicates, purge, dedupe, `backup -restore`, onefold's own temps), and always after re-reading the bytes that justify it, journaled, behind a dry run and an explicit confirmation. New deletion paths need the same treatment and an explicit design decision; prefer writing a script for the user (as `reclaim` does).
 
 ### 28.3 Before saying done
 

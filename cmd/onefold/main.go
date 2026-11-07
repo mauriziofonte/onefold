@@ -207,6 +207,8 @@ usage:
   onefold reclaim -target G -script F <plan> verify the exact-duplicate drops, write a deletion script (deletes nothing)
   onefold backup [-execute] SRC DST         cold-storage copy (same paths, only adds, verified, content manifest)
   onefold backup -check DST                 audit a cold copy: every file read again against its manifests
+  onefold backup -check -tree G DST         read the tree too against the hashes the backups recorded
+  onefold backup -restore -tree G [-execute -expect N] DST   put back damaged or missing files from the healthy side
   onefold seed -from S -to D -o F <plan>    bulk-copy script (rsync or robocopy) of a materialized tree (runs nothing)
   onefold export-text --target D <plan>     .txt sidecars for document/text assets
   onefold push --host H --user U [--key K] <local> <remote>   SFTP upload (idempotent; ssh-agent without --key)

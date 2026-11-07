@@ -245,10 +245,21 @@ func Check(dst string, workers int, gate *runctl.Gate) (*Audit, error) {
 	if n == 0 {
 		return nil, fmt.Errorf("%s: no backup manifest in %s", dst, StateDir)
 	}
+	a, err := audit(dst, want, workers, gate)
+	if a != nil {
+		a.Manifests = n
+	}
+	return a, err
+}
+
+// audit reads every file of want under root again. Untracked lists the
+// regular files under root that want does not name (the state folder and
+// onefold temps excepted).
+func audit(root string, want map[string]Entry, workers int, gate *runctl.Gate) (*Audit, error) {
 	if workers <= 0 {
 		workers = max(1, runtime.NumCPU()/2)
 	}
-	a := &Audit{Manifests: n}
+	a := &Audit{}
 	rels := make([]string, 0, len(want))
 	for r := range want {
 		rels = append(rels, r)
@@ -266,7 +277,7 @@ func Check(dst string, workers int, gate *runctl.Gate) (*Audit, error) {
 					continue
 				}
 				e := want[rel]
-				p := filepath.Join(dst, filepath.FromSlash(rel))
+				p := filepath.Join(root, filepath.FromSlash(rel))
 				var verdict *[]string
 				h, err := sparsehash.FullFile(p)
 				switch {
@@ -296,7 +307,7 @@ func Check(dst string, workers int, gate *runctl.Gate) (*Audit, error) {
 	if gate.Stopped() {
 		return nil, runctl.ErrStopped
 	}
-	_ = filepath.WalkDir(dst, func(p string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -306,8 +317,8 @@ func Check(dst string, workers int, gate *runctl.Gate) (*Audit, error) {
 			}
 			return nil
 		}
-		rel, _ := filepath.Rel(dst, p)
-		if _, ok := want[filepath.ToSlash(rel)]; !ok && d.Type().IsRegular() {
+		rel, _ := filepath.Rel(root, p)
+		if _, ok := want[filepath.ToSlash(rel)]; !ok && d.Type().IsRegular() && !fsx.IsTemp(d.Name()) {
 			a.Untracked = append(a.Untracked, filepath.ToSlash(rel))
 		}
 		return nil
