@@ -11,6 +11,7 @@ The version being prepared is in the `VERSION` file; a release is the tag `v<VER
 - The state dir is private: created with mode 0700 (an existing one is tightened at the GUI start), its files with mode 0600. It holds archive paths in runs and logs.
 - Safer deletion: `purge-sources` (and the GUI purge) flushes each copy in the output and its folder to the disk before deleting the source, and refuses the deletion when that fails. A merge run with `-no-fsync`, or a drive that caches writes, could otherwise lose both after a power cut.
 - Names written by `merge`, `apply`, `export-text`, `backup` and `rearrange` reach the disk by the end of the run: each folder that gained or lost a file is flushed once.
+- Fixed: `onefold stats -dups` with an unknown mode exited 1 (a failed run) instead of 2 (a usage error).
 - Fixed: the GUI job bar read "Merge· execute" instead of "Merge · execute".
 
 ## [0.0.2-alpha] - 2026-11-01

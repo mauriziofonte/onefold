@@ -51,6 +51,11 @@ func cmdStats(args []string) {
 	if err != nil {
 		fatal(2, fmt.Errorf("-dup-min: %w", err))
 	}
+	switch *dups {
+	case stats.DupsOff, stats.DupsFast, stats.DupsFull:
+	default:
+		fatal(2, fmt.Errorf("-dups %q: use off, fast or full", *dups))
+	}
 	o := stats.Options{Roots: fs.Args(), Workers: *workers, OneVolume: *oneVol, Dups: *dups, DupMin: dm, Depth: *depth,
 		Top: max(100, *top), ReadOnlineOnly: *readOnline}
 	o.ProgressFor = func(phase string) (stats.Progress, func()) {
