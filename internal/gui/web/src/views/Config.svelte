@@ -11,21 +11,21 @@
   import { t } from '../lib/i18n.svelte.js';
 
   // the form follows the saved config; Save writes it back (validated by the server)
-  let form = $state({ artist: '', signature: '', language: '', timezone: '', dateOrder: '', namesLanguage: '', photoDateFallback: false, diagLog: false });
+  let form = $state({ artist: '', signature: '', language: '', timezone: '', dateOrder: '', namesLanguage: '', photoDateFallback: false, keepAwake: true, lowPriority: false, diagLog: false });
   // IANA zones the browser knows, offered as suggestions
   const zones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
   let saved = $state(false);
   const c = $derived(store.config);
   $effect(() => {
     const v = c?.config;
-    if (v) form = { artist: v.artist || '', signature: v.signature || '', language: v.language || '', timezone: v.timezone || '', dateOrder: v.dateOrder || '', namesLanguage: v.namesLanguage || '', photoDateFallback: !!v.photoDateFallback, diagLog: !!v.diagLog };
+    if (v) form = { artist: v.artist || '', signature: v.signature || '', language: v.language || '', timezone: v.timezone || '', dateOrder: v.dateOrder || '', namesLanguage: v.namesLanguage || '', photoDateFallback: !!v.photoDateFallback, keepAwake: !v.noKeepAwake, lowPriority: !!v.lowPriority, diagLog: !!v.diagLog };
   });
 
   async function save() {
     saved = false;
     try {
       await saveConfig({ artist: form.artist.trim(), signature: form.signature.trim(), language: form.language.trim().toLowerCase(),
-        timezone: form.timezone.trim(), dateOrder: form.dateOrder, namesLanguage: form.namesLanguage, photoDateFallback: form.photoDateFallback, diagLog: form.diagLog });
+        timezone: form.timezone.trim(), dateOrder: form.dateOrder, namesLanguage: form.namesLanguage, photoDateFallback: form.photoDateFallback, noKeepAwake: !form.keepAwake, lowPriority: form.lowPriority, diagLog: form.diagLog });
       saved = true;
     } catch (e) {
       flash(e.message);
@@ -68,6 +68,10 @@
         <p class="hint">{t('config.namesLanguageHint')}</p>
         <label class="chk"><input type="checkbox" bind:checked={form.photoDateFallback} onchange={() => (saved = false)} data-testid="config-photo-date-fallback" />{t('config.photoDateFallback')}</label>
         <p class="hint">{t('config.photoDateFallbackHint')}</p>
+        <label class="chk"><input type="checkbox" bind:checked={form.keepAwake} onchange={() => (saved = false)} data-testid="config-keep-awake" />{t('config.keepAwake')}</label>
+        <p class="hint">{t('config.keepAwakeHint')}</p>
+        <label class="chk"><input type="checkbox" bind:checked={form.lowPriority} onchange={() => (saved = false)} data-testid="config-low-priority" />{t('config.lowPriority')}</label>
+        <p class="hint">{t('config.lowPriorityHint')}</p>
       </div>
       {#if c.diagSupported}
         <div class="border-t border-slate-100 pt-4">

@@ -29,6 +29,7 @@ import (
 	"github.com/mauriziofonte/onefold/internal/meta"
 	"github.com/mauriziofonte/onefold/internal/plan"
 	"github.com/mauriziofonte/onefold/internal/planreport"
+	"github.com/mauriziofonte/onefold/internal/power"
 	"github.com/mauriziofonte/onefold/internal/remote"
 	"github.com/mauriziofonte/onefold/internal/report"
 	"github.com/mauriziofonte/onefold/internal/scan"
@@ -69,6 +70,9 @@ func main() {
 	}
 	if timedCommands[os.Args[1]] {
 		requireZone()
+	}
+	if longCommands[os.Args[1]] || strings.HasPrefix(os.Args[1], "-") {
+		powerFromConfig()
 	}
 	switch os.Args[1] {
 	case "merge":
@@ -131,6 +135,32 @@ func main() {
 // timedCommands read or write canonical times: they need the user's config
 // applied and a known zone.
 var timedCommands = map[string]bool{"merge": true, "rearrange": true, "catalog": true, "plan": true, "golden-index": true, "match": true, "similar": true, "reclaim": true, "seed": true, "apply": true, "export-text": true}
+
+// longCommands may work for hours: they hold a sleep lock (config
+// keep-awake, on by default) and take the configured priority. The GUI does
+// the same per job.
+var longCommands = map[string]bool{"merge": true, "rearrange": true, "purge-sources": true, "catalog": true, "plan": true,
+	"golden-index": true, "match": true, "similar": true, "reclaim": true, "backup": true, "seed": true, "apply": true,
+	"export-text": true, "push": true, "stats": true, "dedupe": true}
+
+// powerFromConfig takes the sleep lock and the priority the config asks for;
+// both end with the process. Failures only warn: the run goes on.
+func powerFromConfig() {
+	c, err := config.Load()
+	if err != nil {
+		return // requireZone, or the command, reports a broken config
+	}
+	if !c.NoKeepAwake {
+		if _, err := power.KeepAwake(power.Reason); err != nil {
+			dlog("keep awake: %v", err)
+		}
+	}
+	if c.LowPriority {
+		if err := power.SetLowPriority(true); err != nil {
+			fmt.Fprintf(os.Stderr, "low priority: %v\n", err)
+		}
+	}
+}
 
 // requireZone applies the user's config (zone, date order, month names) and
 // stops when the config is broken or no zone is known.

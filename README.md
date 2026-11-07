@@ -356,11 +356,14 @@ onefold config set timezone Europe/Rome   # IANA zone of every date; default: $T
 onefold config set date-order dmy         # names like 03-04-2020: dmy (3 April) or mdy (March 4); unset = not used
 onefold config set names-language it      # month names in folders: en (default) or it
 onefold config set photo-date-fallback on # JPEGs without a capture date: EXIF CreateDate, else ModifyDate
+onefold config set keep-awake off         # let the computer sleep during long runs (on by default)
+onefold config set low-priority on        # long runs yield the disk and the processor to other programs
 onefold config                            # what is set and where the file lives
 ```
 
 - Dates in names and folders are wall clocks in one time zone. Indexes and plans record their zone, and `plan` and `apply` refuse files made in another zone instead of shifting every date: set the same zone on every machine that works on one archive.
 - `plan -artist`, `apply -signature` and `apply -lang` override the configuration for one run (`-` for none).
+- While a long command or a GUI job works the computer does not go to sleep on its own (the display may still turn off; a closed lid still sleeps). On Linux this needs systemd (`systemd-inhibit`); `onefold doctor` tells whether it works on your computer.
 - Turn `photo-date-fallback` on before the first index of an archive, not later: it changes the name of those photos, and an archive built without it would get them again under the new name.
 
 ## Optional tools

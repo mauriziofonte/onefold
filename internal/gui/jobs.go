@@ -19,6 +19,7 @@ import (
 
 	"github.com/mauriziofonte/onefold/internal/catalog"
 	"github.com/mauriziofonte/onefold/internal/merge"
+	"github.com/mauriziofonte/onefold/internal/power"
 	"github.com/mauriziofonte/onefold/internal/report"
 	"github.com/mauriziofonte/onefold/internal/runctl"
 )
@@ -469,6 +470,18 @@ func (m *Manager) run(j *Job, stage string, resume bool, g *runctl.Gate) {
 		pending int
 		err     error
 	)
+	// the config's sleep lock and priority hold while the job works
+	c := m.config()
+	if perr := power.SetLowPriority(c.LowPriority); perr != nil && c.LowPriority {
+		m.log(j, LogEntry{Level: "warn", Msg: "low priority: " + perr.Error()})
+	}
+	if !c.NoKeepAwake {
+		if release, perr := power.KeepAwake(power.Reason); perr == nil {
+			defer release()
+		} else {
+			Logf("keep awake: %v", perr)
+		}
+	}
 	func() {
 		defer func() {
 			if r := recover(); r != nil {

@@ -50,7 +50,8 @@ onefold is a single static Go binary that deduplicates photo/video archives and 
 | `internal/runctl` | pause/stop gate the engine waits on between units of work |
 | `internal/fsx`, `internal/tools`, `internal/testfix` | no-replace rename; optional tool registry; test fixture builders |
 | `internal/tooldl`, `internal/statedir` | pinned downloads of the optional tools (Windows); per-user durable state dir |
-| `internal/config` | per-user config `<state dir>/config.json` (`onefold config`, GUI Config view): owner, comment and video stream language stamped on media copies, Windows diagnostic log |
+| `internal/config` | per-user config `<state dir>/config.json` (`onefold config`, GUI Config view): owner, comment and video stream language stamped on media copies, sleep lock and low priority of long runs, Windows diagnostic log |
+| `internal/power` | sleep lock of long runs (Windows SetThreadExecutionState, macOS IOPMAssertion via purego, Linux `systemd-inhibit` as an optional tool) and low I/O + CPU priority |
 | `internal/winres` | Windows resources of the exe: icon (`assets/brand/onefold-icon.svg`, rasterized in Go: keep the two in step) and manifest (per-monitor DPI awareness, long paths), written as a `.syso` |
 | `testdata/fixtures/` | real-file test corpus: never edit the files, update test expectations |
 | `testdata/media-synth/` | synthetic photos and videos (`scripts/gen-media-synth.sh`) pinning the media naming and winner rules (`TestMediaSynthRegression`) and the golden match |

@@ -123,6 +123,16 @@ func effect(c config.Config, key string) string {
 			return "a JPEG without DateTimeOriginal takes its EXIF CreateDate, else ModifyDate (catalog; changes its golden name)"
 		}
 		return "a JPEG without DateTimeOriginal is dated by its file name, else its file time"
+	case "keep-awake":
+		if c.NoKeepAwake {
+			return "the computer may sleep on idle during a long run"
+		}
+		return "the computer does not sleep on idle while a command or a GUI job works (the display may turn off)"
+	case "low-priority":
+		if c.LowPriority {
+			return "commands and GUI jobs run with low disk and CPU priority (slower, the computer stays responsive)"
+		}
+		return "normal disk and CPU priority"
 	case "diag-log":
 		return "Windows only: onefold-gui.log next to the exe"
 	}

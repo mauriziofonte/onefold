@@ -20,7 +20,7 @@ func TestSaveLoadAndDefaults(t *testing.T) {
 	if s := c.EffectiveSignature("v1.0.0"); s != "Onefold v1.0.0" {
 		t.Fatalf("default signature %q", s)
 	}
-	for _, kv := range [][2]string{{"artist", " Jane Doe "}, {"signature", "My archive"}, {"language", "ENG"}, {"diag-log", "on"}, {"photo-date-fallback", "yes"}} {
+	for _, kv := range [][2]string{{"artist", " Jane Doe "}, {"signature", "My archive"}, {"language", "ENG"}, {"diag-log", "on"}, {"photo-date-fallback", "yes"}, {"keep-awake", "off"}, {"low-priority", "on"}} {
 		if err := c.Set(kv[0], kv[1]); err != nil {
 			t.Fatal(err)
 		}
@@ -30,7 +30,7 @@ func TestSaveLoadAndDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, err := Load()
-	want := Config{Artist: "Jane Doe", Signature: "My archive", Language: "eng", DiagLog: true, PhotoDateFallback: true}
+	want := Config{Artist: "Jane Doe", Signature: "My archive", Language: "eng", DiagLog: true, PhotoDateFallback: true, NoKeepAwake: true, LowPriority: true}
 	if err != nil || got != want {
 		t.Fatalf("reload %+v %v", got, err)
 	}
@@ -39,6 +39,12 @@ func TestSaveLoadAndDefaults(t *testing.T) {
 	}
 	if v, _ := got.Get("photo-date-fallback"); v != "on" {
 		t.Fatalf("photo-date-fallback %q", v)
+	}
+	if v, _ := got.Get("keep-awake"); v != "off" {
+		t.Fatalf("keep-awake %q", v)
+	}
+	if got.Set("keep-awake", ""); got.NoKeepAwake {
+		t.Fatal("unset keep-awake is not the default (on)")
 	}
 	got.Set("signature", None)
 	if s := got.EffectiveSignature("v1.0.0"); s != "" {
@@ -51,7 +57,7 @@ func TestSaveLoadAndDefaults(t *testing.T) {
 
 func TestValidation(t *testing.T) {
 	var c Config
-	for _, kv := range [][2]string{{"language", "english"}, {"language", "e1g"}, {"artist", "a\nb"}, {"signature", "x\ty"}, {"diag-log", "maybe"}, {"photo-date-fallback", "maybe"}, {"nope", "x"}} {
+	for _, kv := range [][2]string{{"language", "english"}, {"language", "e1g"}, {"artist", "a\nb"}, {"signature", "x\ty"}, {"diag-log", "maybe"}, {"photo-date-fallback", "maybe"}, {"keep-awake", "maybe"}, {"low-priority", "2"}, {"nope", "x"}} {
 		if err := c.Set(kv[0], kv[1]); err == nil {
 			t.Errorf("set %s=%q accepted", kv[0], kv[1])
 		}
