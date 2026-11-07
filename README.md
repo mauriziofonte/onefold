@@ -34,6 +34,7 @@ One static binary for Linux (amd64, arm64), macOS (Apple Silicon, Intel) and Win
 - [Photo and video archive](#photo-and-video-archive)
 - [Configuration](#configuration)
 - [Optional tools](#optional-tools)
+- [How many files](#how-many-files)
 - [Windows notes](#windows-notes)
 - [Documentation](#documentation)
 - [Build from source](#build-from-source)
@@ -60,10 +61,10 @@ How it decides that two files are the same:
 
 ## Safety
 
-- **Sources are read-only.** Two operations delete files, only when you ask for them: `rearrange` deletes duplicates confirmed on their full content, and `purge-sources` deletes merged input files whose copy in the output was read again and found equal. Both are dry runs until you add `-execute`, and both write a journal first.
+- **Sources are read-only.** Three operations delete or replace files, only when you ask for them: `rearrange` deletes duplicates confirmed on their full content, `purge-sources` deletes merged input files whose copy in the output was read again and found equal, and `dedupe` sends extra copies to the Recycle Bin / Trash or replaces them by links or clones of the copy that stays, after reading both again. All are dry runs until you add `-execute`, and all write a journal first.
 - **Nothing is overwritten.** Every file is written under a temporary name, verified, and only then given its final name with a rename that refuses to replace an existing file.
 - **Run it again to finish.** Every command is idempotent: an interrupted run, a power cut, a closed laptop lid are fixed by running the same command again.
-- **Preview first.** Commands that copy, move or delete files (`merge`, `rearrange`, `purge-sources`, `apply`, `backup`) do nothing without `-execute`; the GUI always shows a preview and executes exactly what you reviewed.
+- **Preview first.** Commands that copy, move or delete files (`merge`, `rearrange`, `purge-sources`, `dedupe`, `apply`, `backup`) do nothing without `-execute`; the GUI always shows a preview and executes exactly what you reviewed.
 - **Local only.** The GUI listens on 127.0.0.1, behind a one-time session link; its state folder is readable by you only. Nothing leaves your computer unless you ask: `push` uploads to your own server, `onefold tools install` downloads the optional tools.
 
 ## Install
@@ -373,6 +374,20 @@ No external program is required: metadata of photos (jpg, heic, png, webp, tiff,
 Optional helpers, used when found on PATH, next to the executable (or in its `tools` folder) or, on macOS, in the Homebrew folders: `ffprobe`, `ffmpeg` and `exiftool` (needed to stamp photo and video copies), `pdfinfo`, `pdftotext` (PDF text), `antiword`, `7z`, `unrar`. `onefold doctor` shows what is available.
 
 On Windows (x64), `onefold tools install all` (or the Doctor page of the GUI) downloads exiftool, ffmpeg/ffprobe, the Xpdf tools and 7-Zip from their official sources. Each file has a fixed version and is installed only if its SHA-256 matches the one written in onefold. The tools go into a onefold folder, nothing is installed system-wide, and an interrupted download resumes. On Linux and macOS use your package manager (for example `apt install libimage-exiftool-perl ffmpeg poppler-utils p7zip-full`, or `brew install exiftool ffmpeg poppler p7zip`).
+
+## How many files
+
+Measured every week on a synthetic tree of one million small files (Linux, 4 processors, 16 GB; `.github/workflows/scale.yml`, budgets in `bench/scale.tsv`):
+
+| Step | Time | Memory |
+|---|---|---|
+| `stats` (duplicates on sampled content) | 14 s | 530 MB |
+| `stats -dups full` | 15 s | 600 MB |
+| `catalog -preset all` | 12 s | 27 MB |
+| `merge` preview into an empty folder | 52 s | 2.3 GB |
+| `dedupe` preview | 26 s | 680 MB |
+
+Time grows with the files and with the bytes that must be read (the tiny files here are read in an instant; large photos and videos take their reading time). Memory grows with the number of files: a merge keeps every file it plans in memory, about 2.2 GB per million files, so a merge of ten million files needs a computer with more than 22 GB of memory; `catalog` writes its records as it goes. Windows and macOS are not measured at this scale.
 
 ## Windows notes
 

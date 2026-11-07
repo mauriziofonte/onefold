@@ -1808,7 +1808,13 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 | `gui` | section 22.9; on Windows the WebView2 fallback |
 | `remote` | SFTP push against an in-process SSH/SFTP server, including size conflicts |
 | `winres` | `.syso` in sync, layout, logo pixels, version info |
-| `cmd/onefold` | CLI end-to-end (`TestE2E` on a synthetic two-host corpus, `TestCorpusFlow`, merge, rearrange, desktop archive with purge, settings round trip, the golden delta flow with similar, reclaim, backup and seed, `apply -link`, `stats` with `-dups full`, `-json`, `-mounts` and bad input), `TestSourceHeaders`, `TestVersionFile` |
+| `dedupe` | keep rules and `-keep-in`, links, clones (Btrfs, APFS), the Trash, refusals of a changed copy or an unflushed keeper, the script, `Resume` of a half-done replacement |
+| `power` | nested locks; Linux: a stand-in `systemd-inhibit` holds and releases the lock, a refused lock is reported, every thread gets the low I/O priority; macOS: the assertion is listed by `pmset -g assertions` and gone after release; Windows: execution state and background mode |
+| `cmd/onefold` | CLI end-to-end (`TestE2E` on a synthetic two-host corpus, `TestCorpusFlow`, merge, rearrange, desktop archive with purge, settings round trip, the golden delta flow with similar, reclaim, backup and seed, `apply -link`, `stats` with `-dups full`, `-json`, `-mounts` and bad input, `dedupe` dry run, script, execute and exit codes), `TestSourceHeaders`, `TestVersionFile` |
+
+### 27.1.1 Scale
+
+`cmd/scalebench` (not product) writes a synthetic tree of N tiny files (1,000 per folder, generic types of the default scope, a tenth of them duplicated, one modification time), runs a prebuilt binary on it (`stats -dups fast`, `stats -dups full`, `catalog -preset all`, a `merge` preview into an empty output, a `dedupe -action link` preview; no hash cache, its own state dir) and records each step's wall time and peak resident memory (`ru_maxrss`). `bench/scale.tsv` holds the budget of each step per size; a step over budget fails the run, `-` skips a step at a size. `.github/workflows/scale.yml` runs 1 million files every Sunday on `ubuntu-24.04` (4 CPUs, 16 GB) and 5 or 10 million by hand, on an ext4 image with inline data (millions of tiny files in a few GB); the result is the artifact `scale-<N>`. Measured at 1 million files (Linux, 4 CPUs): `stats` 14 s and 530 MiB, `stats -dups full` 15 s and 600 MiB, `catalog` 12 s and 27 MiB (records stream to the manifest), a `merge` preview 52 s and 2.3 GiB, a `dedupe` preview 26 s and 680 MiB. Merge, rearrange and plan keep every record in memory (a record is 400 bytes plus its strings): about 2.2 GiB per million files for a merge preview, so 10 million files need about 22 GB.
 
 ### 27.2 Fixtures
 
@@ -1880,4 +1886,5 @@ Run the suite with `TZ=America/New_York go test ./...` and `TZ=UTC go test ./...
 - Two `apply` runs on the same target at the same time (CLI and GUI together) could interfere through deterministic temp names; one run per target.
 - The rearrange journal stores absolute paths: a moved or remounted tree cannot be resumed or undone in place.
 - macOS binaries are not notarized (it needs a paid Apple Developer account): the first start needs the Gatekeeper steps of the README. The GUI runs in the browser (no native window).
+- Memory grows with the number of files: a `merge` preview holds about 2.2 GiB per million files, `stats` and `dedupe` about 0.6 GiB, `catalog` streams (section 27.1.1). Ten million files in one merge need a machine with more than 22 GB of memory. The scale benchmark runs on Linux only.
 - `stats` on Windows: a directory listing carries no link count, so each path of a hard-linked file counts as a file (and the paths as duplicates of each other), and there is no space-on-disk figure; years follow the computer's local time, not the canonical zone (no stored times are involved).
