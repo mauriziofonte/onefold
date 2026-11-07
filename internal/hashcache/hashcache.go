@@ -10,7 +10,9 @@
 // A file is known by its identity and its change marks (KeyOf): on Linux and
 // macOS the device, inode, size, modification and status-change times (any
 // write changes the status-change time, so a changed file never matches an
-// old entry); on Windows the folded path, size, creation and last-write times.
+// old entry); on Windows the same from the file itself (volume serial, file
+// ID, size, last-write and change times; NTFS and ReFS only, FAT and exFAT
+// keep no change time and are not cached).
 //
 // What it is trusted for, and what not:
 //   - a sampled digest (sparsehash, not the whole content) feeds grouping:

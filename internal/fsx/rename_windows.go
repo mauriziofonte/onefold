@@ -43,3 +43,7 @@ func fixLong(p string) string {
 	}
 	return p
 }
+
+// LongPath is p with the \\?\ prefix when it is too long for the plain Win32
+// calls (absolute paths only).
+func LongPath(p string) string { return fixLong(p) }
