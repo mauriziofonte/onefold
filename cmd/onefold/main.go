@@ -362,6 +362,9 @@ func cmdCatalog(args []string) {
 	fmt.Println()
 	fmt.Printf("time source:  metadata %d | filename %d | takeout %d | filemtime %d | NONE %d\n", sum.FromMetadata, sum.FromFilename, sum.FromTakeout, sum.FromMtime, sum.NoTime)
 	fmt.Printf("sub-second:   %d photos   |   dims missing: %d\n", sum.SubSec, sum.DimsMissing)
+	if sum.WithPlace > 0 {
+		fmt.Printf("places:       %d photos and videos know where they were taken\n", sum.WithPlace)
+	}
 	fmt.Printf("logical:      %s   wall: %s", report.HumanBytes(sum.LogicalBytes), sum.Elapsed.Round(time.Millisecond))
 	if secs > 0 {
 		fmt.Printf("   (%.0f assets/s)", float64(sum.Assets)/secs)

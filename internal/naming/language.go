@@ -11,8 +11,9 @@ import (
 	"github.com/mauriziofonte/onefold/internal/names"
 )
 
-// Languages of month names in folder and file names (config names-language,
-// D88): {month-name} follows it, {month-name-en} and {month-name-it} do not.
+// Languages of month and country names in folder and file names (config
+// names-language): {month-name} and {country} follow it, the -en and -it
+// variants do not.
 const (
 	NamesEN = "en"
 	NamesIT = "it"

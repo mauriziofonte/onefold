@@ -38,7 +38,7 @@ type catalogFlags struct {
 	skipCSV, keepCSV, minSize, maxSize, wholeMax            *string
 	noSweep, skipSysDirs, skipCloud, skipDev, skipSysExt    *bool
 	skipUnknown, skipNoExt, keepDot, keepJunk, quick        *bool
-	sidecars, takeout                                       *bool
+	sidecars, takeout, places                               *bool
 	excludePaths, excludeGlobs                              *multiFlag
 }
 
@@ -77,6 +77,7 @@ func addCatalogFlags(fs *flag.FlagSet, defPreset string, defJ int, regime string
 		wholeMax:    fs.String("whole-max", catalog.DefaultWholeMax, "read files up to SIZE once, sequentially, and hash/extract from memory (0 = seek-based sampling only)"),
 		quick:       fs.Bool("quick", false, "generic kinds: no archive listing, no document parsing, no external tools (time from the filename, else the filesystem)"),
 		takeout:     fs.Bool("takeout", false, "read the Google Takeout .json next to each photo and video: its capture time when the file's metadata and name have none, its place, and \"-edited\" copies kept as edits"),
+		places:      fs.Bool("places", false, "keep where each photo and video was taken (GPS in its metadata) for the {country} and {city} placeholders; looked up offline, nothing leaves the computer"),
 		sidecars:    fs.Bool("sidecars", false, "keep the files that belong to a photo or video with it: .AAE, .xmp, .THM, Google Takeout .json and the video of a Live Photo take its new name and are never deduplicated alone"),
 	}
 }
@@ -136,6 +137,9 @@ func (c *catalogFlags) filters(base catalog.Filters) (catalog.Filters, error) {
 	}
 	if set["takeout"] {
 		f.Takeout = *c.takeout
+	}
+	if set["places"] {
+		f.Places = *c.places
 	}
 	if set["limit"] {
 		f.Limit = *c.limit

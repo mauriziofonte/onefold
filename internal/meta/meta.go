@@ -73,6 +73,10 @@ type Options struct {
 	// video (applyTakeout): its capture time below the file's own metadata
 	// and name, its place, and "-edited" copies as edits.
 	Takeout bool
+	// Places keeps the place a photo or video's own metadata gives (EXIF
+	// GPS, a video's ISO 6709 location) in Lat and Lon; without it they stay
+	// empty (Takeout still fills them from the .json).
+	Places bool
 }
 
 // InScope reports whether the extension belongs to the media scope (the
@@ -113,6 +117,9 @@ func ExtractWith(path string, o Options) (Meta, error) {
 		m = extractGeneric(path, ext, kind, o)
 	}
 	m.FileCategory = kinds.Category(ext)
+	if !o.Places {
+		m.Lat, m.Lon = 0, 0
+	}
 	if o.Takeout && kinds.IsMedia(kind) {
 		applyTakeout(path, &m)
 	}
@@ -227,6 +234,7 @@ func extractPhoto(path string) (Meta, error) {
 	creator := strings.TrimSpace(xm.Basic.CreatorTool)
 	m.CanonDevice, m.Category, m.Prefix = CanonicalDevice(make_, model, software, creator)
 	m.Device = strings.TrimSpace(make_ + " " + model) // RAW, for reference
+	setGeo(&m, ex.GPS.Latitude(), ex.GPS.Longitude())
 	m.Width, m.Height = int(ex.ImageWidth), int(ex.ImageHeight)
 	// EXIF often omits pixel dimensions (they live in the JPEG SOF). Read them
 	// from the SOF via DecodeConfig (header only, no pixel decode) so the winner
@@ -357,6 +365,7 @@ func extractVideo(path string) (Meta, error) {
 		}
 	}
 	m.Device = VendorSlug(sig)
+	videoGeo(&m, ft)
 	return m, nil
 }
 
@@ -404,6 +413,7 @@ func extractVideoNative(path string) (Meta, error) {
 		}
 		m.Width, m.Height = info.Width, info.Height
 		m.Device = VendorSlug(info.vendorSignals())
+		videoGeo(&m, info.Tags)
 	}
 	if m.Time == "" {
 		if t, ok := DeduceFromFilename(filepath.Base(path)); ok {

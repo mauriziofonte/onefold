@@ -227,3 +227,41 @@ func TestGoldenTreeAndLayoutName(t *testing.T) {
 		t.Fatalf("Resolve(music) = %v %v, want the music preset", n, err)
 	}
 }
+
+// {country} and {city} come from where a photo or video was taken, offline;
+// {country} follows names-language; a file without a place takes the
+// fallback; a naming that uses them says so (merge and rearrange then
+// catalog with Places).
+func TestPlaces(t *testing.T) {
+	rome := rec("/p/IMG_1234.JPG", "photo", "2021-05-06 07:08:09", meta.Meta{Lat: 41.8902, Lon: 12.4922})
+	sea := rec("/p/IMG_1235.JPG", "photo", "2021-05-06 07:08:09", meta.Meta{Lat: 30, Lon: -40})
+	none := rec("/p/IMG_1236.JPG", "photo", "2021-05-06 07:08:09", meta.Meta{})
+	vid := rec("/v/VID_1.mp4", "video", "2022-01-02 03:04:05", meta.Meta{Lat: 48.8584, Lon: 2.2945})
+	for r, w := range map[*catalog.Record]string{
+		&rome: "2021/Italy/Rome/IMG_1234.jpg", &sea: "2021/Unknown place/IMG_1235.jpg",
+		&none: "2021/Unknown place/IMG_1236.jpg", &vid: "2022/France/Paris/VID_1.mp4",
+	} {
+		if got := render(t, "places", *r); got != w {
+			t.Errorf("places(%s) = %q want %q", r.Path, got, w)
+		}
+	}
+	SetNamesLanguage(NamesIT)
+	got := render(t, "places", rome)
+	SetNamesLanguage("")
+	if got != "2021/Italia/Rome/IMG_1234.jpg" {
+		t.Errorf("places with names-language it = %q", got)
+	}
+	v := VarsOf(rome)
+	if v["country-code"] != "IT" || v["country-en"] != "Italy" || v["country-it"] != "Italia" {
+		t.Errorf("country vars %v", v)
+	}
+	for spec, want := range map[string]bool{"places": true, `{year}/{city|"x"}/{stem}`: true, `<{country-code}/>{stem}`: true, "ext-year": false, "library": false} {
+		n, err := Resolve(spec)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n.Uses(PlacePlaceholders...) != want {
+			t.Errorf("%s uses places: %v", spec, !want)
+		}
+	}
+}

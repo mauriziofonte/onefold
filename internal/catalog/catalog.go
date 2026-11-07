@@ -60,6 +60,8 @@ type Record struct {
 	Sidecar bool `json:"sidecar,omitempty"`
 	// Takeout: extracted with Options.Takeout (a reuse needs the same).
 	Takeout bool `json:"takeout,omitempty"`
+	// Places: extracted with Options.Places (a reuse needs the same).
+	Places bool `json:"places,omitempty"`
 }
 
 // Summary is the aggregate view printed for inspection (no per-file personal data).
@@ -84,6 +86,7 @@ type Summary struct {
 	FromFilename    int
 	FromTakeout     int
 	FromMtime       int
+	WithPlace       int // records with a place (Meta.Lat, Meta.Lon)
 	SubSec          int
 	DimsMissing     int
 	LogicalBytes    int64
@@ -151,6 +154,11 @@ type Options struct {
 	// Takeout reads the Google Takeout metadata file next to each photo and
 	// video (meta.Options.Takeout): capture time, place, edited copies.
 	Takeout bool
+	// Places keeps the place in each photo and video's own metadata (EXIF
+	// GPS, a video's location: meta.Options.Places), for the {country} and
+	// {city} naming placeholders. Off by default: a manifest then holds no
+	// location.
+	Places bool
 
 	Progress Progress     // optional (report.Reporter implements it)
 	Gate     *runctl.Gate // optional pause/stop (GUI); nil = never pauses
@@ -330,7 +338,7 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 		t0 := time.Now()
 		var rec Record
 		reused := false
-		if old, ok := o.Reuse[j.path]; ok && old.Size == j.size && old.MTimeNs == j.mtime && j.mtime != 0 && !(old.Quick && !o.Quick) && old.Takeout == o.Takeout {
+		if old, ok := o.Reuse[j.path]; ok && old.Size == j.size && old.MTimeNs == j.mtime && j.mtime != 0 && !(old.Quick && !o.Quick) && old.Takeout == o.Takeout && old.Places == o.Places {
 			rec, reused = old, true
 			rec.Room, rec.Host, rec.Sidecar = j.room, o.Host, j.side
 		} else {
@@ -361,7 +369,7 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 				return
 			}
 			te := perf.Start()
-			md, _ := meta.ExtractWith(j.path, meta.Options{Quick: o.Quick || j.side, Data: data, Takeout: o.Takeout}) // best-effort; never fatal
+			md, _ := meta.ExtractWith(j.path, meta.Options{Quick: o.Quick || j.side, Data: data, Takeout: o.Takeout, Places: o.Places}) // best-effort; never fatal
 			stage := "extract:" + md.Kind
 			if md.Kind == "archive" {
 				stage += ":" + kinds.Ext(j.path)
@@ -370,7 +378,7 @@ func Walk(rooms []string, o Options, emit func(Record)) (*Summary, error) {
 			perf.Outlier(stage, j.path, te)
 			perf.Outlier("file-total", j.path, th)
 			rec = Record{Room: j.room, Path: j.path, Size: h.Size, Hash: h.Hex, Full: h.Full, Meta: md,
-				Host: o.Host, MTimeNs: j.mtime, Quick: o.Quick || j.side, Sidecar: j.side, Takeout: o.Takeout}
+				Host: o.Host, MTimeNs: j.mtime, Quick: o.Quick || j.side, Sidecar: j.side, Takeout: o.Takeout, Places: o.Places}
 			if h.Full {
 				rec.ContentHash = h.Hex
 			}
@@ -562,6 +570,9 @@ func accumulate(s *Summary, r Record) {
 	}
 	if r.Meta.SubSec {
 		s.SubSec++
+	}
+	if r.Meta.Lat != 0 || r.Meta.Lon != 0 {
+		s.WithPlace++
 	}
 	if (r.Meta.Kind == "photo" || r.Meta.Kind == "video") && (r.Meta.Width == 0 || r.Meta.Height == 0) {
 		s.DimsMissing++

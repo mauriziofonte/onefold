@@ -64,6 +64,8 @@ type Filters struct {
 	Sidecars bool `json:"sidecars,omitempty"`
 	// Takeout reads the Google Takeout metadata files (Options.Takeout).
 	Takeout bool `json:"takeout,omitempty"`
+	// Places keeps where photos and videos were taken (Options.Places).
+	Places bool `json:"places,omitempty"`
 }
 
 // RuleOn reports whether the skip rule name is on for f.
@@ -106,7 +108,7 @@ func (f Filters) RuleOn(name string) bool {
 func (f Filters) Options(defPreset string) (Options, error) {
 	o := Options{Coverage: sparsehash.DefaultCoverage, Sample: sparsehash.DefaultSampleSize,
 		KeepDotDirs: !f.RuleOn(RuleDotDirs), KeepJunk: !f.RuleOn(RuleJunk), Quick: f.Quick, Limit: f.Limit,
-		KeepDotfiles: f.KeepDotfiles, KeepEmpty: f.KeepDotfiles, Sidecars: f.Sidecars, Takeout: f.Takeout}
+		KeepDotfiles: f.KeepDotfiles, KeepEmpty: f.KeepDotfiles, Sidecars: f.Sidecars, Takeout: f.Takeout, Places: f.Places}
 	for n := range f.Rules {
 		if !KnownRule(n) {
 			return o, fmt.Errorf("unknown skip rule %q", n)

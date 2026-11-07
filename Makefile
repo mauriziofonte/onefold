@@ -91,7 +91,8 @@ notices:
 	    GOOS=windows go list -deps -f '{{with .Module}}{{if not .Main}}{{.Path}} {{.Version}} {{.Dir}}{{end}}{{end}}' $(PKG); \
 	    GOOS=darwin go list -deps -f '{{with .Module}}{{if not .Main}}{{.Path}} {{.Version}} {{.Dir}}{{end}}{{end}}' $(PKG); } | sort -u | \
 	  while read -r mod ver dir; do echo "=== $$mod $$ver"; cat "$$dir"/LICENSE* "$$dir"/LICENCE* "$$dir"/COPYING* "$$dir"/UNLICENSE* 2>/dev/null; echo; done; \
-	  echo "=== GUI frontend (bundled JavaScript and CSS)"; cat internal/gui/web/dist/THIRD_PARTY_LICENSES.md; } > $(DIST)/THIRD_PARTY_NOTICES.txt
+	  echo "=== GUI frontend (bundled JavaScript and CSS)"; cat internal/gui/web/dist/THIRD_PARTY_LICENSES.md; echo; \
+	  echo "=== Place tables (internal/geo: GeoNames, CC BY 4.0; Unicode CLDR country names)"; cat internal/geo/DATA.md; } > $(DIST)/THIRD_PARTY_NOTICES.txt
 
 # GitHub workflows checked before they reach GitHub: linters, then act runs of
 # CI and release on a clean clone (scripts/check-workflows.sh; needs docker).

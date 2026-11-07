@@ -6,7 +6,9 @@
 package meta
 
 import (
+	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -186,13 +188,27 @@ func (r *boxReader) walk(start, end int64, depth int, info *isobmffInfo, parent 
 			if v := r.dataValue(body, bodyLen); v != "" {
 				info.Tags[strings.ToLower(key)] = v
 			}
+		case parent == "udta" && typ == "loci" && bodyLen >= 20:
+			// 3GPP location: version/flags(4) language(2) name(NUL-ended)
+			// role(1) longitude latitude altitude (16.16 fixed point)
+			b, _ := r.readAt(body, int(min64(bodyLen, 512)))
+			if i := bytes.IndexByte(b[min(6, len(b)):], 0); i >= 0 && 6+i+1+1+8 <= len(b) {
+				q := b[6+i+2:]
+				lon := float64(int32(binary.BigEndian.Uint32(q[0:4]))) / 65536
+				lat := float64(int32(binary.BigEndian.Uint32(q[4:8]))) / 65536
+				info.Tags["location"] = fmt.Sprintf("%+08.4f%+09.4f/", lat, lon) // as ffprobe writes it
+			}
 		case parent == "udta" && len(typ) == 4 && typ[0] == 0xa9 && bodyLen > 4:
 			// QuickTime international text atom: size(2) lang(2) text
 			b, _ := r.readAt(body, int(min64(bodyLen, 512)))
 			if len(b) > 4 {
 				n := int(binary.BigEndian.Uint16(b[0:2]))
 				if 4+n <= len(b) {
-					info.Tags[strings.ToLower(typ)] = strings.TrimSpace(string(b[4 : 4+n]))
+					key := strings.ToLower(typ)
+					if typ == "\xa9xyz" {
+						key = "location" // what ffprobe calls it
+					}
+					info.Tags[key] = strings.TrimSpace(string(b[4 : 4+n]))
 				}
 			}
 		case containerBox[typ]:
