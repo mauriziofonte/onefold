@@ -6,10 +6,13 @@
 package meta
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
+	"math"
 	"path"
 	"regexp"
 	"strconv"
@@ -19,6 +22,8 @@ import (
 	"github.com/bodgit/sevenzip"
 	"github.com/dhowden/tag"
 	"github.com/evanoberholster/imagemeta"
+	"github.com/evanoberholster/imagemeta/exif2"
+	"github.com/evanoberholster/imagemeta/imagetype"
 	"github.com/richardlehane/mscfb"
 	"github.com/richardlehane/msoleps"
 	"github.com/richardlehane/msoleps/types"
@@ -166,56 +171,82 @@ func rar5Walk(f src, off, size int64, acc *archiveAcc) error {
 			return err
 		}
 		next := off + int64(pos) + int64(hsize)
-		q := 0
-		htype, k := uvarint(body[q:])
-		q += k
-		hflags, k := uvarint(body[q:])
-		q += k
-		var extraSize, dataSize uint64
+		c := vcursor{b: body}
+		htype := c.uvarint()
+		hflags := c.uvarint()
+		var dataSize uint64
 		if hflags&0x1 != 0 {
-			extraSize, k = uvarint(body[q:])
-			q += k
+			c.uvarint() // extra area size
 		}
 		if hflags&0x2 != 0 {
-			dataSize, k = uvarint(body[q:])
-			q += k
+			dataSize = c.uvarint()
 		}
-		_ = extraSize
+		if c.bad || dataSize > math.MaxInt64-uint64(next) {
+			return errUnsupported
+		}
 		switch htype {
 		case 4: // archive encryption header: everything after is encrypted
 			return errUnsupported
 		case 5: // end of archive
 			return nil
 		case 2: // file header
-			fflags, k := uvarint(body[q:])
-			q += k
-			_, k = uvarint(body[q:]) // unpacked size
-			q += k
-			_, k = uvarint(body[q:]) // attributes
-			q += k
+			fflags := c.uvarint()
+			c.uvarint() // unpacked size
+			c.uvarint() // attributes
 			var mt time.Time
-			if fflags&0x2 != 0 && q+4 <= len(body) {
-				mt = time.Unix(int64(binary.LittleEndian.Uint32(body[q:q+4])), 0).In(Zone())
-				q += 4
+			if fflags&0x2 != 0 {
+				if b := c.bytes(4); b != nil {
+					mt = time.Unix(int64(binary.LittleEndian.Uint32(b)), 0).In(Zone())
+				}
 			}
 			if fflags&0x4 != 0 {
-				q += 4 // data CRC32
+				c.bytes(4) // data CRC32
 			}
-			_, k = uvarint(body[q:]) // compression info
-			q += k
-			_, k = uvarint(body[q:]) // host OS
-			q += k
-			nl, k := uvarint(body[q:])
-			q += k
+			c.uvarint() // compression info
+			c.uvarint() // host OS
+			nl := c.uvarint()
 			name := ""
-			if q+int(nl) <= len(body) {
-				name = string(body[q : q+int(nl)])
+			if nl <= uint64(len(body)) {
+				name = string(c.bytes(int(nl)))
+			}
+			if c.bad {
+				return errUnsupported
 			}
 			acc.add(name, mt, fflags&0x1 != 0)
 		}
 		off = next + int64(dataSize)
 	}
 	return nil
+}
+
+// vcursor reads a RAR5 header body field by field. A field that does not fit
+// sets bad, and every later read returns zero values.
+type vcursor struct {
+	b   []byte
+	q   int
+	bad bool
+}
+
+func (c *vcursor) uvarint() uint64 {
+	if c.bad {
+		return 0
+	}
+	v, k := uvarint(c.b[c.q:])
+	if k <= 0 {
+		c.bad = true
+		return 0
+	}
+	c.q += k
+	return v
+}
+
+func (c *vcursor) bytes(n int) []byte {
+	if c.bad || n < 0 || n > len(c.b)-c.q {
+		c.bad = true
+		return nil
+	}
+	c.q += n
+	return c.b[c.q-n : c.q]
 }
 
 func uvarint(b []byte) (uint64, int) {
@@ -412,6 +443,41 @@ func audioNative(p, ext string, m *Meta) error {
 
 // ------------------------------------------------------------------ images
 
+// decodeEXIF is imagemeta.Decode made safe on damaged input, so that one
+// malformed photo cannot stop a scan: a panic (imagemeta v0.3.1 indexes past
+// the end of some truncated IFDs) becomes an error, and JPEG content goes
+// through scanJPEG, which ends where imagemeta's JPEG walk loops forever.
+// Everything else is imagemeta.Decode unchanged.
+func decodeEXIF(r io.ReadSeeker) (ex exif2.Exif, err error) {
+	defer recoverDecode(&err)
+	start, err := r.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return ex, err
+	}
+	rr := bufio.NewReaderSize(r, 4<<10)
+	if it, err := imagetype.ScanBuf(rr); err == nil && it == imagetype.ImageJPEG {
+		// imagemeta.Decode, case ImageJPEG
+		ir := exif2.NewIfdReader(exif2.Logger)
+		defer ir.Close()
+		ir.Exif.ImageType = it
+		if err := scanJPEG(rr, ir.DecodeJPEGIfd, nil); err != nil {
+			return exif2.Exif{}, err
+		}
+		return ir.Exif, nil
+	}
+	if _, err := r.Seek(start, io.SeekStart); err != nil {
+		return ex, err
+	}
+	return imagemeta.Decode(r)
+}
+
+// recoverDecode, deferred, turns a panic of a third-party decoder into *err.
+func recoverDecode(err *error) {
+	if r := recover(); r != nil {
+		*err = fmt.Errorf("malformed metadata (%v)", r)
+	}
+}
+
 // HEIFSize returns the size of the primary image of a HEIF, HEIC or AVIF
 // file, read from its head (0,0 when it does not say).
 func HEIFSize(path string) (w, h int) { return heifDims(head(path, 1<<20)) }
@@ -448,7 +514,7 @@ func imageNative(p string, m *Meta) error {
 		return err
 	}
 	defer f.Close()
-	ex, err := imagemeta.Decode(f)
+	ex, err := decodeEXIF(f)
 	if err != nil {
 		return err
 	}
@@ -594,7 +660,7 @@ func pngExifNative(p string, m *Meta) error {
 			break
 		}
 		if typ == "eXIf" {
-			ex, err := imagemeta.Decode(bytes.NewReader(b[pos+8 : pos+8+n]))
+			ex, err := decodeEXIF(bytes.NewReader(b[pos+8 : pos+8+n]))
 			if err != nil {
 				return err
 			}

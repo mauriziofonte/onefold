@@ -26,7 +26,6 @@ import (
 
 	"github.com/evanoberholster/imagemeta/exif2"
 	"github.com/evanoberholster/imagemeta/imagetype"
-	"github.com/evanoberholster/imagemeta/jpeg"
 	"github.com/evanoberholster/imagemeta/xmp"
 )
 
@@ -272,14 +271,18 @@ var errNotJPEG = errors.New("not a JPEG stream (no SOI marker)")
 // (passes a nil xmp reader to ScanJPEG); here we wire xmp.ParseXmp so the device
 // signals that live only in XMP (tiff:Make/Model, CreatorTool) are recovered —
 // pure-Go, no exiftool. JPEG photos only; the other photo formats go through extractPhotoImage.
-func decodePhoto(rs io.ReadSeeker) (exif2.Exif, xmp.XMP, error) {
+func decodePhoto(rs io.ReadSeeker) (ex exif2.Exif, x xmp.XMP, err error) {
+	defer recoverDecode(&err) // imagemeta panics on some truncated IFDs
+	return decodeJPEGMeta(rs)
+}
+
+func decodeJPEGMeta(rs io.ReadSeeker) (exif2.Exif, xmp.XMP, error) {
 	rr := bufio.NewReader(rs)
 	ir := exif2.NewIfdReader(exif2.Logger)
 	defer ir.Close()
 
-	// Guard: imagemeta v0.3.1 jpeg.ScanJPEG spins forever when the stream does
-	// not start with the SOI marker (e.g. a PNG named .jpg). Refuse early; the
-	// caller falls back to filename/mtime.
+	// A stream that does not start with the SOI marker (e.g. a PNG named
+	// .jpg) is refused early; the caller falls back to filename/mtime.
 	if head, err := rr.Peek(3); err != nil || head[0] != 0xff || head[1] != 0xd8 || head[2] != 0xff {
 		return exif2.Exif{}, xmp.XMP{}, errNotJPEG
 	}
@@ -294,7 +297,7 @@ func decodePhoto(rs io.ReadSeeker) (exif2.Exif, xmp.XMP, error) {
 		x, _ = xmp.ParseXmp(r) // best-effort: malformed XMP just yields a zero value
 		return nil
 	}
-	if err := jpeg.ScanJPEG(rr, ir.DecodeJPEGIfd, xmpFn); err != nil {
+	if err := scanJPEG(rr, ir.DecodeJPEGIfd, xmpFn); err != nil {
 		return ir.Exif, x, err
 	}
 	return ir.Exif, x, nil
