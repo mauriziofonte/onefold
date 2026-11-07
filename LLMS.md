@@ -27,7 +27,7 @@ onefold is a single static Go binary that deduplicates photo/video archives and 
 | `cmd/onefold` | CLI: `merge rearrange purge-sources catalog plan golden-index match similar reclaim backup seed apply export-text push stats dedupe naming doctor tools gui hash index version`; `e2e_test.go` builds the binary |
 | `cmd/bakeoff` | throwaway benchmark, not product |
 | `internal/kinds` | file-type registry: `types.tsv` (one row per extension) + presets, skip lists, magic sniff, the stats families of the categories (`Family`) |
-| `internal/meta` | metadata extraction (time, device, dims, title/author...) |
+| `internal/meta` | metadata extraction (time, device, dims, place, title/author...); `-takeout`: Google Takeout `.json` files (time below the file's own, place, `-edited` copies as edits) |
 | `internal/catalog` | indexer: rooms -> manifest JSONL; `Filters` = the scope with its defaults, shared by the CLI flags and the GUI; skip rules by name (`Rules`: `-skip`/`-keep`), exclusions by path and pattern, the reason of every excluded file, driver/installer package folders |
 | `internal/plan` | dedup + winner election + canonical names -> plan JSONL; full-content verification |
 | `internal/golden` | golden index built from the applied plans (+ manifests), never from the tree; incremental `match`: new files planned against it -> dupes, upgrades (reported, never applied), sub-plan of new assets with names free in the tree |

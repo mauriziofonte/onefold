@@ -290,6 +290,7 @@ Useful plan options:
 - `-verify-full` reads every candidate duplicate in full before dropping it (run it where the files are readable);
 - `-video-tolerance 1` treats re-encoded videos whose length changed by up to a second as the same video;
 - `-filename-seq` keeps the counter of date-only names (`IMG-20200101-WA0007.jpg` -> `IMG_20200101_100000_WA0007.jpg`) instead of numbering them `_01`, `_02`;
+- `catalog -takeout` reads the `.json` files of a Google Takeout export: a photo or video without a date of its own (WhatsApp images, screenshots, edited copies) takes the capture time Google recorded, and its place; the `-edited` copies Takeout puts next to an original are kept as edits (`EDT_...`), never dropped as smaller versions of it. Also in `merge` and `rearrange`;
 - `-sidecars` (with `catalog -sidecars`) keeps the files that belong to a photo or video with it: the iPhone edits (`IMG_1234.AAE`), the Lightroom or darktable metadata (`IMG_1234.xmp`, `IMG_1234.CR2.xmp`), a camera's video thumbnail (`MVI_1234.THM`), the Google Takeout data (`IMG_1234.HEIC.json`) and the video of a Live Photo (`IMG_1234.MOV`, at most 6 seconds) are copied next to the golden file under its new name, so editors and photo apps still find them. They are never assets of their own. When the winner has none, those of a byte-identical copy on the same machine are taken.
 
 ### Adding files later

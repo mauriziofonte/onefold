@@ -141,6 +141,8 @@ export default {
   'filters.title': 'Filters',
   'filters.sidecars': 'Keep sidecars with their photo or video',
   'filters.sidecars.ex': 'the .AAE, .xmp, .THM, Google Takeout .json and the video of a Live Photo take the new name of their photo and are never deduplicated alone',
+  'filters.takeout': 'Read Google Takeout data',
+  'filters.takeout.ex': 'the .json next to each photo and video gives its date when the file has none, its place, and keeps the "-edited" copies as edits',
   'filters.maxSize': 'Max size',
   'filters.exclude': 'Exclude paths containing (comma separated)',
   'safety.title': 'Safety',

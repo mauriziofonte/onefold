@@ -358,7 +358,7 @@ func cmdCatalog(args []string) {
 		fmt.Printf(" %s %d", k, sum.ByKind[k])
 	}
 	fmt.Println()
-	fmt.Printf("time source:  metadata %d | filename %d | filemtime %d | NONE %d\n", sum.FromMetadata, sum.FromFilename, sum.FromMtime, sum.NoTime)
+	fmt.Printf("time source:  metadata %d | filename %d | takeout %d | filemtime %d | NONE %d\n", sum.FromMetadata, sum.FromFilename, sum.FromTakeout, sum.FromMtime, sum.NoTime)
 	fmt.Printf("sub-second:   %d photos   |   dims missing: %d\n", sum.SubSec, sum.DimsMissing)
 	fmt.Printf("logical:      %s   wall: %s", report.HumanBytes(sum.LogicalBytes), sum.Elapsed.Round(time.Millisecond))
 	if secs > 0 {
