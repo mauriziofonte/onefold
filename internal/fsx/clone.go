@@ -19,4 +19,7 @@ var ErrNoClone = errors.New("cloning not supported here")
 // with dst absent. A clone is a separate file: deleting or changing the
 // source never touches it. It shares the device blocks, though: one bad
 // sector damages both, so a backup never clones.
-func Clone(src, dst string) error { return cloneFile(src, dst) }
+func Clone(src, dst string) error {
+	CrashPoint("clone")
+	return cloneFile(src, dst)
+}

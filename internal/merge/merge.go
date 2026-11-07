@@ -892,7 +892,7 @@ func copyOne(c Copy, dst string, buf []byte, o Options) (content string, err err
 	}
 	h := xxh3.New()
 	tc := perf.Start()
-	n, err := io.CopyBuffer(io.MultiWriter(f, h), struct{ io.Reader }{src}, buf)
+	n, err := io.CopyBuffer(io.MultiWriter(fsx.CrashWriter(f), h), struct{ io.Reader }{src}, buf)
 	perf.End("copy", tc, n)
 	if err != nil {
 		return "", err
@@ -906,6 +906,7 @@ func copyOne(c Copy, dst string, buf []byte, o Options) (content string, err err
 	}
 	if !o.NoFsync {
 		ts := perf.Start()
+		fsx.CrashPoint("fsync")
 		if err = f.Sync(); err != nil {
 			return "", err
 		}
@@ -1046,7 +1047,7 @@ func WriteCache(p string, recs []catalog.Record) error {
 	if err != nil {
 		return err
 	}
-	bw := bufio.NewWriterSize(f, 1<<20)
+	bw := bufio.NewWriterSize(fsx.CrashWriter(f), 1<<20)
 	if err := catalog.WriteHeader(bw, catalog.KindManifest); err != nil {
 		f.Close()
 		return err
@@ -1069,5 +1070,6 @@ func WriteCache(p string, recs []catalog.Record) error {
 	if err := f.Close(); err != nil {
 		return err
 	}
+	fsx.CrashPoint("rename")
 	return os.Rename(tmp, p) // our own cache file: replacing it is intended
 }

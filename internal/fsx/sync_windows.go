@@ -12,6 +12,7 @@ import "os"
 // opened without truncating and not written to). A read-only file cannot be
 // flushed and returns its error: callers that delete another copy then refuse.
 func SyncFile(path string) error {
+	CrashPoint("fsync")
 	f, err := os.OpenFile(path, os.O_WRONLY, 0)
 	if err != nil {
 		return err
@@ -27,6 +28,7 @@ func SyncFile(path string) error {
 // with MOVEFILE_WRITE_THROUGH, which returns only once the move is on disk,
 // and NTFS journals directory changes.
 func SyncDir(dir string) error {
+	CrashPoint("fsync")
 	_, err := os.Stat(dir)
 	return err
 }

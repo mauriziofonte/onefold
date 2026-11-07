@@ -345,6 +345,7 @@ func del(p string, trash bool) error {
 	if trash {
 		return moveToTrash(p)
 	}
+	fsx.CrashPoint("remove")
 	return os.Remove(p)
 }
 
@@ -482,10 +483,11 @@ func (j *journal) write(e entry) {
 	}
 	e.Time = time.Now().Format(time.RFC3339)
 	b, _ := json.Marshal(e)
-	if _, err := j.f.Write(append(b, '\n')); err != nil {
+	if _, err := fsx.CrashWriter(j.f).Write(append(b, '\n')); err != nil {
 		j.err = err
 		return
 	}
+	fsx.CrashPoint("fsync")
 	j.err = j.f.Sync()
 }
 

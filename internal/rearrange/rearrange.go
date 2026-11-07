@@ -544,7 +544,7 @@ func writeJournal(root string, res *Result) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	bw := bufio.NewWriter(f)
+	bw := bufio.NewWriter(fsx.CrashWriter(f))
 	enc := json.NewEncoder(bw)
 	enc.Encode(header{Op: "header", Root: root, Naming: res.Naming, Time: time.Now().Format(time.RFC3339),
 		Coverage: res.coverage, Sample: res.sample, Blocks: sparsehash.MaxBlocks, KeepEmptyDirs: res.keepEmpty})
@@ -558,6 +558,7 @@ func writeJournal(root string, res *Result) (string, error) {
 		f.Close()
 		return "", err
 	}
+	fsx.CrashPoint("fsync")
 	if err := f.Sync(); err != nil {
 		f.Close()
 		return "", err
@@ -674,6 +675,7 @@ func doDeletes(root string, res *Result, workers int, tick func(), gate *runctl.
 			if ch != kh || (d.Content != "" && ch != d.Content) {
 				return errors.New("content differs from its keeper: NOT deleted")
 			}
+			fsx.CrashPoint("remove")
 			return os.Remove(abs(root, d.Path))
 		}()
 		mu.Lock()
@@ -919,6 +921,7 @@ func RecoverWith(journal string, undo bool, o RecoverOptions) (RecoverResult, er
 			case ch != kh || (d.Content != "" && ch != d.Content):
 				fail("delete "+d.Src, errors.New("content differs from its keeper: NOT deleted"))
 			default:
+				fsx.CrashPoint("remove")
 				if err := os.Remove(p); err != nil {
 					fail("delete "+d.Src, err)
 				} else {

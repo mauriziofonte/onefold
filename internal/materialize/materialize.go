@@ -408,11 +408,12 @@ func copyFile(src, tmp string, clone bool) (cloned bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	if _, err := io.Copy(out, in); err != nil {
+	if _, err := io.Copy(fsx.CrashWriter(out), in); err != nil {
 		out.Close()
 		os.Remove(tmp)
 		return false, err
 	}
+	fsx.CrashPoint("fsync")
 	if err := out.Sync(); err != nil {
 		out.Close()
 		os.Remove(tmp)
@@ -431,6 +432,7 @@ func syncFile(p string) error {
 	if err != nil {
 		return err
 	}
+	fsx.CrashPoint("fsync")
 	if err := f.Sync(); err != nil {
 		f.Close()
 		return err

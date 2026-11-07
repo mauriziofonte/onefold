@@ -22,6 +22,7 @@ var ErrCrossVolume = errors.New("source and destination are on different volumes
 // ErrCrossVolume; a filesystem without hard links (FAT, exFAT, some network
 // shares) returns the system error, wrapped with both paths.
 func LinkNoReplace(src, dst string) error {
+	CrashPoint("link")
 	err := os.Link(src, dst)
 	switch {
 	case err == nil:

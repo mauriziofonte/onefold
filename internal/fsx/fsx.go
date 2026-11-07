@@ -47,6 +47,7 @@ func TempFor(dst string, keepExt bool) string {
 // (hard link + unlink, then check-and-rename) is used where the kernel/FS does
 // not support an atomic no-replace rename (e.g. WSL drvfs).
 func RenameNoReplace(src, dst string) error {
+	CrashPoint("rename")
 	err := renameNoReplace(src, dst)
 	if err == nil || errors.Is(err, ErrExists) || !errors.Is(err, errUnsupported) {
 		return err

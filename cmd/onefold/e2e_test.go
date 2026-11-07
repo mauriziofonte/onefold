@@ -63,6 +63,7 @@ func TestMain(m *testing.M) {
 		bin = b
 		code := m.Run()
 		os.RemoveAll(state)
+		removeCrashDir()
 		os.Exit(code)
 	}
 	dir, err := os.MkdirTemp("", "onefold-e2e-bin")
@@ -81,6 +82,7 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 	os.RemoveAll(dir)
 	os.RemoveAll(state)
+	removeCrashDir()
 	os.Exit(code)
 }
 
