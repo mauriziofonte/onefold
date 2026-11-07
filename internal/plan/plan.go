@@ -646,7 +646,6 @@ func VerifyGroupsWith(recs []catalog.Record, workers int, prog catalog.Progress,
 	for i, rec := range recs {
 		byHash[rec.Hash] = append(byHash[rec.Hash], i)
 	}
-	out := append([]catalog.Record(nil), recs...)
 	var todo [][]int
 	for _, idxs := range byHash {
 		if len(idxs) < 2 {
@@ -661,6 +660,10 @@ func VerifyGroupsWith(recs []catalog.Record, workers int, prog catalog.Progress,
 		}
 	}
 	st.Groups = len(todo)
+	if len(todo) == 0 {
+		return recs, st // nothing to verify: no copy of the records
+	}
+	out := append([]catalog.Record(nil), recs...)
 	full := make([]string, len(recs))
 	jobs := make(chan int)
 	var wg sync.WaitGroup
