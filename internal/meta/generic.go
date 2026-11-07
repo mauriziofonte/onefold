@@ -551,8 +551,14 @@ func extractImage(p, ext string, m *Meta) {
 		imageDims(p, ext, m)
 		return
 	}
-	t := exifJSON(p, "-DateTimeOriginal", "-SubSecTimeOriginal", "-CreateDate", "-Make", "-Model", "-Software", "-CreatorTool", "-ImageWidth", "-ImageHeight")
+	t := exifJSON(p, "-DateTimeOriginal", "-SubSecTimeOriginal", "-CreateDate", "-Make", "-Model", "-Software", "-CreatorTool", "-ImageWidth", "-ImageHeight",
+		"-Composite:GPSLatitude#", "-Composite:GPSLongitude#")
 	if t != nil {
+		if lat, ok1 := t["GPSLatitude"].(float64); ok1 {
+			if lon, ok2 := t["GPSLongitude"].(float64); ok2 {
+				setGeo(m, lat, lon)
+			}
+		}
 		exifTime(t, m, "DateTimeOriginal", "CreateDate")
 		if dto, wall, ok := parseExifDate(asStr(t["DateTimeOriginal"])); ok && wall && m.Time == dto.Format(canonFmt) {
 			m.SubSecNs = subSecNs(anyStr(t["SubSecTimeOriginal"]))

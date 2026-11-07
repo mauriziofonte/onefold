@@ -465,6 +465,7 @@ func imageNative(p string, m *Meta) error {
 	if ex.ImageWidth > 0 && ex.ImageHeight > 0 {
 		m.Width, m.Height = int(ex.ImageWidth), int(ex.ImageHeight)
 	}
+	setGeo(m, ex.GPS.Latitude(), ex.GPS.Longitude())
 	return nil
 }
 
@@ -607,6 +608,7 @@ func pngExifNative(p string, m *Meta) error {
 				m.CanonDevice, m.Category, m.Prefix = CanonicalDevice(mk, md, ex.Software, "")
 				m.Device = strings.TrimSpace(mk + " " + md)
 			}
+			setGeo(m, ex.GPS.Latitude(), ex.GPS.Longitude())
 			return nil
 		}
 		if typ == "IDAT" || typ == "IEND" {

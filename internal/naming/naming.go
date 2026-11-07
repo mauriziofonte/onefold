@@ -259,6 +259,47 @@ func (n *Naming) Target(v Vars) string {
 	return names.NFC(t.Render(v))
 }
 
+// Uses reports whether any template of n has one of the placeholders.
+func (n *Naming) Uses(placeholders ...string) bool {
+	want := map[string]bool{}
+	for _, p := range placeholders {
+		want[p] = true
+	}
+	var walk func(nd node) bool
+	walk = func(nd node) bool {
+		switch x := nd.(type) {
+		case ph:
+			for _, a := range x {
+				if want[a.name] {
+					return true
+				}
+			}
+		case seq:
+			for _, c := range x {
+				if walk(c) {
+					return true
+				}
+			}
+		case group:
+			for _, s := range x {
+				if walk(s) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	for _, t := range n.byKind {
+		if walk(t.root) {
+			return true
+		}
+	}
+	return false
+}
+
+// PlacePlaceholders are the placeholders that need a place (catalog Places).
+var PlacePlaceholders = []string{"country", "country-en", "country-it", "country-code", "city"}
+
 // Spec renders the naming back as "kind=template;..." (for reports).
 func (n *Naming) Spec() string {
 	keys := make([]string, 0, len(n.byKind))

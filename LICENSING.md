@@ -32,3 +32,5 @@ Neither license grants rights to the onefold name or logo: see [TRADEMARKS.md](T
 ## 5. Third-party components
 
 The dependencies keep their own licenses. Release binaries ship with `THIRD_PARTY_NOTICES.txt` (`make notices`).
+
+The binaries also carry data made by others: the city table behind the `{city}` and `{country}` placeholders comes from [GeoNames](https://www.geonames.org) under the [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/) license (onefold keeps only part of it: what and how is in [internal/geo/DATA.md](internal/geo/DATA.md)), and the country names from the [Unicode CLDR](https://cldr.unicode.org) under the [Unicode License v3](https://www.unicode.org/license.txt).

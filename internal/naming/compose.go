@@ -36,8 +36,8 @@ type Family struct {
 
 // Families in display order; "rest" (everything else) is last.
 var Families = []Family{
-	{"img", "image", "photo,image", []string{"photo-timestamp", "photo-month", "devices"}},
-	{"video", "video", "video", []string{"video-tier"}},
+	{"img", "image", "photo,image", []string{"photo-timestamp", "photo-month", "devices", "places"}},
+	{"video", "video", "video", []string{"video-tier", "places"}},
 	{"doc", "document", docGroups, []string{"documents"}},
 	{"music", "audio", "audio", []string{"music"}},
 	{"arch", "archive", "archive", nil},

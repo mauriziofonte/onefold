@@ -229,6 +229,9 @@ func Run(o Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	if nm.Uses(naming.PlacePlaceholders...) {
+		o.Catalog.Places = true // the naming needs where each file was taken
+	}
 	out, err := cleanAbs(o.Output)
 	if err != nil {
 		return nil, err

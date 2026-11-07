@@ -35,6 +35,7 @@ func exifTIFF(b []byte, m *Meta) error {
 		m.CanonDevice, m.Category, m.Prefix = CanonicalDevice(mk, md, ex.Software, "")
 		m.Device = strings.TrimSpace(mk + " " + md)
 	}
+	setGeo(m, ex.GPS.Latitude(), ex.GPS.Longitude())
 	return nil
 }
 

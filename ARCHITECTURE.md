@@ -206,6 +206,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 │   ├── plan/               dedup, winner election, canonical names, plan files
 │   ├── names/              name primitives: sanitize, _NN, legacy markers, copy names, tables
 │   ├── naming/             naming templates, presets, families, collision resolver
+│   ├── geo/                offline place lookup: GeoNames cities, CLDR country names
 │   ├── golden/             golden index and incremental match
 │   ├── materialize/        apply: copy, silver, publish
 │   ├── textexport/         export-text: plain-text sidecars, pure-Go extractors
@@ -265,6 +266,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 | `internal/textexport` | text sidecars | `Export`, `Extract` |
 | `internal/similar` | look-alike review lists | `Find`, `FindDocs`, `DHash` |
 | `internal/reclaim` | verified drops, deletion script | `Check`, `Script` |
+| `internal/geo` | offline place lookup for `{country}` and `{city}` | `Lookup`, `CountryName`, `Valid` |
 | `internal/backup` | cold copy, audit, tree health and restore | `Run`, `Check`, `Compare`, `Restore`, `ResumeRestore` |
 | `internal/seed` | rsync/robocopy scripts | `Collect`, `Rsync`, `Robocopy` |
 | `internal/remote` | SFTP push | `Dial`, `Client.UploadTree` |
@@ -302,7 +304,7 @@ Leaves: `kinds`, `fsx`, `perf`, `report`, `runctl`, `statedir`, `testfix`, `winr
 | `tooldl` | fsx |
 | `meta` | kinds, perf, tools |
 | `catalog` | fsx, hashcache, kinds, meta, names, perf, runctl, sparsehash |
-| `naming` | catalog, kinds, meta, names |
+| `naming` | catalog, geo, kinds, meta, names |
 | `sidecar` | catalog, kinds, names |
 | `plan` | catalog, kinds, meta, names, naming, perf, runctl, sidecar, sparsehash |
 | `golden` | catalog, kinds, names, plan |
@@ -318,6 +320,7 @@ Leaves: `kinds`, `fsx`, `perf`, `report`, `runctl`, `statedir`, `testfix`, `winr
 | `materialize` | fsx, kinds, meta, plan, runctl, tools |
 | `textexport` | fsx, kinds, meta, plan, tools |
 | `similar` | kinds, meta, plan, runctl, textexport, tools |
+| `geo` | standard library only (embedded tables) |
 | `reclaim` | plan, runctl, sparsehash |
 | `backup` | fsx, merge, runctl, sparsehash, statedir |
 | `seed` | plan |
@@ -458,9 +461,10 @@ One JSON object per line after the header (`catalog.Record`):
 | `meta.width`, `meta.height`, `meta.durationSec` | pixels; seconds (video) |
 | `meta.fileCategory` | registry category of the extension |
 | `meta.title`, `author`, `album`, `tagYear`, `track`, `disc`, `pages`, `entries` | generic metadata (documents, audio, archives) |
-| `meta.lat`, `meta.lon` | where a photo or video was taken, degrees (WGS84), 6 decimals; absent = unknown |
+| `meta.lat`, `meta.lon` | where a photo or video was taken, degrees (WGS84), 6 decimals; absent = unknown. Only with `-places` (the file's own GPS) or `-takeout` (the Takeout file's place) |
 | `meta.extMismatch`, `meta.sniffExt` | the magic bytes disagree with the extension; the extension they imply when unambiguous |
 | `takeout` | extracted with `-takeout` (section 9.2) |
+| `places` | extracted with `-places` (section 13.10) |
 | `sidecar` | cataloged only because it may belong to a photo or video (`catalog -sidecars`: its type is out of the scope); kept with its owner, never an asset (section 13.9) |
 
 Fields marked omitempty are absent in older manifests, which load and plan unchanged. The order of records is not deterministic (parallel workers).
@@ -991,6 +995,7 @@ Parse errors are reported with their position: unclosed `{`/`<`, stray `>`/`|`/`
 | `{device}`, `{device-slug}`, `{device-category}` | canonical device, slug, category |
 | `{tier}` | video tier from the size |
 | `{author}`, `{title}`, `{artist}`, `{album}`, `{album-year}`, `{track-num}` | document and audio metadata; `{track-num}` = `NN`, `DNN` when the disc is above 1 |
+| `{country}`, `{country-en}`, `{country-it}`, `{country-code}`, `{city}` | where a photo or video was taken (`meta.lat`, `meta.lon`; section 13.10): the country in the configured names language, English, Italian, its ISO 3166-1 code; the city as GeoNames writes it. Empty without a place |
 
 ### 13.3 Presets
 
@@ -1007,6 +1012,7 @@ Parse errors are reported with their position: unclosed `{`/`<`, stray `>`/`|`/`
 | `documents` | documents: `<GROUP>/<YEAR>/<Author>/<Title>`; rest by extension and year |
 | `music` | audio: `<Artist>/<Year - Album>/<NN. Title>`; rest by extension and year |
 | `devices` | photos and images: `<Category>/<Device>/<YEAR>/<name>`; rest by extension and year |
+| `places` | photos, images and videos: `<YEAR>/<Country>/<City>/<name>` (no city: `<YEAR>/<Country>/<name>`; no place: `Unknown place`); rest by extension and year |
 | `library`, `library-files`, `library-date-tree`, `library-documents`, `library-music`, `library-devices` | the golden tree family: rooted under `PICTURES`/`VIDEOS`/`FILES`/`TIMELINE`/`DOCUMENTS`/`MUSIC`/`DEVICES`, raw `{stem}`, undated year `0000`, harmonized extension; frozen |
 
 Any preset + `-clean` uses `{stem-clean}` instead of `{stem-norm}`.
@@ -1073,6 +1079,15 @@ A sidecar is a file that belongs to a photo or video in its folder and only make
 | `sidecar.Target(ownerOld, ownerNew, side)` | the sidecar's new path: ownerNew's folder, its stem (or whole name) plus the kept part; the sidecar's own extension stays as written |
 
 Rules: a paired file follows its owner and is never deduplicated on its own (two photos with the same edit file keep one each); a file cataloged only as a possible sidecar (`Record.Sidecar`) that has no owner is left out. In the golden plan the winner's sidecars come first, then those of its byte-identical copies on the winner's host for the names it lacks; a stem-form name another file of the tree takes falls back to the winner's whole name (`VID_x.mp4.THM`). Merge: a sidecar goes next to the output file holding its owner's content (copied, or already there with the same bytes under that name, or the next `_NN` name when other bytes are: its link to the photo is lost then, never its content). `match` places the sidecars of the new actions it renames again (`plan.PlaceSidecars`).
+
+### 13.10 Places
+
+`{country}` and `{city}` file photos and videos by where they were taken, offline (`internal/geo`; the tables are embedded, nothing leaves the computer).
+
+- The point: with `-places` (`Filters.Places`, catalog, merge and rearrange; the GUI filters checkbox; off by default, so a manifest holds no location) the catalog keeps the place a file's own metadata gives in `meta.lat`/`meta.lon`: EXIF GPS (JPEG, HEIC, TIFF, camera RAW, PNG, WebP through `imagemeta`; exiftool's composite `GPSLatitude`/`GPSLongitude` where exiftool is the reader), and the ISO 6709 location of a video (`com.apple.quicktime.location.ISO6709`, QuickTime `©xyz`, 3GPP `loci`; read by ffprobe and, without it, by the pure-Go ISO-BMFF reader, the same values: `TestVideoPlaceParity`). A merge or rearrange whose naming uses a place placeholder (`Naming.Uses(PlacePlaceholders...)`) turns `-places` on by itself. Records carry `places: true`, and a reuse needs the same setting.
+- The tables (`internal/geo/DATA.md`): 47,334 populated places of GeoNames (the 2020-03-18 snapshot of `cities1000.txt`; at least 5000 people, plus every capital and first-order seat; no sections of a city, `PPLX`, which would split a city into neighbourhoods), 762 KB gzipped, read on the first lookup; country names in English and Italian from the Unicode CLDR. `go run internal/geo/gen/main.go -cities cities1000.txt` regenerates them.
+- The lookup (`geo.Lookup`): among the places within 30 km (`CityMaxKm`), the one with the smallest distance divided by `(population/5000)^(1/4)` (at least 1): a landmark inside a large city stays in it even when a smaller place is nearer to it than the city's centre (the Eiffel Tower is in Paris, not Neuilly), a point in a small town still gets the town. The country is that place's; without a place within 30 km, the nearest place's within 100 km (`CountryMaxKm`); else nothing (at sea). A 0.5 degree grid, the antimeridian wraps; about 30 µs per new point, cached by 10 m. Near a border the nearest place can be across it: the country is approximate there.
+- Values: `{country}` follows `names-language` (`Italy`, `Italia`), `{country-en}`, `{country-it}`, `{country-code}` (ISO 3166-1), `{city}` as GeoNames writes it (`Rome`, `Munich`: mostly the English or the local name), each made one portable path component (`names.Sanitize`: `Biel/Bienne` becomes `Biel_Bienne`). The preset `places`: `<YEAR>/<Country>/<City>/<name>`.
 
 ---
 

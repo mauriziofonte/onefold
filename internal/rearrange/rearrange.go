@@ -170,6 +170,9 @@ func Run(o Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	if nm.Uses(naming.PlacePlaceholders...) {
+		o.Catalog.Places = true // the naming needs where each file was taken
+	}
 	res := &Result{Root: root, Naming: nm.Spec(), coverage: o.Catalog.Coverage, sample: o.Catalog.Sample, keepEmpty: o.KeepEmptyDirs}
 
 	// Refuse to run over an interrupted rearrange.

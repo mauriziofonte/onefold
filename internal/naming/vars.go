@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/mauriziofonte/onefold/internal/catalog"
+	"github.com/mauriziofonte/onefold/internal/geo"
 	"github.com/mauriziofonte/onefold/internal/kinds"
 	"github.com/mauriziofonte/onefold/internal/meta"
 	"github.com/mauriziofonte/onefold/internal/names"
@@ -87,6 +88,11 @@ var Placeholders = [][2]string{
 	{"album", "audio album"},
 	{"album-year", "audio release year tag"},
 	{"track-num", "NN, or DNN when disc > 1"},
+	{"country", "country where a photo or video was taken (GPS; catalog -places), in names-language: Italy or Italia"},
+	{"country-en", "country in English"},
+	{"country-it", "country in Italian"},
+	{"country-code", "ISO country code (IT, FR, US...)"},
+	{"city", "nearest city or town of 5000+ people within 30 km, as GeoNames writes it (Rome, Munich...)"},
 }
 
 var knownPH = func() map[string]bool {
@@ -196,6 +202,16 @@ func VarsOfCtx(r catalog.Record, exists func(path string) bool) Vars {
 	}
 	if m.Kind == kinds.Video {
 		v["tier"] = names.VideoTier(m.Width, m.Height)
+	}
+	if p, ok := geo.Lookup(m.Lat, m.Lon); ok {
+		v["country-code"] = p.CountryCode
+		v["country-en"] = clean(names.Sanitize(geo.CountryName(p.CountryCode, geo.English), 100))
+		v["country-it"] = clean(names.Sanitize(geo.CountryName(p.CountryCode, geo.Italian), 100))
+		v["country"] = v["country-en"]
+		if l, _ := namesLanguage.Load().(string); l == NamesIT {
+			v["country"] = v["country-it"]
+		}
+		v["city"] = clean(names.Sanitize(p.City, 100))
 	}
 	switch {
 	case m.Track > 0 && m.Disc > 1:

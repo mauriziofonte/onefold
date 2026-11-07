@@ -1188,3 +1188,27 @@ func TestTakeoutCLI(t *testing.T) {
 		}
 	}
 }
+
+// TestPlacesCLI: a merge whose naming uses {country} and {city} reads where
+// each photo was taken and files it there; catalog keeps the place only
+// with -places.
+func TestPlacesCLI(t *testing.T) {
+	root := testfix.TempDir(t)
+	src, out := filepath.Join(root, "src"), filepath.Join(root, "out")
+	must(t, testfix.JPEG(filepath.Join(src, "IMG_0001.jpg"), 32, 24, 1, testfix.Exif{DateTimeOriginal: "2021:05:06 07:08:09", Lat: 41.8902, Lon: 12.4922}))
+	must(t, testfix.JPEG(filepath.Join(src, "IMG_0002.jpg"), 32, 24, 2, testfix.Exif{DateTimeOriginal: "2021:05:06 07:08:10"}))
+	m := filepath.Join(root, "m.jsonl")
+	dd(t, "catalog", "-host", "pc", "-o", m, src)
+	if b, _ := os.ReadFile(m); strings.Contains(string(b), `"lat"`) {
+		t.Fatal("a place in a manifest cataloged without -places")
+	}
+	if o := dd(t, "catalog", "-places", "-host", "pc", "-o", m, src); !strings.Contains(o, "places:       1 photos and videos") {
+		t.Fatalf("catalog -places: %s", o)
+	}
+	dd(t, "merge", "-execute", "-naming", "places", "-input", src, "-output", out)
+	for _, p := range []string{"2021/Italy/Rome/IMG_0001.jpg", "2021/Unknown place/IMG_0002.jpg"} {
+		if _, err := os.Stat(filepath.Join(out, filepath.FromSlash(p))); err != nil {
+			t.Errorf("%s: %v", p, err)
+		}
+	}
+}

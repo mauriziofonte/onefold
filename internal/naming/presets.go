@@ -86,6 +86,8 @@ var Presets = func() map[string]Preset {
 			`video=VIDEOS/{year|"0000"}/<VID_{datetime}.{ext-norm}|{stem}<.{ext-norm}>>;*=FILES/` + goldenYear,
 			"PICTURES/<EXT>/<YEAR>/<PFX>_<datetime>, VIDEOS/<YEAR>/VID_<datetime>, FILES/<EXT>/<YEAR>/<name>"},
 		"library-files": {`*=FILES/` + goldenYear, "FILES/<EXT>/<YEAR or 0000>/<name> (plan default)"},
+		"places": {`photo,image,video={year|"UNDATED"}/{country|"Unknown place"}/<{city}/>{stem-norm}<.{ext}>;*=` + extYear,
+			"photos and videos: <YEAR>/<Country>/<City>/<name> (where they were taken: -places); rest <EXT>/<YEAR>/<name>"},
 	}
 	for name, l := range layouts {
 		fallback := ";*=" + extYear
