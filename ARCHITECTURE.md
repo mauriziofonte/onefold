@@ -150,6 +150,7 @@ Four operations delete or replace files in the folders they are given, each only
 - `push` never overwrites a remote file: same size = skipped (resume), different size = conflict (listed, exit 1).
 - `backup` never replaces a file of the copy: another file under the same path is a conflict. Only `backup -restore` replaces, and only a file proven damaged against the recorded hash (section 3.1).
 - Published names are durable: a file's bytes are flushed before its rename, and at the end of a run every folder that gained or lost a name is flushed once (`fsx.DirSet`): `merge` (unless `-no-fsync`), `apply`, `export-text`, `backup` (before its manifest) and `rearrange` (after its moves, and after a resume or undo). A deletion that relies on another copy flushes that copy and its folder first (`purge-sources`, section 18.2).
+- A stop at any point is recoverable, and tested: the crash tests (section 27.1.3) stop `merge`, `rearrange`, `purge-sources` and `apply` at each of their writes, fsyncs, renames, links, clones and removals in turn, run them again (`rearrange -resume` from the journal) and require the result of a run that was never stopped. Every such operation of these commands goes through `fsx` (its primitives, or `fsx.CrashPoint` and `fsx.CrashWriter` next to a direct `os` call), so that a new one is a crash point too.
 
 ### 3.3 Duplicates are proven, not guessed
 
@@ -1906,7 +1907,7 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 | `rearrange` | end to end, interrupted runs, duplicate re-verification, presets, stop then recover, refusals, the journal reader and its root check (`TestJournalPathsStayInRoot`, `FuzzReadJournal`) |
 | `purge` | purge, refusals, output inside an input, report reading, journal required, Recycle Bin volume rules, path spellings, the Trash on macOS and Linux (`TestTrashItem`) |
 | `stats` | breakdowns and duplicates on a synthetic tree (`TestRun`), `off`/`fast`/`full` (`TestDupModes`), nested roots and hard links counted once, tree depth, the volume list, Linux `mountinfo` parsing |
-| `fsx`, `tools`, `statedir` | no-replace rename (the one-call primitive on each CI system), no-replace links, temp names, uncached reads, `Canonical` and the stored spelling on macOS; Homebrew lookup without `PATH`, on Windows a killed tool takes its children; the state dir of each OS |
+| `fsx`, `tools`, `statedir` | crash points (section 27.1.3), no-replace rename (the one-call primitive on each CI system), no-replace links, temp names, uncached reads, `Canonical` and the stored spelling on macOS; Homebrew lookup without `PATH`, on Windows a killed tool takes its children; the state dir of each OS |
 | `similar`, `reclaim`, `backup`, `seed` | review lists, scripts (the sh script is executed; on Windows the robocopy script is executed), audits |
 | `textexport` | extractors, sidecars, Office 97-2003 files saved by Microsoft Office, SST continuation, Word fields; fuzz targets of the Word, Excel and PowerPoint streams, RTF and HTML (the text is valid UTF-8) |
 | `gui` | section 22.9; on Windows the WebView2 fallback |
@@ -1916,7 +1917,7 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 | `dedupe` | keep rules and `-keep-in`, links, clones (Btrfs, APFS), the Trash, refusals of a changed copy or an unflushed keeper, the script, `Resume` of a half-done replacement |
 | `schedule` | refused names, times and commands (anything that deletes), the systemd units, the launchd plist and the UTF-16 task XML of every system (built on any), Windows argument quoting read back, add, list, run (the recorded program in the recorded folder, exit code and log), remove leaving a file onefold did not write |
 | `power` | nested locks; Linux: a stand-in `systemd-inhibit` holds and releases the lock, a refused lock is reported, every thread gets the low I/O priority; macOS: the assertion is listed by `pmset -g assertions` and gone after release; Windows: execution state and background mode |
-| `cmd/onefold` | CLI end-to-end (`TestE2E` on a synthetic two-host corpus, `TestCorpusFlow`, merge, rearrange, desktop archive with purge, settings round trip, the golden delta flow with similar, reclaim, backup and seed, `apply -link`, `stats` with `-dups full`, `-json`, `-html`, `-mounts` and bad input, `plan -report` as Markdown, JSON and HTML, `dedupe` dry run, script, execute and exit codes, `schedule` add, run, list, log, remove and its refusals), `TestSourceHeaders`, `TestVersionFile`, `TestFuzzTargetsBuilt` |
+| `cmd/onefold` | CLI end-to-end (`TestE2E` on a synthetic two-host corpus, `TestCorpusFlow`, merge, rearrange, desktop archive with purge, settings round trip, the golden delta flow with similar, reclaim, backup and seed, `apply -link`, `stats` with `-dups full`, `-json`, `-html`, `-mounts` and bad input, `plan -report` as Markdown, JSON and HTML, `dedupe` dry run, script, execute and exit codes, `schedule` add, run, list, log, remove and its refusals), `TestSourceHeaders`, `TestVersionFile`, `TestFuzzTargetsBuilt`, the crash tests (section 27.1.3) |
 
 ### 27.1.1 Scale
 
@@ -1931,6 +1932,12 @@ Every reader of bytes a stranger may have written has a native Go fuzz target (`
 - A crash from CI is an artifact of the run: the bytes libFuzzer saved are encoded for the shim; a `go test -fuzz` run of the same target usually finds the same input in seconds, written to `testdata/fuzz/FuzzX/` where `go test` replays it.
 
 `scanJPEG` (`internal/meta/jpegscan.go`) is imagemeta's JPEG marker walk with one difference, found by fuzzing: the original loops forever on a marker met outside any image (before the first start-of-image, or after an end-of-image that comes before the quantization tables); `scanJPEG` stops there with an error, and the photo falls back to its file name like any unreadable EXIF. `TestScanJPEGMatchesImagemeta` and `FuzzJPEG` check that the two walks return the same error and hand the readers the same bytes on every other input. Panics of imagemeta on damaged IFDs become errors (`decodeEXIF`, `decodePhoto`). Known and not fixed here (a dependency change): on some damaged IFDs imagemeta v0.3.1 fills a tag with bytes left in its pooled buffer by an earlier file.
+
+### 27.1.3 Crash points
+
+`TestCrashMerge`, `TestCrashRearrange`, `TestCrashPurge` and `TestCrashApply` (`cmd/onefold/crash_test.go`) build onefold with `-tags crashtest`. In that build `fsx.CrashPoint` (in `RenameNoReplace`, `LinkNoReplace`, `Clone`, `SyncFile`, `SyncDir`, and next to the direct `Sync` and `Remove` calls and the journal and cache writes) and `fsx.CrashWriter` (around the copy writes) count the operations, and with `ONEFOLD_TEST_CRASH_AT=N` the Nth one ends the process at once (`os.Exit(fsx.CrashExit)`: no deferred cleanup, nothing buffered written; the Nth write writes half its bytes first). In a normal build both are empty and `CrashWriter` returns its writer unchanged.
+
+Each test runs its command on a small synthetic tree (copies inside and across inputs, a name taken by two contents, nested folders, a duplicate to delete) with N = 1, 2, ... until a run completes: about 20 points for a merge, 20 for a rearrange, 45 for a purge, 15 for an apply. After every stop it runs the command again the way a person would (a rearrange is resumed from its journal; a journal cut inside its first line means nothing was changed, and a new run starts over), and requires the same files with the same bytes and times as a run that was never stopped, untouched sources (merge, apply), deletions only where the content is in the output (purge), and no `*.onefold-tmp` or `*.onefold-mv` left. A process crash is simulated, not a power cut: what was written but not flushed survives here.
 
 ### 27.2 Fixtures
 

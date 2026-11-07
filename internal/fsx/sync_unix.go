@@ -16,6 +16,7 @@ import (
 // SyncFile flushes the data and metadata of the file at path to the device
 // (fsync; on macOS Go's File.Sync is F_FULLFSYNC, past the drive cache).
 func SyncFile(path string) error {
+	CrashPoint("fsync")
 	f, err := os.Open(path)
 	if err != nil {
 		return err
@@ -33,6 +34,7 @@ func SyncFile(path string) error {
 // (EINVAL, ENOTSUP: some FUSE and network mounts) are not an error: there is
 // nothing more onefold can do there, and their own semantics apply.
 func SyncDir(dir string) error {
+	CrashPoint("fsync")
 	f, err := os.Open(dir)
 	if err != nil {
 		return err
