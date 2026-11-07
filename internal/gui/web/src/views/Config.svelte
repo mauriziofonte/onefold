@@ -14,9 +14,11 @@
 
   // notifications belong to this browser (its permission), not to the config file
   let perm = $state(permission());
-  async function toggleNotify(on) {
+  async function toggleNotify(box) {
+    const on = box.checked;
     if (on) perm = await ask();
     settings.notify = on && perm === 'granted';
+    box.checked = settings.notify; // a refused permission leaves the box off
     saveSettings();
   }
 
@@ -98,7 +100,7 @@
     </form>
     <div class="card space-y-2" data-testid="config-notify">
       <div class="card-h"><Bell size={16} />{t('config.notify')}</div>
-      <label class="chk"><input type="checkbox" checked={settings.notify} disabled={perm === 'unsupported'} onchange={(e) => toggleNotify(e.currentTarget.checked)} data-testid="config-notify-on" />{t('config.notifyLabel')}</label>
+      <label class="chk"><input type="checkbox" checked={settings.notify} disabled={perm === 'unsupported'} onchange={(e) => toggleNotify(e.currentTarget)} data-testid="config-notify-on" />{t('config.notifyLabel')}</label>
       <p class="hint">{perm === 'unsupported' ? t('config.notifyUnsupported') : perm === 'denied' ? t('config.notifyDenied') : t('config.notifyHint')}</p>
     </div>
     <div class="card space-y-1 text-sm text-slate-600">
