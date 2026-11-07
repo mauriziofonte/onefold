@@ -244,6 +244,7 @@ func remove(o Options, res *Result, j *journal) []string {
 	}
 	var mu sync.Mutex
 	var done []string
+	var flushed fsx.DirSet // output folders already flushed this run
 	jobs := make(chan merge.Settle)
 	var wg sync.WaitGroup
 	for w := 0; w < o.Workers; w++ {
@@ -263,7 +264,7 @@ func remove(o Options, res *Result, j *journal) []string {
 				var gone bool
 				err := fmt.Errorf("journal not writable (%v): NOT deleted", jerr)
 				if jerr == nil {
-					gone, err = removeOne(it, o.Trash)
+					gone, err = removeOne(it, o.Trash, &flushed)
 				}
 				mu.Lock()
 				switch {
@@ -301,10 +302,14 @@ func remove(o Options, res *Result, j *journal) []string {
 	return done
 }
 
+// durable is fsx.Durable; a test replaces it to prove a copy that cannot be
+// flushed keeps its source.
+var durable = fsx.Durable
+
 // removeOne re-reads the source and its keeper in full and deletes the source
 // only when both hold the same content (and the recorded one). gone = the
 // source no longer exists (already purged).
-func removeOne(it merge.Settle, trash bool) (gone bool, err error) {
+func removeOne(it merge.Settle, trash bool, flushed *fsx.DirSet) (gone bool, err error) {
 	fi, err := os.Lstat(it.Src)
 	if os.IsNotExist(err) {
 		return true, nil
@@ -325,6 +330,13 @@ func removeOne(it merge.Settle, trash bool) (gone bool, err error) {
 	}
 	if sh != kh || (it.Content != "" && sh != it.Content) {
 		return false, errors.New("content differs from its copy in the output: NOT deleted")
+	}
+	// The copy was just read back, possibly from the OS cache: before the only
+	// other copy goes, its bytes and its name must be on the device, or a power
+	// cut right after the purge could keep the deletion and lose the copy (a
+	// merge run with -no-fsync, or a FAT/exFAT drive that orders nothing).
+	if err := durable(it.Keeper, flushed); err != nil {
+		return false, fmt.Errorf("copy in the output could not be flushed to disk (%v): NOT deleted", err)
 	}
 	return false, del(it.Src, trash)
 }

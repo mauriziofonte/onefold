@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mauriziofonte/onefold/internal/fsx"
 	"github.com/mauriziofonte/onefold/internal/plan"
 	"github.com/mauriziofonte/onefold/internal/runctl"
 	"github.com/mauriziofonte/onefold/internal/tools"
@@ -71,6 +72,7 @@ func ApplyAll(acts []plan.Action, target string, o RunOptions) RunStats {
 	var st RunStats
 	var mu sync.Mutex
 	var written, skipped, pending, unsilvered atomic.Int64
+	var dirs fsx.DirSet // folders of the tree that gained a file: flushed at the end
 	if o.Progress != nil && !o.Link {
 		// one notice per missing tool instead of one warning per file
 		if hasMedia(photos) && !tools.Has("exiftool") {
@@ -99,6 +101,7 @@ func ApplyAll(acts []plan.Action, target string, o RunOptions) RunStats {
 			}
 		default:
 			written.Add(1)
+			dirs.Add(res.Dst)
 			if res.Unsilvered != "" {
 				unsilvered.Add(1)
 				if o.Progress != nil && res.Unsilvered != NoExiftool && res.Unsilvered != NoFfmpeg {
@@ -163,6 +166,12 @@ func ApplyAll(acts []plan.Action, target string, o RunOptions) RunStats {
 		}
 	}()
 	wg.Wait()
+	// Each copy was flushed before its rename; the renames are flushed here,
+	// once per folder, so a power cut cannot drop names the run reported.
+	if err := dirs.SyncAll(); err != nil {
+		st.Failed++
+		st.Errors = append(st.Errors, "flushing the target folders to disk: "+err.Error())
+	}
 	st.Written, st.Skipped, st.Pending = int(written.Load()), int(skipped.Load()), int(pending.Load())
 	st.Unsilvered = int(unsilvered.Load())
 	st.Stopped = o.Gate.Stopped()

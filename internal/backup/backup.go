@@ -108,6 +108,7 @@ func Run(src, dst string, o Options) (*Result, error) {
 	var entries []Entry
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+	var dirs fsx.DirSet // folders that gained a copy: flushed before the manifest
 	jobs := make(chan file)
 	for w := 0; w < o.Workers; w++ {
 		wg.Add(1)
@@ -135,6 +136,7 @@ func Run(src, dst string, o Options) (*Result, error) {
 					res.Copied++
 					res.CopiedBytes += f.size
 					entries = append(entries, e)
+					dirs.Add(filepath.Join(dst, filepath.FromSlash(f.rel)))
 				}
 				mu.Unlock()
 			}
@@ -151,6 +153,10 @@ func Run(src, dst string, o Options) (*Result, error) {
 		return res, nil
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Rel < entries[j].Rel })
+	// The manifest vouches for the copies: their names reach the device first.
+	if err := dirs.SyncAll(); err != nil {
+		return res, fmt.Errorf("flushing the copied folders to disk: %w", err)
+	}
 	p, err := writeManifest(dst, entries)
 	if err != nil {
 		return res, err
@@ -211,7 +217,7 @@ func writeManifest(dst string, es []Entry) (string, error) {
 		os.Remove(tmp)
 		return "", err
 	}
-	return p, nil
+	return p, fsx.SyncDir(dir)
 }
 
 // Audit of a Check.
