@@ -125,8 +125,11 @@ jobs:
           app="$RUNNER_TEMP/apps/onefold.app"
           plutil -lint "$app/Contents/Info.plist"
           test -x "$app/Contents/MacOS/onefold"
-          # Apple Silicon runs only signed code: the linker signs arm64 ad hoc
-          if [ "$(go env GOARCH)" = arm64 ]; then codesign --verify --verbose "$app/Contents/MacOS/onefold"; fi
+          # Apple Silicon runs only signed code: the linker signs arm64 ad hoc.
+          # The bundle holds the same bytes; inside it codesign would ask for
+          # the sealed resources of a signed bundle, which onefold.app is not.
+          if [ "$(go env GOARCH)" = arm64 ]; then codesign --verify --verbose "$RUNNER_TEMP/onefold-darwin"; fi
+          cmp "$RUNNER_TEMP/onefold-darwin" "$app/Contents/MacOS/onefold"
           state="$HOME/Library/Application Support/onefold"
           rm -f "$state/gui.json"
           open -g "$app"
