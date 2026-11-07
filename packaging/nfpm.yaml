@@ -1,0 +1,71 @@
+# onefold
+# Author: Maurizio Fonte <fonte.maurizio@gmail.com>
+# Copyright (c) 2026 Maurizio Fonte
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# The Linux packages (.deb, .rpm, .apk) of a release, built by `make packages`
+# with nfpm (pinned in release.yml) from the static binary: no dependency, the
+# optional tools suggested. The environment gives ARCH (amd64, arm64),
+# PKG_VERSION (the tag without "v"; a pre-release suffix becomes ~alpha for
+# deb and rpm, _alpha for apk), BIN (the binary) and NOTICES.
+name: onefold
+arch: ${ARCH}
+platform: linux
+version: ${PKG_VERSION}
+version_schema: semver
+release: "1"
+section: utils
+priority: optional
+maintainer: Maurizio Fonte <fonte.maurizio@gmail.com>
+vendor: Maurizio Fonte
+homepage: https://github.com/mauriziofonte/onefold
+license: AGPL-3.0-or-later
+description: |-
+  One copy of every file you own, under a name you can predict
+  onefold merges folders and disks so that every distinct file is kept
+  once, tidies a folder in place under a naming layout, measures what fills
+  a disk and builds a photo and video archive from several machines. Every
+  action starts as a preview; sources are never changed unless asked.
+  Run `onefold gui` or open onefold from the applications menu.
+
+contents:
+  - src: ${BIN}
+    dst: /usr/bin/onefold
+    expand: true
+    file_info:
+      mode: 0755
+  - src: packaging/linux/onefold.desktop
+    dst: /usr/share/applications/onefold.desktop
+    file_info:
+      mode: 0644
+  - src: assets/brand/onefold-icon.svg
+    dst: /usr/share/icons/hicolor/scalable/apps/onefold.svg
+    file_info:
+      mode: 0644
+  - src: assets/brand/onefold-icon-512.png
+    dst: /usr/share/icons/hicolor/512x512/apps/onefold.png
+    file_info:
+      mode: 0644
+  - src: LICENSE
+    dst: /usr/share/doc/onefold/copyright
+    file_info:
+      mode: 0644
+  - src: ${NOTICES}
+    dst: /usr/share/doc/onefold/THIRD_PARTY_NOTICES.txt
+    expand: true
+    file_info:
+      mode: 0644
+
+overrides:
+  deb:
+    suggests:
+      - libimage-exiftool-perl
+      - ffmpeg
+      - poppler-utils
+      - 7zip
+  rpm:
+    suggests:
+      - perl-Image-ExifTool
+      - ffmpeg
+      - poppler-utils
+      - p7zip

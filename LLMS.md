@@ -55,6 +55,7 @@ onefold is a single static Go binary that deduplicates photo/video archives and 
 | `internal/tooldl`, `internal/statedir` | pinned downloads of the optional tools (Windows); per-user durable state dir |
 | `internal/config` | per-user config `<state dir>/config.json` (`onefold config`, GUI Config view): owner, comment and video stream language stamped on media copies, sleep lock and low priority of long runs, Windows diagnostic log |
 | `internal/power` | sleep lock of long runs (Windows SetThreadExecutionState, macOS IOPMAssertion via purego, Linux `systemd-inhibit` as an optional tool) and low I/O + CPU priority |
+| `internal/pack` | release packages: `onefold.app` (Info.plist, the icon drawn by `winres.Logo`, a deterministic zip with Unix modes, `make darwin-app`) and the Homebrew, Scoop and winget manifests written from a release's `SHA256SUMS`; the Linux packages are `packaging/nfpm.yaml` (`make packages`) |
 | `internal/winres` | Windows resources of the exe: icon (`assets/brand/onefold-icon.svg`, rasterized in Go: keep the two in step) and manifest (per-monitor DPI awareness, long paths), written as a `.syso` |
 | `testdata/fixtures/` | real-file test corpus: never edit the files, update test expectations |
 | `testdata/media-synth/` | synthetic photos and videos (`scripts/gen-media-synth.sh`) pinning the media naming and winner rules (`TestMediaSynthRegression`) and the golden match |

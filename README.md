@@ -12,6 +12,7 @@
   <a href="https://github.com/mauriziofonte/onefold/releases"><img alt="release" src="https://img.shields.io/github/v/release/mauriziofonte/onefold?include_prereleases&sort=semver"></a>
   <a href="LICENSING.md"><img alt="license: AGPL-3.0-or-later or commercial" src="https://img.shields.io/badge/license-AGPL--3.0--or--later%20%7C%20commercial-blue"></a>
   <a href="https://pkg.go.dev/github.com/mauriziofonte/onefold"><img alt="Go Reference" src="https://pkg.go.dev/badge/github.com/mauriziofonte/onefold.svg"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/mauriziofonte/onefold"><img alt="OpenSSF Scorecard" src="https://api.scorecard.dev/projects/github.com/mauriziofonte/onefold/badge"></a>
 </p>
 
 Your files are spread over a laptop, an old PC, a phone backup, two external drives and a NAS. The same photo exists five times under five names; some copies were resized, some renamed by tools that added `(1)` or a date in front. onefold finds what is the same, keeps one copy of every distinct thing and puts it under a predictable name, without ever touching the originals unless you ask.
@@ -84,8 +85,11 @@ shasum -a 256 -c SHA256SUMS --ignore-missing     # macOS
 | Linux ARM64 (Raspberry Pi 4/5, ARM NAS) | `onefold-linux-arm64` |
 | macOS Apple Silicon (M1 and later) | `onefold-darwin-arm64` |
 | macOS Intel | `onefold-darwin-amd64` |
+| macOS, as an app for Finder, the Dock and Launchpad | `onefold-darwin-arm64-app.zip` (Apple Silicon), `onefold-darwin-amd64-app.zip` (Intel) |
 
 Nothing to install: put the file anywhere (rename it to `onefold.exe` or `onefold` if you like). The optional helper tools are covered [below](#optional-tools).
+
+Releases after v0.0.2-alpha also carry Linux packages, which add a menu entry and the icon: `sudo apt install ./onefold-linux-amd64.deb`, `sudo dnf install ./onefold-linux-amd64.rpm`, or `sudo apk add --allow-untrusted onefold-linux-amd64.apk` (arm64 alike). Every such release has a CycloneDX SBOM per binary (`<binary>.cdx.json`) and a build provenance attestation you can check with `gh attestation verify onefold-linux-amd64 --repo mauriziofonte/onefold`; the release workflow also builds everything twice and requires the same bytes. A Homebrew tap, a Scoop bucket and a winget entry are prepared but not published yet ([packaging/README.md](packaging/README.md)).
 
 On macOS the binaries are not notarized (that needs a paid Apple Developer account), so the first start is blocked by Gatekeeper. Either remove the download mark once, from Terminal:
 
@@ -96,6 +100,8 @@ xattr -d com.apple.quarantine onefold-darwin-arm64
 ```
 
 or run it once, then allow it in System Settings > Privacy & Security ("Allow Anyway") and run it again. On macOS the GUI opens in your default browser (`onefold gui` from Terminal).
+
+The app zip holds `onefold.app`: unzip it, move it to Applications and open it. The first time Gatekeeper stops it the same way: allow it in System Settings > Privacy & Security ("Open Anyway"), or run `xattr -dr com.apple.quarantine /Applications/onefold.app` once. Opening the app opens the GUI in the browser; it has no Dock icon and ends by itself two minutes after the last onefold page is closed (a running job keeps it alive). The command line is inside it too: `/Applications/onefold.app/Contents/MacOS/onefold help`.
 
 ## Quick start
 

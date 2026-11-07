@@ -48,12 +48,16 @@ func main() {
 	}
 	dlog("start version=%s args=%q %s", version, os.Args[1:], launchInfo())
 	if len(os.Args) < 2 {
-		own, shell := ownsConsole(), parentIsExplorer()
-		if own || shell {
-			// double-clicked in Explorer (or a shortcut): nobody reads a
-			// terminal, open the GUI. ownsConsole alone misses the case of
-			// Windows Terminal hosting the console.
-			dlog("launch: GUI (ownsConsole=%t parentExplorer=%t)", own, shell)
+		own, shell, app := ownsConsole(), parentIsExplorer(), startedAsApp()
+		if own || shell || app {
+			// double-clicked in Explorer (or a shortcut), or onefold.app
+			// opened on macOS: nobody reads a terminal, open the GUI.
+			// ownsConsole alone misses the case of Windows Terminal hosting
+			// the console.
+			dlog("launch: GUI (ownsConsole=%t parentExplorer=%t appBundle=%t)", own, shell, app)
+			if app {
+				fmt.Fprintln(os.Stderr, "onefold: started as onefold.app with no command: opening the GUI (onefold help lists the commands)")
+			}
 			detachConsole()
 			runGUI(guiOptions{})
 			return

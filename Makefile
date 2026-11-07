@@ -24,17 +24,20 @@ COMMIT  := $(or $(shell git rev-parse --short HEAD 2>/dev/null),unknown)
 DIRTY   := $(shell git status --porcelain --untracked-files=no 2>/dev/null | grep -q . && echo .dirty)
 VERSION := $(if $(and $(filter $(BASE),$(TAGGED)),$(if $(DIRTY),,clean)),$(BASE),$(BASE)+dev.$(COMMIT)$(DIRTY))
 LDFLAGS := -s -w -X main.version=$(VERSION)
+# -trimpath: no path of the build machine in the binary, so two checkouts of
+# the same commit build the same bytes (the release checks it).
+BUILD   := go build -trimpath -ldflags "$(LDFLAGS)"
 
 # Static by default: CGO off so the binary runs on any host with zero deps.
 export CGO_ENABLED := 0
 
-.PHONY: version build test vet lint race cli-demo all linux windows linux-arm64 darwin release notices winres workflows-check dist-clean web web-e2e web-demo
+.PHONY: version build test vet lint race cli-demo all linux windows linux-arm64 darwin darwin-app packages release notices winres workflows-check dist-clean web web-e2e web-demo
 
 version: ## the version a build of this tree gets
 	@echo $(VERSION)
 
 build: ## host binary
-	go build -ldflags "$(LDFLAGS)" -o $(BIN) $(PKG)
+	$(BUILD) -o $(BIN) $(PKG)
 
 test:
 	go test ./...
@@ -76,9 +79,10 @@ all: linux windows ## the two targets we actually deploy
 
 # Release artifacts: every deploy target, the license, the third-party notices,
 # SHA-256 sums (.github/workflows/release.yml publishes them on a version tag).
-release: linux windows linux-arm64 darwin notices
+release: linux windows linux-arm64 darwin darwin-app notices packages
 	cp LICENSE $(DIST)/LICENSE
-	cd $(DIST) && sha256sum $(BIN)-linux-amd64 $(BIN)-windows-amd64.exe $(BIN)-linux-arm64 $(BIN)-darwin-arm64 $(BIN)-darwin-amd64 LICENSE THIRD_PARTY_NOTICES.txt > SHA256SUMS
+	cd $(DIST) && sha256sum $(BIN)-linux-amd64 $(BIN)-windows-amd64.exe $(BIN)-linux-arm64 $(BIN)-darwin-arm64 $(BIN)-darwin-amd64 \
+	  $(BIN)-darwin-arm64-app.zip $(BIN)-darwin-amd64-app.zip $(PACKAGES) LICENSE THIRD_PARTY_NOTICES.txt > SHA256SUMS
 
 # Licenses of everything linked or bundled into the binaries: Go standard
 # library, every module onefold imports on Linux, Windows and macOS, the GUI
@@ -105,7 +109,7 @@ winres:
 	go generate ./cmd/onefold
 
 linux: ## Linux / WSL / NAS (amd64, static)
-	GOOS=linux   GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(DIST)/$(BIN)-linux-amd64      $(PKG)
+	GOOS=linux   GOARCH=amd64 $(BUILD) -o $(DIST)/$(BIN)-linux-amd64      $(PKG)
 
 # The version of the build goes into the exe's version information (Explorer,
 # Task Manager): the committed .syso is regenerated with it for this build and
@@ -116,14 +120,31 @@ windows: ## native Windows (amd64) — indexes D:\ without 9P
 	@cp $(SYSO) $(SYSO).committed
 	@trap 'mv -f $(SYSO).committed $(SYSO)' EXIT; \
 	  (cd cmd/onefold && go run gen_winres.go -version $(VERSION)) && \
-	  GOOS=windows GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(DIST)/$(BIN)-windows-amd64.exe $(PKG)
+	  GOOS=windows GOARCH=amd64 $(BUILD) -o $(DIST)/$(BIN)-windows-amd64.exe $(PKG)
 
 linux-arm64: ## (e.g. an ARM NAS) — trivial extra target
-	GOOS=linux   GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o $(DIST)/$(BIN)-linux-arm64      $(PKG)
+	GOOS=linux   GOARCH=arm64 $(BUILD) -o $(DIST)/$(BIN)-linux-arm64      $(PKG)
 
 darwin: ## macOS, Apple Silicon and Intel (the linker signs arm64 ad hoc, as macOS requires)
-	GOOS=darwin  GOARCH=arm64 go build -ldflags "$(LDFLAGS)" -o $(DIST)/$(BIN)-darwin-arm64     $(PKG)
-	GOOS=darwin  GOARCH=amd64 go build -ldflags "$(LDFLAGS)" -o $(DIST)/$(BIN)-darwin-amd64     $(PKG)
+	GOOS=darwin  GOARCH=arm64 $(BUILD) -o $(DIST)/$(BIN)-darwin-arm64     $(PKG)
+	GOOS=darwin  GOARCH=amd64 $(BUILD) -o $(DIST)/$(BIN)-darwin-amd64     $(PKG)
+
+# Linux packages (packaging/nfpm.yaml; needs nfpm, pinned in release.yml):
+# the static binary, the menu entry and the icons, for amd64 and arm64. The
+# files carry the commit time, so a rebuild gives the same bytes.
+PACKAGES := $(foreach a,amd64 arm64,$(foreach p,deb rpm apk,$(BIN)-linux-$(a).$(p)))
+EPOCH    := $(or $(shell git log -1 --format=%ct 2>/dev/null),0)
+packages: linux linux-arm64 notices
+	@for a in amd64 arm64; do for p in deb rpm apk; do \
+	  ARCH=$$a PKG_VERSION=$(patsubst v%,%,$(VERSION)) BIN=$(DIST)/$(BIN)-linux-$$a NOTICES=$(DIST)/THIRD_PARTY_NOTICES.txt \
+	  SOURCE_DATE_EPOCH=$(EPOCH) nfpm package -f packaging/nfpm.yaml -p $$p -t $(DIST)/$(BIN)-linux-$$a.$$p || exit 1; \
+	done; done
+
+# onefold.app for Finder, Dock and Launchpad (internal/pack): the darwin
+# binaries in a bundle with Info.plist and the icon, zipped with Unix modes.
+darwin-app: darwin
+	go run internal/pack/gen_macapp.go -exe $(DIST)/$(BIN)-darwin-arm64 -version $(VERSION) -o $(DIST)/$(BIN)-darwin-arm64-app.zip
+	go run internal/pack/gen_macapp.go -exe $(DIST)/$(BIN)-darwin-amd64 -version $(VERSION) -o $(DIST)/$(BIN)-darwin-amd64-app.zip
 
 dist-clean:
 	go clean

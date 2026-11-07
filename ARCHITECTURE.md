@@ -233,6 +233,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 │   ├── tooldl/             pinned tool downloads (Windows)
 │   ├── statedir/           per-user state directory
 │   ├── winres/             Windows exe resources (icon, manifest, version)
+│   ├── pack/               release packages: onefold.app, package-manager manifests
 │   ├── gui/                local GUI server, job manager, guided setup
 │   │   └── web/            Svelte frontend (dist/ committed and embedded)
 │   └── testfix/            test-only fixture builders
@@ -292,6 +293,7 @@ The GUI server listens on 127.0.0.1 only, needs a per-session cookie obtained th
 | `internal/statedir` | state dir location | `Dir` |
 | `internal/power` | sleep lock and low priority of long runs | `KeepAwake`, `SetLowPriority`, `Problem` |
 | `internal/winres` | exe resources | `Build`, `BuildVersion` |
+| `internal/pack` | release packages | `MacApp`, `InfoPlist`, `Icns`, `Manifests`, `ReadSums` |
 | `internal/gui` | GUI server and jobs | `New`, `Server.Serve`, `OpenWindow` |
 | `internal/testfix` | test fixtures | `Zip`, `Docx`, `PDF`, `RAR5`... |
 
@@ -320,6 +322,7 @@ Leaves: `kinds`, `fsx`, `perf`, `report`, `runctl`, `statedir`, `testfix`, `winr
 | `stats` | fsx, hashcache, htmlreport, kinds, report, runctl, sparsehash |
 | `dedupe` | fsx, hashcache, purge, runctl, sparsehash, statedir, stats |
 | `schedule` | fsx, statedir, tools |
+| `pack` | winres |
 | `scan` | kinds, sparsehash |
 | `planreport` | catalog, htmlreport, kinds, plan, report |
 | `remote` | fsx |
@@ -375,7 +378,9 @@ Direct dependencies and what they are for:
 | `make lint` | staticcheck (pinned) for `GOOS=linux`, `windows`, `darwin` |
 | `make race` | `go test -race` (cgo and a C compiler needed) |
 | `make linux`, `make windows`, `make linux-arm64`, `make darwin` | `dist/onefold-<os>-<arch>[.exe]` (`darwin`: arm64 and amd64; the Go linker signs arm64 ad hoc, which macOS requires) with the version of 5.4; `make windows` regenerates the exe resources with the build version (section 25.4) and restores the committed file afterwards |
-| `make release` | every build above (five binaries), `THIRD_PARTY_NOTICES.txt` (`make notices`), `SHA256SUMS`; `DIST=<dir>` to build elsewhere |
+| `make darwin-app` | `dist/onefold-darwin-arm64-app.zip` and `-amd64-app.zip`: the darwin binaries in `onefold.app` (`internal/pack`, section 24.7) |
+| `make packages` | `dist/onefold-linux-{amd64,arm64}.{deb,rpm,apk}` with nfpm (`packaging/nfpm.yaml`; nfpm on the `PATH`), file times from the commit |
+| `make release` | every build above (five binaries, two app zips, six packages), `THIRD_PARTY_NOTICES.txt` (`make notices`), `SHA256SUMS`; `DIST=<dir>` to build elsewhere. Builds use `-trimpath`, so two checkouts of a commit build the same bytes |
 | `make notices` | the Go standard library license, the license of every linked module, the licenses bundled in the GUI |
 | `make winres` | `go generate ./cmd/onefold`: rewrites `cmd/onefold/rsrc_windows_amd64.syso` (committed) |
 | `make web` | rebuilds `internal/gui/web/dist` (Node) |
@@ -390,7 +395,8 @@ Direct dependencies and what they are for:
 ### 5.3 Continuous integration and release
 
 - `.github/workflows/ci.yml` (push to `main`, pull requests, called by the release, weekly on Mondays, by hand): matrix Ubuntu, Windows, macOS arm64 (`macos-15`) and macOS Intel (`macos-15-intel`), all four required; macOS installs exiftool, ffmpeg and poppler from Homebrew; Linux installs exiftool, ffmpeg, poppler, p7zip, antiword from apt; Windows installs the pinned tools with `go run ./cmd/onefold tools install all`, which also proves the download pins. Steps: gofmt (Linux), `go vet` for linux, windows and darwin, `go test -count=1 ./...`, then `TestE2E` again with `-v`: the job fails unless it PASSED (a skip is not a pass). On every OS the Recycle Bin / Trash tests run the same way (`ONEFOLD_TEST_TRASH=1`; a skip fails the job). Separate jobs: `race` (`go test -race` on Ubuntu with cgo, coverage of every package uploaded as the `coverage` artifact: `coverage.out`, a per-function `coverage.txt`, `coverage.html`), `lint` (staticcheck v0.8.2 for each target GOOS; suppressions are inline `//lint:ignore` with the reason), `vulncheck` (govulncheck, fails on any reachable advisory).
-- `.github/workflows/release.yml` (tag `v<VERSION>` on a commit of `main`, section 5.4): runs CI, then `make release`, checks that no tracked file changed, verifies checksums, versions (`go version -m`, `onefold version`) and notices, and publishes the GitHub release with the binaries, `LICENSE`, `THIRD_PARTY_NOTICES.txt` and `SHA256SUMS`.
+- `.github/workflows/release.yml` (tag `v<VERSION>` on a commit of `main`, section 5.4): runs CI, then `make release` (nfpm pinned), checks that no tracked file changed, verifies checksums, versions (`go version -m`, `onefold version`, the Info.plist and the binary of each app zip) and notices, installs the `.deb` and lists the `.rpm` and `.apk`, then builds everything again from a second clone in another folder and fails unless `SHA256SUMS` is identical. A `sign` job sends the Windows exe to SignPath and checks the signature with `osslsigncode`, only when the repository has the SignPath variables (skipped otherwise; a failed signing stops the release). The publish job puts the signed exe in place, writes a CycloneDX SBOM per binary (`cyclonedx-gomod bin`, pinned), the final `SHA256SUMS`, the Homebrew, Scoop and winget manifests (`internal/pack`, kept as the `package-manifests` artifact for the owner to submit: `packaging/README.md`), attests the build provenance of every asset (`actions/attest-build-provenance`) and publishes the GitHub release with the binaries, app zips, packages, SBOMs, `LICENSE`, `THIRD_PARTY_NOTICES.txt` and `SHA256SUMS`.
+- `.github/workflows/scorecard.yml` (push to `main`, weekly, changes to branch protection): OpenSSF Scorecard; the results go to code scanning and to scorecard.dev, which serves the README badge (it shows a score once the first run on `main` has published). The job keeps to what scorecard.dev accepts for publishing: no top-level env or defaults, only checkout, the Scorecard action, upload-artifact and upload-sarif.
 - Actions are pinned by commit; `.github/dependabot.yml` keeps the pins and the Go modules current through weekly pull requests. Workflows run only on github.com (`if: github.server_url == 'https://github.com'`), so mirrors on other forges stay quiet.
 
 ### 5.4 Versions and releasing
@@ -1715,6 +1721,13 @@ A catalog or a copy of hours must not stop at the first idle sleep. `power.KeepA
 - Best effort: without the lock (Linux without systemd or logind, a session without the right, `ONEFOLD_NO_EXTERNAL=1`) the run goes on. Linux learns a refusal after the start, when `systemd-inhibit` exits early: `power.Problem()` says why, and `onefold doctor` takes the lock for a moment and prints whether it holds.
 - Raising a nice value back needs privileges: `low-priority` off restores the disk priority, the CPU priority stays lowered until the process ends (a GUI restart).
 
+### 24.7 `pack`: onefold.app and the Linux menu entry
+
+- `pack.MacApp` writes the zip of `onefold.app` around a darwin binary: `Contents/Info.plist` (`pack.InfoPlist`: bundle id `io.github.mauriziofonte.onefold`, the version numbers of the tag in `CFBundleShortVersionString` and the full version in `CFBundleGetInfoString`, `LSMinimumSystemVersion` 12.0 as the Go toolchain requires, `LSUIElement`: no Dock icon or menu bar, since the GUI lives in the browser), `Contents/PkgInfo`, `Contents/MacOS/onefold` (mode 0755) and `Contents/Resources/onefold.icns` (`pack.Icns`: the logo of `winres.Logo` as PNG at 16 to 1024 px). Every entry has Unix modes and one fixed time, so the same binary gives the same zip.
+- Started with no arguments from inside a bundle (`<name>.app/Contents/MacOS/<file>`, `startedAsApp` in `cmd/onefold`), the binary opens the GUI, like a double-click on Windows; it says so on standard error, for whoever runs it by its path from Terminal. The GUI ends by itself after two idle minutes (section 22).
+- The bundle is not signed beyond the linker's ad hoc signature of the arm64 binary, and not notarized (section 29). CI builds it on both macOS runners, unpacks it with `ditto` as Finder does, lints the plist, verifies the arm64 signature and opens it with `open`: the job fails unless the GUI started.
+- `packaging/linux/onefold.desktop` is the menu entry of the Linux packages (`Exec=onefold gui`, `Icon=onefold`, the icons of `assets/brand` in `hicolor`); CI runs `desktop-file-validate` on it.
+
 ---
 
 ## 25. Windows specifics
@@ -1895,6 +1908,7 @@ Covered in sections 17.3, 19 and 18. Shared: every catalog filter flag (default 
 | `gui` | section 22.9; on Windows the WebView2 fallback |
 | `remote` | SFTP push against an in-process SSH/SFTP server, including size conflicts |
 | `winres` | `.syso` in sync, layout, logo pixels, version info |
+| `pack` | Info.plist keys and version, the icon's entries and sizes, the bundle's entries, modes and times (two builds give the same bytes), the Linux menu entry, the Homebrew, Scoop and winget files (urls, hashes, versions), `SHA256SUMS` parsing |
 | `dedupe` | keep rules and `-keep-in`, links, clones (Btrfs, APFS), the Trash, refusals of a changed copy or an unflushed keeper, the script, `Resume` of a half-done replacement |
 | `schedule` | refused names, times and commands (anything that deletes), the systemd units, the launchd plist and the UTF-16 task XML of every system (built on any), Windows argument quoting read back, add, list, run (the recorded program in the recorded folder, exit code and log), remove leaving a file onefold did not write |
 | `power` | nested locks; Linux: a stand-in `systemd-inhibit` holds and releases the lock, a refused lock is reported, every thread gets the low I/O priority; macOS: the assertion is listed by `pmset -g assertions` and gone after release; Windows: execution state and background mode |
@@ -1973,6 +1987,6 @@ Run the suite with `TZ=America/New_York go test ./...` and `TZ=UTC go test ./...
 - `similar` reads HEIC, HEIF and AVIF only with ffmpeg (7.1 or later for tiled HEIC), and a camera RAW only through the JPEG it embeds (a RAW without one, or with only a lossless preview, is unreadable); `-docs` needs `pdftotext` for PDFs.
 - Two `apply` runs on the same target at the same time (CLI and GUI together) could interfere through deterministic temp names; one run per target.
 - The rearrange journal stores absolute paths: a moved or remounted tree cannot be resumed or undone in place.
-- macOS binaries are not notarized (it needs a paid Apple Developer account): the first start needs the Gatekeeper steps of the README. The GUI runs in the browser (no native window).
+- macOS binaries and `onefold.app` are not notarized (it needs a paid Apple Developer account): the first start needs the Gatekeeper steps of the README. The GUI runs in the browser (no native window).
 - Memory grows with the number of files: a `merge` preview holds about 2.2 GiB per million files, `stats` and `dedupe` about 0.6 GiB, `catalog` streams (section 27.1.1). Ten million files in one merge need a machine with more than 22 GB of memory. The scale benchmark runs on Linux only.
 - `stats` on Windows: a directory listing carries no link count, so each path of a hard-linked file counts as a file (and the paths as duplicates of each other), and there is no space-on-disk figure; years follow the computer's local time, not the canonical zone (no stored times are involved).
