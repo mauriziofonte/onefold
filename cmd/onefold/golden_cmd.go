@@ -168,8 +168,15 @@ func cmdSimilar(args []string) {
 		})
 		fmt.Fprintf(os.Stderr, "pairs: %s\n", *out)
 	}
-	fmt.Printf("photos hashed %d, plain (not compared) %d, skipped %d (no pure-Go decoder: HEIC, RAW, WebP, TIFF...), unreadable %d\n",
-		r.Hashed, r.Flat, r.Skipped, len(r.Failed))
+	fmt.Printf("photos hashed %d (RAW through their JPEG preview %d, HEIC/AVIF through ffmpeg %d), plain (not compared) %d, unreadable %d\n",
+		r.Hashed, r.Previews, r.FFmpeg, r.Flat, len(r.Failed))
+	if r.Skipped > 0 {
+		fmt.Printf("skipped %d: no decoder here", r.Skipped)
+		if r.NoFFmpeg > 0 {
+			fmt.Printf(" (%d HEIC/AVIF: install ffmpeg to compare them)", r.NoFFmpeg)
+		}
+		fmt.Println()
+	}
 	fmt.Printf("look-alike pairs (distance <= %d): %d; review them, nothing is dropped\n", *maxDist, len(r.Pairs))
 	for i, p := range r.Pairs {
 		if i == 20 {

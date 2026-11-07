@@ -31,7 +31,7 @@ onefold is a single static Go binary that deduplicates photo/video archives and 
 | `internal/catalog` | indexer: rooms -> manifest JSONL; `Filters` = the scope with its defaults, shared by the CLI flags and the GUI; skip rules by name (`Rules`: `-skip`/`-keep`), exclusions by path and pattern, the reason of every excluded file, driver/installer package folders |
 | `internal/plan` | dedup + winner election + canonical names -> plan JSONL; full-content verification |
 | `internal/golden` | golden index built from the applied plans (+ manifests), never from the tree; incremental `match`: new files planned against it -> dupes, upgrades (reported, never applied), sub-plan of new assets with names free in the tree |
-| `internal/similar` | `similar`: look-alike golden photos (difference hash) and, with `-docs`, documents with the same extracted text, listed for a manual review; never drops anything |
+| `internal/similar` | `similar`: look-alike golden photos (difference hash; JPEG/PNG/GIF/TIFF/WebP in pure Go, RAW through their embedded JPEG preview, HEIC/AVIF through ffmpeg) and, with `-docs`, documents with the same extracted text, listed for a manual review; never drops anything |
 | `internal/reclaim` | `reclaim`: verifies the exact-duplicate drops of an applied plan and writes a deletion script for a person to run; deletes nothing itself |
 | `internal/backup` | `backup`: cold-storage copy of a tree with a content manifest (only adds, verified copies); `backup -check`: audit by reading every file again |
 | `internal/seed` | `seed`: the rsync or robocopy script that copies a materialized staging tree to its destination (never replacing); onefold runs neither |

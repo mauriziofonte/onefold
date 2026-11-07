@@ -56,6 +56,7 @@ func save(t *testing.T, p string, img image.Image) {
 // A smaller, recompressed copy of a picture is a pair; another picture is
 // not; formats without a pure-Go decoder are skipped, unreadable files listed.
 func TestFind(t *testing.T) {
+	t.Setenv("ONEFOLD_NO_EXTERNAL", "1") // c.heic: no ffmpeg, skipped
 	d := t.TempDir()
 	save(t, filepath.Join(d, "a.png"), scene(640, 480, 0))
 	save(t, filepath.Join(d, "a_small.jpg"), scene(160, 120, 0))
@@ -76,8 +77,8 @@ func TestFind(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Hashed != 3 || r.Skipped != 1 || r.Flat != 2 || len(r.Failed) != 1 {
-		t.Fatalf("hashed %d skipped %d flat %d failed %v", r.Hashed, r.Skipped, r.Flat, r.Failed)
+	if r.Hashed != 3 || r.Skipped != 1 || r.NoFFmpeg != 1 || r.Flat != 2 || len(r.Failed) != 1 {
+		t.Fatalf("hashed %d skipped %d (no ffmpeg %d) flat %d failed %v", r.Hashed, r.Skipped, r.NoFFmpeg, r.Flat, r.Failed)
 	}
 	if len(r.Pairs) != 1 || r.Pairs[0].A.CanonRel != "PICTURES/a.png" || r.Pairs[0].B.CanonRel != "PICTURES/a_small.jpg" {
 		t.Fatalf("pairs %+v", r.Pairs)

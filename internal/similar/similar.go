@@ -13,11 +13,7 @@ package similar
 import (
 	"fmt"
 	"image"
-	_ "image/gif" // decoders for image.Decode
-	_ "image/jpeg"
-	_ "image/png"
 	"math/bits"
-	"os"
 	"runtime"
 	"sort"
 	"strings"
@@ -30,6 +26,7 @@ import (
 	"github.com/mauriziofonte/onefold/internal/plan"
 	"github.com/mauriziofonte/onefold/internal/runctl"
 	"github.com/mauriziofonte/onefold/internal/textexport"
+	"github.com/mauriziofonte/onefold/internal/tools"
 )
 
 // DHash is the 64-bit difference hash of an image: the image is reduced to
@@ -103,11 +100,16 @@ type Pair struct {
 
 // Result of a Find.
 type Result struct {
-	Hashed  int      `json:"hashed"`
-	Skipped int      `json:"skipped"` // photos without a pure-Go decoder (HEIC, RAW, WebP, TIFF...)
-	Flat    int      `json:"flat"`    // plain images (one colour, no detail): not compared
-	Failed  []string `json:"failed,omitempty"`
-	Pairs   []Pair   `json:"pairs"`
+	Hashed int `json:"hashed"`
+	// Of the photos read: camera RAW read through the JPEG preview they
+	// embed, and HEIF/HEIC/AVIF read through ffmpeg.
+	Previews int      `json:"rawPreviews"`
+	FFmpeg   int      `json:"viaFfmpeg"`
+	Skipped  int      `json:"skipped"`  // photos with no decoder here (HEIC/AVIF without ffmpeg, other formats)
+	NoFFmpeg int      `json:"noFfmpeg"` // of the skipped: HEIC/AVIF while ffmpeg is missing or ONEFOLD_NO_EXTERNAL=1
+	Flat     int      `json:"flat"`     // plain images (one colour, no detail): not compared
+	Failed   []string `json:"failed,omitempty"`
+	Pairs    []Pair   `json:"pairs"`
 }
 
 // Options of Find.
@@ -117,9 +119,6 @@ type Options struct {
 	Workers     int    // 0 = NumCPU
 	Gate        *runctl.Gate
 }
-
-// decodable: formats the standard library decodes.
-var decodable = map[string]bool{"jpg": true, "jpeg": true, "png": true, "gif": true}
 
 // Find hashes the photo actions of a plan (reading their sources) and pairs
 // the ones within MaxDistance. Read-only.
@@ -131,31 +130,48 @@ func Find(acts []plan.Action, o Options) (*Result, error) {
 		o.Workers = runtime.NumCPU()
 	}
 	res := &Result{}
-	var todo []plan.Action
+	type job struct {
+		a   plan.Action
+		how string
+	}
+	var todo []job
 	for _, a := range acts {
 		if a.Kind != "photo" || (o.OnlyHost != "" && a.SrcHost != o.OnlyHost) {
 			continue
 		}
-		if !decodable[kinds.Ext(a.SrcPath)] {
+		how := decoderOf(kinds.Ext(a.SrcPath))
+		if how == "" || (how == viaFFmpeg && !tools.Has("ffmpeg")) {
 			res.Skipped++
+			if how != "" {
+				res.NoFFmpeg++
+			}
 			continue
 		}
-		todo = append(todo, a)
+		todo = append(todo, job{a, how})
 	}
 	photos := make([]Photo, 0, len(todo))
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	jobs := make(chan plan.Action)
+	jobs := make(chan job)
 	for w := 0; w < o.Workers; w++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for a := range jobs {
+			for j := range jobs {
 				if !o.Gate.Wait() {
 					continue
 				}
-				h, flat, err := hashFile(a.SrcPath)
+				a := j.a
+				h, flat, err := hashFile(a.SrcPath, j.how)
 				mu.Lock()
+				if err == nil {
+					switch j.how {
+					case viaRAW:
+						res.Previews++
+					case viaFFmpeg:
+						res.FFmpeg++
+					}
+				}
 				switch {
 				case err != nil:
 					res.Failed = append(res.Failed, a.SrcPath+": "+err.Error())
@@ -168,8 +184,8 @@ func Find(acts []plan.Action, o Options) (*Result, error) {
 			}
 		}()
 	}
-	for _, a := range todo {
-		jobs <- a
+	for _, j := range todo {
+		jobs <- j
 	}
 	close(jobs)
 	wg.Wait()
@@ -183,13 +199,8 @@ func Find(acts []plan.Action, o Options) (*Result, error) {
 	return res, nil
 }
 
-func hashFile(p string) (uint64, bool, error) {
-	f, err := os.Open(p)
-	if err != nil {
-		return 0, false, err
-	}
-	defer f.Close()
-	img, _, err := image.Decode(f)
+func hashFile(p, how string) (uint64, bool, error) {
+	img, err := decode(p, how)
 	if err != nil {
 		return 0, false, err
 	}

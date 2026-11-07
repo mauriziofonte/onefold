@@ -315,7 +315,7 @@ Leaves: `kinds`, `fsx`, `perf`, `report`, `runctl`, `statedir`, `testfix`, `winr
 | `remote` | fsx |
 | `materialize` | fsx, kinds, meta, plan, runctl, tools |
 | `textexport` | fsx, kinds, meta, plan, tools |
-| `similar` | kinds, plan, runctl, textexport |
+| `similar` | kinds, meta, plan, runctl, textexport, tools |
 | `reclaim` | plan, runctl, sparsehash |
 | `backup` | fsx, merge, runctl, sparsehash |
 | `seed` | plan |
@@ -351,6 +351,7 @@ Direct dependencies and what they are for:
 | `github.com/jchv/go-webview2` | the Windows GUI window |
 | `github.com/ebitengine/purego` | macOS only: calls the Foundation Trash API without cgo (`purge-sources -trash`) |
 | `golang.org/x/sys`, `golang.org/x/text` | OS calls; Unicode normalization |
+| `golang.org/x/image` | TIFF and WebP decoders for `similar` |
 
 ### 5.2 Make targets
 
@@ -533,7 +534,7 @@ Timestamps in these names are `yyyyMMdd-HHmmss.nnnnnnnnn`.
 | `merge -report FILE` | JSON of `merge.Result`; after an execute it includes `settled` (input of `purge-sources`) |
 | `plan -report FILE` | `.md` = Markdown, else JSON: totals, by kind/category/extension/year, duplicate groups, document near-duplicates, extension mismatches, golden file list with `-extensive` |
 | `match -report FILE` | JSON: dupes, upgrades, counts |
-| `similar -o FILE` | JSON: hashed, skipped, flat, failed, pairs, docGroups |
+| `similar -o FILE` | JSON: hashed, rawPreviews, viaFfmpeg, skipped, noFfmpeg, flat, failed, pairs, docGroups |
 | `reclaim -o FILE`, `-script FILE` | JSON: safe, review, skipped; the sh or PowerShell script |
 | `seed -o FILE`, `-list FILE` | the sh or cmd script; the rsync file list |
 | `stats -json FILE` | JSON of `stats.Result` (`version` 1): totals, breakdowns, folder tree, duplicates, folder pairs, problems (section 16.6) |
@@ -1189,7 +1190,12 @@ The sub-plan is applied like any plan. Afterwards the index is rebuilt from all 
 
 `onefold similar [-max-distance N] [-docs] [-only-host H] [-o FILE] PLAN` builds a list for a person to review; it never drops anything and never changes the plan. Perceptual hashes give too many false positives to decide alone (bursts, scans of prints, two shots of the same scene).
 
-- Photos: every `photo` action with a standard-library decoder (JPEG, PNG, GIF) is decoded and reduced to a 64-bit difference hash (dHash: 9x8 gray cells, each bit = a cell brighter than its right neighbour; box-averaged and sampled so a 12 MP photo costs about as much as a thumbnail). Pairs within `-max-distance` bits (default 6, 0..16) are listed, closest first. Pairs are found with the pigeonhole trick: two hashes within d bits agree on at least one of d+1 disjoint bit slices, so only photos sharing a slice value are compared (`TestPairsMatchBruteForce` pins the equivalence). Flat images (no visible difference between cells) hash to zeros and are counted apart, never paired. HEIC, RAW, WebP, TIFF are skipped (no pure-Go decoder).
+- Photos: every `photo` action is decoded and reduced to a 64-bit difference hash (dHash: 9x8 gray cells, each bit = a cell brighter than its right neighbour; box-averaged and sampled so a 12 MP photo costs about as much as a thumbnail). Pairs within `-max-distance` bits (default 6, 0..16) are listed, closest first. Pairs are found with the pigeonhole trick: two hashes within d bits agree on at least one of d+1 disjoint bit slices, so only photos sharing a slice value are compared (`TestPairsMatchBruteForce` pins the equivalence). Flat images (no visible difference between cells) hash to zeros and are counted apart, never paired.
+- Decoders, chosen by the registry (`kinds.IsRAW`, `kinds.Format`; `internal/similar/decode.go`):
+  - JPEG, PNG, GIF (standard library), TIFF and WebP (`golang.org/x/image`): pure Go.
+  - Camera RAW: the JPEG preview the camera embeds. The file is scanned in 1 MiB chunks for JPEG start markers; each candidate is sized with `jpeg.DecodeConfig` on at most 1 MiB, and the first one whose long side is at least 1024 pixels (`PreviewMin`) and decodes is used, so a RAW whose preview comes first costs a few megabytes. Otherwise the largest smaller JPEG that decodes is used (a thumbnail, which may carry black bars), and a TIFF-based RAW without any JPEG (some DNG) is read as a TIFF (its first image). Lossless-JPEG sensor data (SOF3) is rejected by the decoder and never taken for a preview. A RAW with none of these is listed as unreadable ("no embedded JPEG preview").
+  - HEIF, HEIC, AVIF: ffmpeg through `internal/tools` (`-frames:v 1`, scaled to one eighth, a PNG on a pipe, killed after 2 minutes). The size read is checked against the primary image size the file declares (`meta.HEIFSize`, the largest `ispe`): FFmpeg older than 7.1 reads one 512x512 tile of the tiled HEIC phones write, and a tile would give a wrong hash, so such a photo is listed as unreadable with the reason. Without ffmpeg, or with `ONEFOLD_NO_EXTERNAL=1`, they are skipped and counted (`noFfmpeg`).
+- Counters: `hashed`, `rawPreviews` and `viaFfmpeg` (of the decoded photos, how they were read), `skipped` (no decoder here), `noFfmpeg` (of the skipped), `flat`, `failed` (path and reason). `TestFindReadsRAWTIFFWebP` builds RAW files around synthetic JPEGs (a thumbnail of another picture first, a broken start marker, the preview across a chunk boundary) and pins each path; `TestFindReadsAVIFWithFFmpeg` writes an AVIF with ffmpeg and a copy declaring a larger size than its pixels (the tile case), and skips where ffmpeg has no AV1 encoder.
 - `-docs`: every `document` action's text is extracted (`textexport.Extract`), normalized (lower case, every run of non-letters and non-digits one space) and hashed; groups of two or more golden documents with the same text are listed with their formats (the same report as docx and as PDF, a file saved twice). Texts under 200 characters are ignored.
 
 ### 16.2 `reclaim`: freeing the space of drops
@@ -1908,7 +1914,7 @@ Run the suite with `TZ=America/New_York go test ./...` and `TZ=UTC go test ./...
 - Upgrades found by `match` are reported only; replacing a golden file is not supported (the tree only grows).
 - An unsilvered copy stays unsilvered: a tool installed later does not stamp files that already exist.
 - `push` compares remote files by size only: a same-size file with different content is kept as is.
-- `similar` cannot decode HEIC, RAW, WebP or TIFF (no pure-Go decoder); `-docs` needs `pdftotext` for PDFs.
+- `similar` reads HEIC, HEIF and AVIF only with ffmpeg (7.1 or later for tiled HEIC), and a camera RAW only through the JPEG it embeds (a RAW without one, or with only a lossless preview, is unreadable); `-docs` needs `pdftotext` for PDFs.
 - Two `apply` runs on the same target at the same time (CLI and GUI together) could interfere through deterministic temp names; one run per target.
 - The rearrange journal stores absolute paths: a moved or remounted tree cannot be resumed or undone in place.
 - macOS binaries are not notarized (it needs a paid Apple Developer account): the first start needs the Gatekeeper steps of the README. The GUI runs in the browser (no native window).
