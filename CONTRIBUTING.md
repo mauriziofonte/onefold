@@ -54,7 +54,7 @@ Never add a fallback that silently behaves differently on one OS.
 
 A pull request that breaks one of these is not merged, however useful it is:
 
-- Sources are read-only. Only `rearrange -execute` and `purge-sources -execute` delete user files, after re-reading the bytes that justify it, with a journal, a dry-run default and an explicit confirmation. Do not add a deletion path; write a script the user runs instead (as `reclaim` does).
+- Sources are read-only. Only `rearrange -execute`, `purge-sources -execute`, `dedupe -execute` and `backup -restore -execute` delete or replace user files, after re-reading the bytes that justify it, with a journal, a dry-run default and an explicit confirmation (`dedupe` and `backup -restore` never delete for good). Do not add a deletion path; write a script the user runs instead (as `reclaim` does).
 - Writes go to a temporary name and are published with `fsx.RenameNoReplace`, never `os.Rename`: nothing is ever overwritten.
 - Frozen contracts (media naming and winner rules, golden tree presets, media kinds) are pinned by tests. A red pinned test means the change is wrong. New behaviour goes behind an option whose default keeps them green.
 - Every external program goes through `internal/tools`; all file-type knowledge lives in `internal/kinds/types.tsv`.

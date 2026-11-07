@@ -855,6 +855,26 @@ func TestGoldenDeltaCLI(t *testing.T) {
 	if out, err := exec.Command(bin, "backup", "-check", cold).CombinedOutput(); err == nil || !strings.Contains(string(out), "CHANGED (bit rot or edited): 1") {
 		t.Fatalf("backup -check after damage: %v\n%s", err, out)
 	}
+	// the golden itself is read against the hashes of the backup: healthy,
+	// so the damaged copy is restored from it, the damaged bytes kept aside
+	if out, err := exec.Command(bin, "backup", "-check", "-tree", G, cold).CombinedOutput(); err == nil || !strings.Contains(string(out), "to restore: 1\n  copy ") {
+		t.Fatalf("backup -check -tree: %v\n%s", err, out)
+	}
+	if out := dd(t, "backup", "-restore", "-tree", G, cold); !strings.Contains(out, "(dry run: add -execute -expect 1)") {
+		t.Fatalf("backup -restore: %s", out)
+	}
+	if out, err := exec.Command(bin, "backup", "-restore", "-execute", "-expect", "2", "-tree", G, cold).CombinedOutput(); err == nil {
+		t.Fatalf("backup -restore with a wrong count: %s", out)
+	}
+	if out := dd(t, "backup", "-restore", "-execute", "-expect", "1", "-tree", G, cold); !strings.Contains(out, "done 1, already healthy 0, failed 0") {
+		t.Fatalf("backup -restore -execute: %s", out)
+	}
+	if out := dd(t, "backup", "-check", "-tree", G, cold); !strings.Contains(out, "to restore: 0") {
+		t.Fatalf("backup -check -tree after the restore: %s", out)
+	}
+	if kept, _ := filepath.Glob(filepath.Join(cold, ".onefold", "damaged", "*")); len(kept) != 1 {
+		t.Fatalf("damaged files kept: %v", kept)
+	}
 	// bulk seed script of the golden of room A: every action of the plan is in the staging tree
 	if out := dd(t, "seed", "-from", G, "-to", "user@nas:/golden", "-o", filepath.Join(w, "seed.sh"), pA); !strings.Contains(out, ": 12 files,") {
 		t.Fatalf("seed: %s", out)

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/mauriziofonte/onefold/internal/backup"
@@ -245,8 +246,17 @@ func cmdBackup(args []string) {
 	fs := flag.NewFlagSet("backup", flag.ExitOnError)
 	execute := fs.Bool("execute", false, "ACTUALLY copy (default: dry run, nothing written)")
 	check := fs.Bool("check", false, "audit a copy: read every file again against its manifests (one argument: DST)")
+	tree := fs.String("tree", "", "with -check or -restore: the tree the copy was made from, read again against the hashes the backups recorded")
+	restore := fs.Bool("restore", false, "put back damaged or missing files from the other side (-tree G DST); dry run unless -execute -expect N")
+	expect := fs.Int("expect", -1, "with -restore -execute: the number of files to restore the preview showed")
+	resume := fs.String("resume", "", "with -restore: finish an interrupted restore from its journal")
+	out := fs.String("o", "", "with -check -tree or -restore: write the report (JSON)")
 	workers := fs.Int("j", 0, "parallel copies or reads (0 = half the CPUs)")
 	_ = fs.Parse(args)
+	if *restore || (*check && *tree != "") {
+		backupRestore(fs, *tree, *restore, *execute, *expect, *resume, *out, *workers)
+		return
+	}
 	if *check {
 		if fs.NArg() != 1 {
 			fmt.Fprintln(os.Stderr, "usage: onefold backup -check DST")
@@ -274,7 +284,7 @@ func cmdBackup(args []string) {
 		return
 	}
 	if fs.NArg() != 2 {
-		fmt.Fprintln(os.Stderr, "usage: onefold backup [-execute] [-j N] SRC DST  |  onefold backup -check DST")
+		fmt.Fprintln(os.Stderr, backupUsage)
 		os.Exit(2)
 	}
 	r, err := backup.Run(fs.Arg(0), fs.Arg(1), backup.Options{Execute: *execute, Workers: *workers})
@@ -296,6 +306,122 @@ func cmdBackup(args []string) {
 		fmt.Println("(dry run: add -execute)")
 	}
 	if len(r.Conflicts)+len(r.Failed) > 0 {
+		os.Exit(1)
+	}
+}
+
+const backupUsage = `usage: onefold backup [-execute] [-j N] SRC DST
+       onefold backup -check DST
+       onefold backup -check -tree G [-o FILE] DST
+       onefold backup -restore -tree G [-execute -expect N] [-o FILE] DST
+       onefold backup -restore -resume JOURNAL`
+
+// backupRestore: the health of a tree and its copy against the hashes the
+// backups recorded (-check -tree), and the restore of damaged or missing
+// files from the healthy side (-restore).
+func backupRestore(fs *flag.FlagSet, tree string, restore, execute bool, expect int, resume, out string, workers int) {
+	if resume != "" {
+		if !restore || fs.NArg() != 0 {
+			fmt.Fprintln(os.Stderr, backupUsage)
+			os.Exit(2)
+		}
+		fin, back, probs, err := backup.ResumeRestore(resume)
+		if err != nil {
+			fatal(1, err)
+		}
+		fmt.Printf("restore resumed: finished %d, damaged files put back %d, problems %d\n", fin, back, len(probs))
+		for _, p := range probs {
+			fmt.Printf("  %s\n", p)
+		}
+		if len(probs) > 0 {
+			os.Exit(1)
+		}
+		return
+	}
+	if tree == "" || fs.NArg() != 1 || (execute && !restore) {
+		fmt.Fprintln(os.Stderr, backupUsage)
+		os.Exit(2)
+	}
+	if execute && expect < 0 {
+		fmt.Fprintln(os.Stderr, "backup -restore -execute needs -expect N: the number of files to restore the preview showed")
+		os.Exit(2)
+	}
+	var h *backup.Health
+	var r *backup.RestoreResult
+	var err error
+	if restore {
+		r, err = backup.Restore(tree, fs.Arg(0), backup.RestoreOptions{Execute: execute, Expect: expect, Workers: workers})
+		if r != nil {
+			h = r.Health
+		}
+	} else {
+		h, err = backup.Compare(tree, fs.Arg(0), workers, nil)
+	}
+	if h == nil {
+		fatal(1, err)
+	}
+	if out != "" {
+		var v any = h
+		if r != nil {
+			v = r
+		}
+		writeFile(out, func(f *os.File) error {
+			enc := json.NewEncoder(f)
+			enc.SetIndent("", "  ")
+			return enc.Encode(v)
+		})
+	}
+	fmt.Printf("manifests %d; tree ok %d (%s), copy ok %d (%s)\n", h.Manifests, h.Tree.OK, report.HumanBytes(h.Tree.Bytes), h.Copy.OK, report.HumanBytes(h.Copy.Bytes))
+	fmt.Printf("to restore: %d\n", len(h.Repairs))
+	for _, rp := range h.Repairs {
+		from := backup.SideCopy
+		if rp.To == backup.SideCopy {
+			from = backup.SideTree
+		}
+		fmt.Printf("  %-10s %s (%s, from the %s)\n", rp.To, rp.Rel, rp.Why, from)
+	}
+	if len(h.Lost) > 0 {
+		fmt.Printf("LOST (damaged or missing on both sides, nothing to restore from): %d\n", len(h.Lost))
+		for _, l := range h.Lost {
+			fmt.Printf("  %s\n", l)
+		}
+	}
+	if len(h.Moved) > 0 {
+		fmt.Printf("renamed after the backup (same content under another path, not restored): %d\n", len(h.Moved))
+		keys := make([]string, 0, len(h.Moved))
+		for k := range h.Moved {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			fmt.Printf("  %s -> %s\n", k, h.Moved[k])
+		}
+	}
+	if n := len(h.Tree.Untracked); n > 0 {
+		fmt.Printf("in the tree, not in any backup yet: %d (onefold backup -execute %s %s adds them)\n", n, tree, fs.Arg(0))
+	}
+	if err != nil {
+		fatal(1, err)
+	}
+	if r != nil && execute {
+		fmt.Printf("done %d, already healthy %d, failed %d; journal %s\n", r.Done, r.Healthy, len(r.Failed), r.Journal)
+		for _, f := range r.Failed {
+			fmt.Printf("  FAILED %s %s: %s\n", f.To, f.Rel, f.Error)
+		}
+		kept := false
+		for _, rp := range r.Repairs {
+			if rp.Aside != "" && !kept {
+				fmt.Println("the replaced files are kept under .onefold/damaged/ of their side: delete them once you have looked")
+				kept = true
+			}
+		}
+		if len(r.Failed) > 0 || r.Stopped {
+			os.Exit(1)
+		}
+	} else if restore && len(h.Repairs) > 0 {
+		fmt.Printf("(dry run: add -execute -expect %d)\n", len(h.Repairs))
+	}
+	if len(h.Lost) > 0 || (!restore && !h.Clean()) {
 		os.Exit(1)
 	}
 }
