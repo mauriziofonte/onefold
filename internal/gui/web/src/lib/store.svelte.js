@@ -4,6 +4,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { api, events } from './api.js';
+import { settings } from './settings.svelte.js';
+import { ended, jobEnded } from './notify.js';
 
 // Global reactive state shared by every view.
 export const store = $state({
@@ -36,6 +38,7 @@ function upsert(j) {
   // an HTTP response can arrive after a newer SSE snapshot: keep the newest
   if (old && old.updated > j.updated) return;
   store.jobs[j.id] = j;
+  if (settings.notify && ended(old, j)) jobEnded(j);
   if (j.status === 'running' || j.status === 'paused') store.active = j.id;
   else if (store.active === j.id) store.active = '';
 }

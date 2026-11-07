@@ -8,8 +8,9 @@
 // persisted settings and the resume of a run killed mid-copy (power loss).
 // Data: read-only system trees as sources, scratch copies under E2E_ROOT.
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, chmodSync, existsSync, readdirSync, lstatSync, createWriteStream } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, appendFileSync, chmodSync, existsSync, readdirSync, lstatSync, createWriteStream } from 'node:fs';
 import { join } from 'node:path';
 
 const repo = new URL('../../../../', import.meta.url).pathname;
@@ -56,7 +57,29 @@ function count(dir) {
   walk(dir);
   return n;
 }
-const shot = (page, name) => page.screenshot({ path: join(shots, name + '.png') });
+// every screenshot of a settled page is also an accessibility check: the
+// WCAG 2.1 A and AA rules of axe-core, in the light theme and in the dark one
+// (prefers-color-scheme), with a screenshot of the dark one; what they find
+// fails the test at its end, all of it listed. Pages caught while a job moves
+// are only photographed.
+const moving = new Set(['03-merge-preview-running', '06-merge-paused', '07-merge-copying']);
+const a11yFound = [];
+async function shot(page, name) {
+  await page.screenshot({ path: join(shots, name + '.png') });
+  if (moving.has(name)) return;
+  for (const scheme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.waitForTimeout(400); // the colors move with the transitions of the elements
+    const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+    for (const v of r.violations) {
+      const line = `${name} (${scheme}) ${v.id}: ${v.help}: ${v.nodes.slice(0, 4).map((n) => n.target.join(' ') + (n.any[0]?.message ? ' [' + n.any[0].message + ']' : '')).join(' | ')}`;
+      a11yFound.push(line);
+      if (process.env.A11Y_OUT) appendFileSync(process.env.A11Y_OUT, line + '\n');
+    }
+    if (scheme === 'dark') await page.screenshot({ path: join(shots, name + '-dark.png') });
+  }
+  await page.emulateMedia({ colorScheme: 'light' });
+}
 // the Filters card is collapsible: open it whatever its state
 const openFilters = (page) => page.getByTestId('filters-card').evaluate((d) => { d.open = true; });
 // the sticky action bar sits flush on the bottom edge of the scroll area while
@@ -328,6 +351,18 @@ test('GUI end to end', async ({ browser }) => {
       writeFileSync(join(root, 'STATS', 'b', `copy${i}.txt`), body);
     }
     writeFileSync(join(root, 'STATS', 'a', 'only.md'), 'only here');
+    // notifications: turned on in Config (the browser grants the permission),
+    // shown when a job ends while the window is not in front
+    await ctx.grantPermissions(['notifications']);
+    await page.getByTestId('nav-config').click();
+    await page.getByTestId('config-notify-on').check();
+    await expect(page.getByTestId('config-notify-on')).toBeChecked();
+    await page.evaluate(() => {
+      window.shownNotifications = [];
+      window.Notification = function (title, o) { window.shownNotifications.push(title + ' | ' + (o?.body || '')); this.close = () => {}; };
+      window.Notification.permission = 'granted';
+      document.hasFocus = () => false;
+    });
     await page.getByTestId('nav-stats').click();
     await page.getByTestId('stats-roots-input').fill(join(root, 'STATS'));
     await page.getByTestId('stats-roots-input').press('Enter');
@@ -338,6 +373,7 @@ test('GUI end to end', async ({ browser }) => {
     await expect(page.getByTestId('stats-dups')).toContainText('Verified');
     await expect(page.getByTestId('treemap')).toBeVisible();
     await shot(page, '18b-stats');
+    await expect.poll(() => page.evaluate(() => window.shownNotifications)).toEqual(['Statistics: done | Finished. Open onefold to see the result.']);
     await expect(page.getByTestId('pairs')).toContainText('STATS/a');
     await page.getByTestId('pairs').getByRole('button', { name: 'Merge' }).first().click();
     await expect(page.getByTestId('merge-inputs')).toContainText(join(root, 'STATS', 'a'));
@@ -539,5 +575,6 @@ test('GUI end to end', async ({ browser }) => {
     expect(out.sort()).toEqual(['[Alfa] spec.pdf', '[Desktop] Relazione.docx', '[Desktop] foo.qqzz', '[Desktop] noext', '[Desktop] nota.txt']);
   });
   expect(nativeDialogs).toEqual([]);
+  expect(a11yFound, a11yFound.join('\n')).toEqual([]);
   await ctx.close();
 });

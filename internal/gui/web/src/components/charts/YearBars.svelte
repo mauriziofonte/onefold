@@ -10,6 +10,7 @@
   import { FAMILIES, famColor } from '../../lib/charts.js';
   import { bytes, num } from '../../lib/format.js';
   import { t } from '../../lib/i18n.svelte.js';
+  import ChartTable from './ChartTable.svelte';
 
   let { years = [], highlight = '', height = 200 } = $props();
   let hover = $state(null);
@@ -22,7 +23,7 @@
 <div class="relative">
   <div class="flex items-end gap-1" style="height:{height}px" data-testid="years">
     {#each years as y (y.year)}
-      <div class="group flex h-full min-w-0 flex-1 flex-col justify-end" role="img" aria-label={String(y.year)}
+      <div class="group flex h-full min-w-0 flex-1 flex-col justify-end" role="img" aria-label={`${y.year || t('stats.yearUnknown')}: ${bytes(val(y))}`}
         onmouseenter={() => (hover = y)} onmouseleave={() => (hover = null)}>
         <div class="flex flex-col-reverse overflow-hidden rounded-t transition-opacity group-hover:opacity-80" style="height:{(100 * val(y)) / max}%">
           {#each FAMILIES.filter((f) => (!highlight || f === highlight) && y.families?.[f]) as f (f)}
@@ -44,3 +45,5 @@
     </div>
   {/if}
 </div>
+<ChartTable head={highlight ? [t('chart.col.year'), t('chart.col.size') + ' · ' + t('fam.' + highlight)] : [t('chart.col.year'), t('chart.col.size'), t('chart.col.files')]}
+  rows={years.filter((y) => val(y) > 0).map((y) => highlight ? [y.year || t('stats.yearUnknown'), bytes(val(y))] : [y.year || t('stats.yearUnknown'), bytes(y.bytes), num(y.files)])} testid="years-table" />

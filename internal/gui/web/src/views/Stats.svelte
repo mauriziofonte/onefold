@@ -197,7 +197,7 @@
     <div class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7" data-testid="stats-kpis">
       <Stat label={t('stats.filesK')} value={num(res.files)} sub={t('stats.dirsN', { n: num(res.dirs) })} />
       <Stat label={t('common.size')} value={bytes(res.bytes)} sub={[res.allocated ? t('stats.onDisk', { size: bytes(res.allocated) }) : '', res.onlineOnly?.files ? t('stats.cloudOnly', { size: bytes(res.onlineOnly.bytes) }) : ''].filter(Boolean).join(' · ')} testid="stats-size" />
-      <Stat label={t('stats.wasted')} value={d ? bytes(d.wasted) : '–'} sub={d ? t('stats.wastedSub', { share: wastedShare, n: num(d.extra) }) : t('stats.dups.off')} tone={d?.wasted ? 'text-amber-600' : ''} testid="stats-wasted" />
+      <Stat label={t('stats.wasted')} value={d ? bytes(d.wasted) : '–'} sub={d ? t('stats.wastedSub', { share: wastedShare, n: num(d.extra) }) : t('stats.dups.off')} tone={d?.wasted ? 'text-amber-700' : ''} testid="stats-wasted" />
       <Stat label={t('stats.types')} value={num((res.exts?.length || 0) + (res.unknown?.length || 0))} sub={res.unknown?.length ? t('stats.unknownN', { n: num(res.unknown.length) }) : ''} />
       <Stat label={t('stats.empty')} value={num(res.empty)} sub={res.junk?.files ? t('stats.junkN', { n: num(res.junk.files) }) : ''} />
       <Stat label={t('stats.links')} value={num(res.symlinks + (res.hardLinks?.files || 0))} sub={res.hardLinks?.files ? t('stats.hardN', { n: num(res.hardLinks.files) }) : ''} />
@@ -216,7 +216,7 @@
       </div>
       <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[auto_1fr]">
         <div class="flex flex-col items-center gap-3">
-          <Donut {slices} selected={fam} onselect={(k) => (fam = k)} center={measure === 'bytes' ? bytes(res.bytes) : num(res.files)} sub={t('stats.total')} />
+          <Donut {slices} name={t('chart.col.family')} selected={fam} onselect={(k) => (fam = k)} center={measure === 'bytes' ? bytes(res.bytes) : num(res.files)} sub={t('stats.total')} />
           <div class="flex max-w-60 flex-wrap justify-center gap-x-3 gap-y-1">
             {#each slices as s (s.key)}
               <button class="flex items-center gap-1 text-xs {fam && fam !== s.key ? 'text-slate-400' : 'text-slate-600'}" onclick={() => (fam = fam === s.key ? '' : s.key)}>

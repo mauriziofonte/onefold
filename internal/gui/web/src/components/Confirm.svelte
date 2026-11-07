@@ -27,7 +27,7 @@
 </script>
 
 {#if d}
-  <div class="fixed inset-0 z-50 grid place-items-center bg-slate-900/30" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 z-50 grid place-items-center bg-black/40" role="dialog" aria-modal="true">
     <div class="w-[540px] space-y-4 rounded-xl bg-white p-5 shadow-xl">
       <div class="flex items-center gap-2 text-lg font-semibold text-slate-900"><TriangleAlert size={18} class="text-amber-500" />{d.title}</div>
       <div class="space-y-2 text-slate-600">{@html d.body}</div>

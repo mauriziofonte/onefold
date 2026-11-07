@@ -67,7 +67,7 @@
         {#if f.key === 'rest' && !cfg.fams.rest}
           <span class="col-span-3 text-xs text-slate-400">{t('naming.restOff')}</span>
         {:else}
-          <select class="input" bind:value={cfg.choice[f.key]} disabled={!cfg.fams[f.key] || cfg.free} data-testid={'choice-' + f.key}>
+          <select class="input" bind:value={cfg.choice[f.key]} disabled={!cfg.fams[f.key] || cfg.free} aria-label={t('naming.layoutCol') + ': ' + t('fam.' + f.key)} data-testid={'choice-' + f.key}>
             {#if f.specific.length}
               <optgroup label={t('naming.forFam', { fam: t('fam.' + f.key).toLowerCase() })}>
                 {#each f.specific as p (p)}<option value={p}>{t('preset.' + p)} ({p})</option>{/each}

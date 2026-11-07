@@ -60,26 +60,28 @@
 </script>
 
 <section class="flex shrink-0 flex-col border-t border-slate-200 bg-white transition-all {alert ? 'ring-2 ring-rose-300' : ''}" style="height:{settings.drawerOpen ? '280px' : '40px'}" data-testid="logdrawer">
-  <div class="flex h-10 shrink-0 cursor-pointer items-center gap-3 px-4 select-none" role="button" tabindex="0"
-    onclick={() => (settings.drawerOpen = !settings.drawerOpen)} onkeydown={(e) => e.key === 'Enter' && (settings.drawerOpen = !settings.drawerOpen)}>
-    <ScrollText size={16} class="text-slate-500" /><b class="text-slate-700">{store.jobLog ? t('log.ofRun', { id: store.jobLog.id }) : t('log.title')}</b>
+  <!-- the toggles are the title and expand/collapse: the row holds other controls -->
+  <div class="flex h-10 shrink-0 items-center gap-3 px-4 select-none">
+    <button class="flex shrink-0 items-center gap-3" aria-expanded={settings.drawerOpen} aria-controls="log-body" onclick={() => (settings.drawerOpen = !settings.drawerOpen)}>
+      <ScrollText size={16} class="text-slate-500" /><b class="text-slate-700">{store.jobLog ? t('log.ofRun', { id: store.jobLog.id }) : t('log.title')}</b>
+    </button>
     <span class="pill bg-rose-100 text-rose-700" data-testid="log-errors">{t('log.errors', { n: num(counts.error) })}</span>
     <span class="pill bg-amber-100 text-amber-700">{t('log.warnings', { n: num(counts.warn) })}</span>
     <span class="pill bg-slate-100 text-slate-600">{t('log.info', { n: num(counts.info) })}</span>
-    {#if store.jobLog}<button class="link text-xs" onclick={(e) => { e.stopPropagation(); store.jobLog = null; }}>{t('log.backLive')}</button>{/if}
+    {#if store.jobLog}<button class="link text-xs" onclick={() => (store.jobLog = null)}>{t('log.backLive')}</button>{/if}
     <span class="max-w-xl truncate text-xs text-slate-400">{last ? clock(last.t) + '  ' + text(last) : ''}</span>
-    <div class="ml-auto flex items-center gap-1" role="toolbar" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+    <div class="ml-auto flex items-center gap-1" role="toolbar" aria-label={t('log.title')}>
       <button class="flt" class:flt-on={settings.logFilter === 'all'} onclick={() => (settings.logFilter = 'all')}>{t('log.all')}</button>
       <button class="flt" class:flt-on={settings.logFilter === 'error'} onclick={() => (settings.logFilter = 'error')}>{t('log.filterErrors')}</button>
       <button class="flt" class:flt-on={settings.logFilter === 'warn'} onclick={() => (settings.logFilter = 'warn')}>{t('log.filterWarnings')}</button>
       <button class="icon-btn" title={t('log.copy')} onclick={copy}><Clipboard size={14} /></button>
       <button class="icon-btn" title={t('log.save')} onclick={download}><Download size={14} /></button>
     </div>
-    <span class="flex items-center gap-1 text-xs text-slate-400">
+    <button class="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700" aria-expanded={settings.drawerOpen} aria-controls="log-body" onclick={() => (settings.drawerOpen = !settings.drawerOpen)}>
       {#if settings.drawerOpen}<ChevronDown size={14} />{t('log.collapse')}{:else}<ChevronUp size={14} />{t('log.expand')}{/if}
-    </span>
+    </button>
   </div>
-  <div bind:this={body} class="scroll-thin flex-1 overflow-auto border-t border-slate-100 font-mono text-xs" data-testid="log-body">
+  <div bind:this={body} id="log-body" class="scroll-thin flex-1 overflow-auto border-t border-slate-100 font-mono text-xs" tabindex="0" role="log" aria-label={t('log.title')} data-testid="log-body">
     {#each shown as e, i (i)}
       <div class="border-b border-slate-50 px-4 py-1 {style[e.level]}"><span class="text-slate-400">{clock(e.t)}</span>&nbsp;&nbsp;<b class="inline-block w-12">{level[e.level]}</b>{text(e)}</div>
     {:else}

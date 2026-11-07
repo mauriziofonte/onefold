@@ -10,6 +10,7 @@
   import { squarify, famColor, dominant, pct } from '../../lib/charts.js';
   import { bytes, num } from '../../lib/format.js';
   import { t } from '../../lib/i18n.svelte.js';
+  import ChartTable from './ChartTable.svelte';
 
   let { node, onopen = () => {}, height = 360, highlight = '' } = $props();
   let w = $state(800);
@@ -26,7 +27,7 @@
   });
 
   function color(it) {
-    if (it.more || it.here) return '#cbd5e1';
+    if (it.more || it.here) return 'var(--color-slate-300)';
     return famColor(dominant(it.node.families));
   }
   function dim(it) {
@@ -41,8 +42,9 @@
 <div class="relative overflow-hidden rounded-lg bg-slate-100" style="height:{height}px" bind:clientWidth={w} data-testid="treemap">
   {#each items as it (it.key)}
     <button
-      class="absolute overflow-hidden border border-white/80 p-1.5 text-left text-white transition-[filter,opacity] hover:brightness-110 {it.node && (it.node.children?.length || 0) > 0 ? 'cursor-zoom-in' : 'cursor-default'}"
+      class="absolute overflow-hidden border border-white/80 p-1.5 text-left text-[#fff] transition-[filter,opacity] hover:brightness-110 {it.node && (it.node.children?.length || 0) > 0 ? 'cursor-zoom-in' : 'cursor-default'}"
       style="left:{it.x}px;top:{it.y}px;width:{it.w}px;height:{it.h}px;background:{color(it)};opacity:{dim(it) ? 0.3 : 1}"
+      aria-label={`${it.label}: ${bytes(it.value)}`}
       onclick={() => it.node && onopen(it.node)}
       onmousemove={(e) => move(e, it)}
       onmouseleave={() => (tip = null)}
@@ -68,3 +70,5 @@
     </div>
   {/if}
 </div>
+<ChartTable head={[t('chart.col.folder'), t('chart.col.size'), t('chart.col.share'), t('chart.col.files')]}
+  rows={items.map((it) => [it.label, bytes(it.value), pct(it.value, node?.bytes || 0), it.node ? num(it.node.files) : ''])} testid="treemap-table" />

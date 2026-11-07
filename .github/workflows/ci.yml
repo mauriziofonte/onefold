@@ -4,7 +4,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 # Tests on Linux, Windows and macOS (Apple Silicon and Intel), equal targets
-# that must behave the same, the race detector with a coverage report,
+# that must behave the same, the race detector with a coverage report, the
+# GUI end-to-end test with its accessibility checks,
 # staticcheck for every target OS and govulncheck. Also called by the release workflow before
 # anything is built, and run every week so that a new advisory or a changed
 # runner image shows up without a push. Actions are pinned by commit.
@@ -165,6 +166,58 @@ jobs:
             coverage.html
           if-no-files-found: error
           retention-days: 14
+
+  gui:
+    name: GUI end-to-end and accessibility
+    if: github.server_url == 'https://github.com'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3"
+          cache: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: external tools
+        # the golden archive steps need exiftool and ffmpeg (the test checks that apply may start)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends libimage-exiftool-perl ffmpeg
+
+      - name: Playwright and its Chromium
+        working-directory: internal/gui/web
+        run: |
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium
+
+      - name: end-to-end, with axe-core (WCAG 2.1 AA) on every page in light and dark
+        env:
+          E2E_ROOT: ${{ runner.temp }}/gui-e2e
+          A11Y_OUT: ${{ runner.temp }}/a11y.txt
+        run: make web-e2e
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: gui-e2e
+          path: |
+            internal/gui/web/e2e/screens
+            internal/gui/web/test-results
+            ${{ runner.temp }}/a11y.txt
+            ${{ runner.temp }}/gui-e2e/server.log
+          if-no-files-found: ignore
+          retention-days: 7
 
   lint:
     name: staticcheck
