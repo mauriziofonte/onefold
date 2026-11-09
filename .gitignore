@@ -5,6 +5,9 @@ internal/gui/web/test-results/
 internal/gui/web/playwright-report/
 /onefold
 /dist/
+# release.yml builds into out/; ignored so Go does not stamp later binaries as vcs.modified
+/out/
+*.syso.committed
 # private regression fixture (manifests of a real archive): a local link, never committed
 /census-final
 internal/gui/web/demo-results/
