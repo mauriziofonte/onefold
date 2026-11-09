@@ -4,9 +4,10 @@ All notable changes to onefold are listed here, newest first. Versions follow [S
 
 The version being prepared is in the `VERSION` file; a release is the tag `v<VERSION>` (see section 5.4 of `ARCHITECTURE.md`).
 
-## [Unreleased]
+## [0.0.3-alpha] - 2026-11-09
 
 - Security: two compression libraries that onefold uses to read archives are updated for advisories published in November 2026, `github.com/andybalholm/brotli` 1.2.7 (GO-2026-6888: a crafted stream could take excessive memory) and `github.com/klauspost/compress` 1.20.2 (GO-2026-6865: a crafted two-block frame could crash the process).
+- Dependencies: `github.com/richardlehane/msoleps` 1.0.6 (properties of Office 97-2003 documents) and `github.com/skeema/knownhosts` 1.3.3 (`push` host-key checks).
 - Crash tests: `merge`, `rearrange`, `purge-sources` and `apply` are stopped at each of their writes, fsyncs, renames and removals in turn (about a hundred points in all), as a kill -9 or a crash would stop them; after each stop the command is run again (rearrange resumed from its journal) and must give the files of a run that was never stopped, with no loss, no damage and no temporary file left (`ARCHITECTURE.md` section 27.1.3).
 - Damaged files no longer stop a scan. A JPEG with an end-of-image marker before its tables made the metadata reader loop forever (also a JPEG inside the EXIF of a PNG, WebP or HEIF file, or a JPEG named `.png`); a crafted EXIF block, RAR5 header or Excel 97-2003 shared-string table crashed the process. Such a photo is now dated by its file name, like any unreadable EXIF; the others are read as far as they go. RTF text export writes the 8-bit characters of a document as text in its code page (they were copied as raw bytes, which is not UTF-8). Found by fuzz targets of every native reader, which ClusterFuzzLite now runs on each pull request and weekly (`ARCHITECTURE.md` section 27.1.2).
 - `rearrange -resume` and `-undo` refuse a journal with a path outside the folder it rearranges, and `apply` refuses a plan whose destinations leave the target: an edited journal or plan could otherwise move or create files elsewhere.
