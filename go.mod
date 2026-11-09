@@ -12,9 +12,9 @@ require (
 	github.com/jchv/go-webview2 v0.0.0-20260205173254-56598839c808
 	github.com/pkg/sftp v1.13.12
 	github.com/richardlehane/mscfb v1.0.9
-	github.com/richardlehane/msoleps v1.0.3
+	github.com/richardlehane/msoleps v1.0.6
 	github.com/rs/zerolog v1.35.1
-	github.com/skeema/knownhosts v1.3.0
+	github.com/skeema/knownhosts v1.3.3
 	github.com/vbauerster/mpb/v8 v8.16.3
 	github.com/zeebo/xxh3 v1.1.0
 	golang.org/x/crypto v0.58.0
