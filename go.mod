@@ -7,7 +7,7 @@ require (
 	github.com/bodgit/sevenzip v1.6.5
 	github.com/charlievieth/fastwalk v1.0.14
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
-	github.com/ebitengine/purego v0.11.2
+	github.com/ebitengine/purego v0.11.3
 	github.com/evanoberholster/imagemeta v0.3.1
 	github.com/jchv/go-webview2 v0.0.0-20260205173254-56598839c808
 	github.com/pkg/sftp v1.13.12
