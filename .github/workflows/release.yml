@@ -88,7 +88,8 @@ jobs:
           sha256sum -c SHA256SUMS
           test "$(./onefold-linux-amd64 version | cut -d' ' -f2)" = "$TAG"
           for f in onefold-linux-amd64 onefold-linux-arm64 onefold-windows-amd64.exe onefold-darwin-arm64 onefold-darwin-amd64; do
-            go version -m "$f" | grep -qF -- "-X main.version=$TAG\"" || { echo "$f: not built as $TAG"; exit 1; }
+            # -trimpath keeps -ldflags out of the build info: look for the version string itself
+            { grep -qaF -- "$TAG" "$f" && ! grep -qaF -- "$TAG+dev" "$f"; } || { echo "$f: not built as $TAG"; exit 1; }
           done
           for a in arm64 amd64; do
             unzip -l "onefold-darwin-$a-app.zip" | grep -q ' onefold.app/Contents/MacOS/onefold$'
