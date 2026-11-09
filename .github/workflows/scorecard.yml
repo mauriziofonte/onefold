@@ -11,7 +11,7 @@
 # below, a GitHub-hosted Ubuntu runner.
 name: scorecard
 
-on:
+on: # zizmor: ignore[concurrency-limits] kept plain for scorecard.dev publishing; weekly, overlapping runs are harmless
   push:
     branches: [main]
   branch_protection_rule:
@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-      actions: read
+      actions: read # read workflow runs for the CI and token-permission checks
       security-events: write # results to code scanning
       id-token: write # results to scorecard.dev (the badge)
     steps:

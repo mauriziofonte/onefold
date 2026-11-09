@@ -187,7 +187,7 @@ jobs:
     permissions:
       contents: write # create the release and upload its assets
       id-token: write # provenance attestations (Sigstore)
-      attestations: write
+      attestations: write # store the provenance attestations
     env:
       CGO_ENABLED: "0"
       TAG: ${{ github.ref_name }}
