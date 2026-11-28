@@ -5,7 +5,7 @@
 
 # ClusterFuzzLite builder: the OSS-Fuzz Go image (Go and libFuzzer), pinned
 # by digest; Dependabot proposes its updates.
-FROM gcr.io/oss-fuzz-base/base-builder-go:v1@sha256:1dbadefbb28c6bfd796c64d9c2115977deb8f19494533cc5a3b724c3441df23d
+FROM gcr.io/oss-fuzz-base/base-builder-go:v1@sha256:0ebd94f573c7917b93a7edc8cd1db21c167adbd1d9c59943c3ebe4afb7aa4497
 COPY . $SRC/onefold
 WORKDIR $SRC/onefold
 COPY .clusterfuzzlite/build.sh $SRC/
